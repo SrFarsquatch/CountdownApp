@@ -1,0 +1,7 @@
+services:
+  countdown:
+    build: .
+    container_name: countdown
+    ports:
+      - "8088:80"
+    restart: unless-stopped
