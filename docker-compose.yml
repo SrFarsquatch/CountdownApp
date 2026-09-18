@@ -1,7 +1,13 @@
 services:
   countdown:
-    build: .
+    image: nginx:alpine
     container_name: countdown
     ports:
       - "8088:80"
     restart: unless-stopped
+    command: >
+      /bin/sh -c "
+      wget -qO /usr/share/nginx/html/index.html
+      https://raw.githubusercontent.com/SrFarsquatch/CountdownApp/main/index.html
+      && exec nginx -g 'daemon off;'
+      "
