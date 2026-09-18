@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>Countdown</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #111827;
+      --panel-2: #172033;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #263449;
+      --accent: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top, rgba(96,165,250,.10), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .wrap { width: min(860px, 100%); }
+    .topbar { margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.25rem); }
+    .subtitle { margin: 6px 0 0; color: var(--muted); }
+    .panel {
+      background: rgba(17,24,39,.88);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: clamp(18px, 4vw, 30px);
+      backdrop-filter: blur(10px);
+    }
+    .event-name {
+      text-align: center;
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .target-label {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 24px;
+      min-height: 1.5em;
+    }
+    .countdown {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .unit {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: clamp(14px, 3vw, 24px) 8px;
+      text-align: center;
+    }
+    .value {
+      display: block;
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      font-size: clamp(2rem, 8vw, 4.75rem);
+      line-height: 1;
+      letter-spacing: -.04em;
+    }
+    .label {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+    .expired {
+      display: none;
+      text-align: center;
+      font-size: clamp(2rem, 7vw, 4rem);
+      font-weight: 800;
+      padding: 32px 0;
+    }
+    .controls {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; }
+    input, button {
+      min-height: 46px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font: inherit;
+    }
+    input {
+      width: 100%;
+      background: #0f172a;
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(96,165,250,.14);
+    }
+    button {
+      cursor: pointer;
+      padding: 0 18px;
+      font-weight: 700;
+      background: var(--accent);
+      color: #07111f;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+    .status {
+      color: var(--muted);
+      text-align: center;
+      margin-top: 14px;
+      min-height: 1.4em;
+      font-size: .9rem;
+    }
+    @media (max-width: 680px) {
+      body { padding: 16px; }
+      .countdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .controls { grid-template-columns: 1fr; }
+      .controls button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <h1>Countdown</h1>
+      <p class="subtitle">A simple countdown for the date that matters.</p>
+    </div>
+
+    <section class="panel">
+      <div id="eventNameDisplay" class="event-name">My Countdown</div>
+      <div id="targetLabel" class="target-label">Choose an end date below.</div>
+
+      <div id="countdown" class="countdown" aria-live="polite">
+        <div class="unit"><span id="days" class="value">00</span><span class="label">Days</span></div>
+        <div class="unit"><span id="hours" class="value">00</span><span class="label">Hours</span></div>
+        <div class="unit"><span id="minutes" class="value">00</span><span class="label">Minutes</span></div>
+        <div class="unit"><span id="seconds" class="value">00</span><span class="label">Seconds</span></div>
+      </div>
+
+      <div id="expired" class="expired">Time's up.</div>
+
+      <form id="settingsForm" class="controls">
+        <label>
+          Countdown name
+          <input id="eventName" type="text" maxlength="60" placeholder="e.g. Last day at work">
+        </label>
+        <label>
+          End date & time
+          <input id="endDate" type="datetime-local" required>
+        </label>
+        <button type="submit">Start</button>
+      </form>
+
+      <div class="actions">
+        <button id="resetBtn" class="secondary" type="button">Reset</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = 'countdown-app-v1';
+      const $ = (id) => document.getElementById(id);
+      const form = $('settingsForm');
+      const eventName = $('eventName');
+      const endDate = $('endDate');
+      const eventNameDisplay = $('eventNameDisplay');
+      const targetLabel = $('targetLabel');
+      const countdown = $('countdown');
+      const expired = $('expired');
+      const status = $('status');
+      const resetBtn = $('resetBtn');
+      let timer = null;
+      let target = null;
+
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function toLocalInputValue(date) {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 16);
+      }
+
+      function formatTarget(date) {
+        return date.toLocaleString([], {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      }
+
+      function save() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          name: eventName.value.trim() || 'My Countdown',
+          end: target ? target.toISOString() : null
+        }));
+      }
+
+      function render() {
+        if (!target) return;
+        const diff = target.getTime() - Date.now();
+        eventNameDisplay.textContent = eventName.value.trim() || 'My Countdown';
+        targetLabel.textContent = `Ends ${formatTarget(target)}`;
+
+        if (diff <= 0) {
+          $('days').textContent = '00';
+          $('hours').textContent = '00';
+          $('minutes').textContent = '00';
+          $('seconds').textContent = '00';
+          countdown.style.display = 'none';
+          expired.style.display = 'block';
+          status.textContent = 'Countdown complete.';
+          return;
+        }
+
+        countdown.style.display = 'grid';
+        expired.style.display = 'none';
+        const totalSeconds = Math.floor(diff / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        $('days').textContent = String(days);
+        $('hours').textContent = pad(hours);
+        $('minutes').textContent = pad(minutes);
+        $('seconds').textContent = pad(seconds);
+      }
+
+      function startTimer() {
+        if (timer) clearInterval(timer);
+        render();
+        timer = setInterval(render, 1000);
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const parsed = new Date(endDate.value);
+        if (!endDate.value || Number.isNaN(parsed.getTime())) {
+          status.textContent = 'Choose a valid end date and time.';
+          return;
+        }
+        if (parsed.getTime() <= Date.now()) {
+          status.textContent = 'Choose a time in the future.';
+          return;
+        }
+        target = parsed;
+        save();
+        status.textContent = 'Saved on this device.';
+        startTimer();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY);
+        if (timer) clearInterval(timer);
+        target = null;
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        tomorrow.setSeconds(0, 0);
+        eventName.value = '';
+        endDate.value = toLocalInputValue(tomorrow);
+        eventNameDisplay.textContent = 'My Countdown';
+        targetLabel.textContent = 'Choose an end date below.';
+        countdown.style.display = 'grid';
+        expired.style.display = 'none';
+        ['days', 'hours', 'minutes', 'seconds'].forEach((id) => {
+          $(id).textContent = '00';
+        });
+        status.textContent = '';
+      });
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (saved?.end) {
+          const savedDate = new Date(saved.end);
+          if (!Number.isNaN(savedDate.getTime())) {
+            eventName.value = saved.name || '';
+            endDate.value = toLocalInputValue(savedDate);
+            target = savedDate;
+            startTimer();
+          }
+        }
+      } catch (_) {}
+
+      if (!target) {
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        tomorrow.setSeconds(0, 0);
+        endDate.value = toLocalInputValue(tomorrow);
+      }
+    })();
+  </script>
+</body>
+</html>
