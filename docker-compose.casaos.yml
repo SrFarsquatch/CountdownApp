@@ -1,0 +1,57 @@
+# CasaOS custom-install file.
+# The image is built and published by GitHub Actions from the main branch.
+
+name: countdownapp
+
+services:
+  countdown:
+    image: ghcr.io/srfarsquatch/countdownapp:edge
+    pull_policy: always
+    container_name: countdownapp
+    ports:
+      - "8088:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    mem_limit: 128m
+    mem_reservation: 16m
+    cpus: "0.25"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    x-casaos:
+      ports:
+        - container: "80"
+          description:
+            en_US: Countdown web interface
+
+x-casaos:
+  id: countdownapp
+  store_app_id: countdownapp
+  architectures:
+    - amd64
+    - arm64
+  main: countdown
+  category: Utilities
+  developer: SrFarsquatch
+  author: SrFarsquatch
+  tagline:
+    en_US: Lightweight self-hosted countdown clock
+  description:
+    en_US: A simple self-hosted countdown clock with a selectable end date and browser-saved settings.
+  scheme: http
+  port_map: "8088"
+  index: /
+  title:
+    custom: Countdown
+    en_US: Countdown
+  version: "edge"
