@@ -3,210 +3,473 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#f3f3f0">
   <title>Countdown</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #0b1220;
-      --panel: #111827;
-      --panel-2: #172033;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --border: #263449;
-      --accent: #60a5fa;
+      color-scheme: light;
+      --bg: #f3f3f0;
+      --surface: #ffffff;
+      --surface-muted: #f8f8f6;
+      --text: #171717;
+      --muted: #6b6b67;
+      --border: #d8d8d3;
+      --border-strong: #b9b9b2;
+      --accent: #1f5eff;
+      --danger: #b42318;
+      --radius: 7px;
     }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #161616;
+        --surface: #202020;
+        --surface-muted: #262626;
+        --text: #f3f3ef;
+        --muted: #a4a49d;
+        --border: #3a3a37;
+        --border-strong: #565650;
+        --accent: #7da2ff;
+        --danger: #ff8a80;
+      }
+    }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background:
-        radial-gradient(circle at top, rgba(96,165,250,.10), transparent 32rem),
-        var(--bg);
+      background: var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
     }
-    .wrap { width: min(860px, 100%); }
-    .topbar { margin-bottom: 24px; }
-    h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.25rem); }
-    .subtitle { margin: 6px 0 0; color: var(--muted); }
-    .panel {
-      background: rgba(17,24,39,.88);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      padding: clamp(18px, 4vw, 30px);
-      backdrop-filter: blur(10px);
+
+    button,
+    input {
+      font: inherit;
     }
-    .event-name {
-      text-align: center;
-      font-size: clamp(1.1rem, 3vw, 1.5rem);
-      font-weight: 700;
-      margin-bottom: 6px;
+
+    button {
+      cursor: pointer;
     }
-    .target-label {
-      text-align: center;
-      color: var(--muted);
-      margin-bottom: 24px;
-      min-height: 1.5em;
+
+    .shell {
+      width: min(980px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 72px;
     }
-    .countdown {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+
+    .header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-strong);
     }
-    .unit {
-      background: var(--panel-2);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: clamp(14px, 3vw, 24px) 8px;
-      text-align: center;
-    }
-    .value {
-      display: block;
-      font-variant-numeric: tabular-nums;
-      font-weight: 800;
-      font-size: clamp(2rem, 8vw, 4.75rem);
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
       line-height: 1;
-      letter-spacing: -.04em;
+      letter-spacing: -0.04em;
+      font-weight: 700;
     }
-    .label {
-      display: block;
-      margin-top: 10px;
+
+    .brand p {
+      margin: 8px 0 0;
       color: var(--muted);
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: .12em;
     }
-    .expired {
+
+    .button {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .button:hover {
+      border-color: var(--text);
+    }
+
+    .button.primary {
+      border-color: var(--text);
+      background: var(--text);
+      color: var(--surface);
+    }
+
+    .button.text {
+      min-height: auto;
+      padding: 4px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .button.text:hover {
+      color: var(--text);
+    }
+
+    .button.danger {
+      color: var(--danger);
+    }
+
+    .editor {
       display: none;
-      text-align: center;
-      font-size: clamp(2rem, 7vw, 4rem);
-      font-weight: 800;
-      padding: 32px 0;
+      margin-bottom: 28px;
+      padding: 18px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
     }
-    .controls {
-      margin-top: 20px;
+
+    .editor.open {
+      display: block;
+    }
+
+    .editor-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .editor-head h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .form-grid {
       display: grid;
       grid-template-columns: 1.2fr 1fr auto;
       gap: 12px;
       align-items: end;
     }
-    label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; }
-    input, button {
-      min-height: 46px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      font: inherit;
+
+    .field {
+      display: grid;
+      gap: 6px;
     }
+
+    .field span {
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
     input {
       width: 100%;
-      background: #0f172a;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface-muted);
       color: var(--text);
-      padding: 10px 12px;
       outline: none;
     }
+
     input:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(96,165,250,.14);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
     }
-    button {
-      cursor: pointer;
-      padding: 0 18px;
-      font-weight: 700;
-      background: var(--accent);
-      color: #07111f;
-    }
-    button.secondary {
-      background: transparent;
-      color: var(--text);
-    }
-    .actions {
+
+    .form-actions {
       display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 12px;
+      gap: 8px;
     }
+
     .status {
+      margin: 10px 0 0;
       color: var(--muted);
-      text-align: center;
-      margin-top: 14px;
-      min-height: 1.4em;
-      font-size: .9rem;
+      min-height: 1.25em;
+      font-size: 0.88rem;
     }
-    @media (max-width: 680px) {
-      body { padding: 16px; }
-      .countdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .controls { grid-template-columns: 1fr; }
-      .controls button { width: 100%; }
+
+    .list-head {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.25fr) minmax(200px, 1fr) minmax(270px, 1.6fr) 84px;
+      gap: 18px;
+      padding: 0 14px 8px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .countdown-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .countdown-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.25fr) minmax(200px, 1fr) minmax(270px, 1.6fr) 84px;
+      gap: 18px;
+      align-items: center;
+      padding: 16px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .countdown-row.expired {
+      opacity: 0.62;
+    }
+
+    .name {
+      min-width: 0;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .date {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .time {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .time-part {
+      min-width: 0;
+    }
+
+    .time-value {
+      display: block;
+      font-size: clamp(1.15rem, 3vw, 1.6rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-weight: 700;
+    }
+
+    .time-label {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .complete {
+      grid-column: 1 / -1;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .row-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .empty {
+      padding: 42px 20px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100% - 24px, 980px);
+        padding-top: 28px;
+      }
+
+      .header {
+        align-items: center;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-actions .button {
+        flex: 1;
+      }
+
+      .list-head {
+        display: none;
+      }
+
+      .countdown-row {
+        grid-template-columns: 1fr auto;
+        gap: 14px 12px;
+      }
+
+      .date {
+        grid-column: 1 / 2;
+      }
+
+      .time {
+        grid-column: 1 / -1;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+
+      .row-actions {
+        grid-column: 2 / 3;
+        grid-row: 1 / 3;
+        align-self: start;
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header .button.primary {
+        width: 100%;
+      }
+
+      .countdown-row {
+        grid-template-columns: 1fr;
+      }
+
+      .date,
+      .time,
+      .row-actions {
+        grid-column: 1;
+      }
+
+      .row-actions {
+        grid-row: auto;
+        flex-direction: row;
+        justify-content: flex-start;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <div class="topbar">
-      <h1>Countdown</h1>
-      <p class="subtitle">A simple countdown for the date that matters.</p>
+  <main class="shell">
+    <header class="header">
+      <div class="brand">
+        <h1>Countdown</h1>
+        <p>Keep the dates you care about in one place.</p>
+      </div>
+      <button id="newButton" class="button primary" type="button">New countdown</button>
+    </header>
+
+    <section id="editor" class="editor" aria-labelledby="editorTitle">
+      <div class="editor-head">
+        <h2 id="editorTitle">New countdown</h2>
+        <button id="closeEditor" class="button text" type="button">Close</button>
+      </div>
+
+      <form id="countdownForm">
+        <div class="form-grid">
+          <label class="field">
+            <span>Name</span>
+            <input id="nameInput" type="text" maxlength="80" placeholder="Last day at work" required>
+          </label>
+
+          <label class="field">
+            <span>End date and time</span>
+            <input id="dateInput" type="datetime-local" required>
+          </label>
+
+          <div class="form-actions">
+            <button id="saveButton" class="button primary" type="submit">Add</button>
+            <button id="cancelButton" class="button" type="button">Cancel</button>
+          </div>
+        </div>
+        <p id="formStatus" class="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <div class="list-head" aria-hidden="true">
+      <div>Countdown</div>
+      <div>End date</div>
+      <div>Time remaining</div>
+      <div></div>
     </div>
 
-    <section class="panel">
-      <div id="eventNameDisplay" class="event-name">My Countdown</div>
-      <div id="targetLabel" class="target-label">Choose an end date below.</div>
+    <section id="countdownList" class="countdown-list" aria-live="polite"></section>
 
-      <div id="countdown" class="countdown" aria-live="polite">
-        <div class="unit"><span id="days" class="value">00</span><span class="label">Days</span></div>
-        <div class="unit"><span id="hours" class="value">00</span><span class="label">Hours</span></div>
-        <div class="unit"><span id="minutes" class="value">00</span><span class="label">Minutes</span></div>
-        <div class="unit"><span id="seconds" class="value">00</span><span class="label">Seconds</span></div>
-      </div>
+    <div id="emptyState" class="empty" hidden>
+      <strong>No countdowns yet.</strong>
+      Use “New countdown” to add one.
+    </div>
 
-      <div id="expired" class="expired">Time's up.</div>
-
-      <form id="settingsForm" class="controls">
-        <label>
-          Countdown name
-          <input id="eventName" type="text" maxlength="60" placeholder="e.g. Last day at work">
-        </label>
-        <label>
-          End date & time
-          <input id="endDate" type="datetime-local" required>
-        </label>
-        <button type="submit">Start</button>
-      </form>
-
-      <div class="actions">
-        <button id="resetBtn" class="secondary" type="button">Reset</button>
-      </div>
-      <div id="status" class="status"></div>
-    </section>
+    <p class="footer">Saved locally in this browser.</p>
   </main>
 
   <script>
-    (() => {
-      const STORAGE_KEY = 'countdown-app-v1';
-      const $ = (id) => document.getElementById(id);
-      const form = $('settingsForm');
-      const eventName = $('eventName');
-      const endDate = $('endDate');
-      const eventNameDisplay = $('eventNameDisplay');
-      const targetLabel = $('targetLabel');
-      const countdown = $('countdown');
-      const expired = $('expired');
-      const status = $('status');
-      const resetBtn = $('resetBtn');
-      let timer = null;
-      let target = null;
+    (function () {
+      var STORAGE_KEY = 'countdown-app-v2';
+      var LEGACY_KEY = 'countdown-app-v1';
+      var items = [];
+      var editingId = null;
+      var timer = null;
 
-      function pad(n) { return String(n).padStart(2, '0'); }
+      var editor = document.getElementById('editor');
+      var editorTitle = document.getElementById('editorTitle');
+      var form = document.getElementById('countdownForm');
+      var nameInput = document.getElementById('nameInput');
+      var dateInput = document.getElementById('dateInput');
+      var saveButton = document.getElementById('saveButton');
+      var formStatus = document.getElementById('formStatus');
+      var list = document.getElementById('countdownList');
+      var emptyState = document.getElementById('emptyState');
+      var newButton = document.getElementById('newButton');
+      var closeEditor = document.getElementById('closeEditor');
+      var cancelButton = document.getElementById('cancelButton');
+
+      function createId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      }
+
+      function pad(value) {
+        return String(value).padStart(2, '0');
+      }
 
       function toLocalInputValue(date) {
-        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        var local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
         return local.toISOString().slice(0, 16);
       }
 
-      function formatTarget(date) {
+      function defaultDateValue() {
+        var date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        date.setSeconds(0, 0);
+        return toLocalInputValue(date);
+      }
+
+      function formatDate(iso) {
+        var date = new Date(iso);
         return date.toLocaleString([], {
           weekday: 'short',
           year: 'numeric',
@@ -217,102 +480,258 @@
         });
       }
 
-      function save() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          name: eventName.value.trim() || 'My Countdown',
-          end: target ? target.toISOString() : null
-        }));
+      function readStorage() {
+        try {
+          var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          if (Array.isArray(saved)) {
+            items = saved.filter(function (item) {
+              return item && item.id && item.name && item.end && !Number.isNaN(new Date(item.end).getTime());
+            });
+          }
+        } catch (error) {
+          items = [];
+        }
+
+        if (items.length === 0) {
+          migrateLegacy();
+        }
+      }
+
+      function migrateLegacy() {
+        try {
+          var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+          if (!legacy || !legacy.end) return;
+
+          var legacyDate = new Date(legacy.end);
+          if (Number.isNaN(legacyDate.getTime())) return;
+
+          items = [{
+            id: createId(),
+            name: String(legacy.name || 'My Countdown').trim() || 'My Countdown',
+            end: legacyDate.toISOString(),
+            created: new Date().toISOString()
+          }];
+
+          saveStorage();
+          localStorage.removeItem(LEGACY_KEY);
+        } catch (error) {
+          return;
+        }
+      }
+
+      function saveStorage() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      }
+
+      function sortItems() {
+        items.sort(function (a, b) {
+          var aTime = new Date(a.end).getTime();
+          var bTime = new Date(b.end).getTime();
+          var now = Date.now();
+          var aExpired = aTime <= now;
+          var bExpired = bTime <= now;
+
+          if (aExpired !== bExpired) return aExpired ? 1 : -1;
+          return aTime - bTime;
+        });
+      }
+
+      function getRemaining(end) {
+        var diff = new Date(end).getTime() - Date.now();
+
+        if (diff <= 0) {
+          return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 };
+        }
+
+        var total = Math.floor(diff / 1000);
+        return {
+          expired: false,
+          days: Math.floor(total / 86400),
+          hours: Math.floor((total % 86400) / 3600),
+          minutes: Math.floor((total % 3600) / 60),
+          seconds: total % 60
+        };
+      }
+
+      function makeTimePart(value, label) {
+        var part = document.createElement('div');
+        part.className = 'time-part';
+
+        var number = document.createElement('span');
+        number.className = 'time-value';
+        number.textContent = value;
+
+        var caption = document.createElement('span');
+        caption.className = 'time-label';
+        caption.textContent = label;
+
+        part.appendChild(number);
+        part.appendChild(caption);
+        return part;
       }
 
       function render() {
-        if (!target) return;
-        const diff = target.getTime() - Date.now();
-        eventNameDisplay.textContent = eventName.value.trim() || 'My Countdown';
-        targetLabel.textContent = `Ends ${formatTarget(target)}`;
+        sortItems();
+        list.innerHTML = '';
 
-        if (diff <= 0) {
-          $('days').textContent = '00';
-          $('hours').textContent = '00';
-          $('minutes').textContent = '00';
-          $('seconds').textContent = '00';
-          countdown.style.display = 'none';
-          expired.style.display = 'block';
-          status.textContent = 'Countdown complete.';
-          return;
-        }
+        emptyState.hidden = items.length !== 0;
 
-        countdown.style.display = 'grid';
-        expired.style.display = 'none';
-        const totalSeconds = Math.floor(diff / 1000);
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-        $('days').textContent = String(days);
-        $('hours').textContent = pad(hours);
-        $('minutes').textContent = pad(minutes);
-        $('seconds').textContent = pad(seconds);
-      }
+        items.forEach(function (item) {
+          var remaining = getRemaining(item.end);
+          var row = document.createElement('article');
+          row.className = 'countdown-row' + (remaining.expired ? ' expired' : '');
 
-      function startTimer() {
-        if (timer) clearInterval(timer);
-        render();
-        timer = setInterval(render, 1000);
-      }
+          var name = document.createElement('div');
+          name.className = 'name';
+          name.textContent = item.name;
 
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const parsed = new Date(endDate.value);
-        if (!endDate.value || Number.isNaN(parsed.getTime())) {
-          status.textContent = 'Choose a valid end date and time.';
-          return;
-        }
-        if (parsed.getTime() <= Date.now()) {
-          status.textContent = 'Choose a time in the future.';
-          return;
-        }
-        target = parsed;
-        save();
-        status.textContent = 'Saved on this device.';
-        startTimer();
-      });
+          var date = document.createElement('div');
+          date.className = 'date';
+          date.textContent = formatDate(item.end);
 
-      resetBtn.addEventListener('click', () => {
-        localStorage.removeItem(STORAGE_KEY);
-        if (timer) clearInterval(timer);
-        target = null;
-        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        tomorrow.setSeconds(0, 0);
-        eventName.value = '';
-        endDate.value = toLocalInputValue(tomorrow);
-        eventNameDisplay.textContent = 'My Countdown';
-        targetLabel.textContent = 'Choose an end date below.';
-        countdown.style.display = 'grid';
-        expired.style.display = 'none';
-        ['days', 'hours', 'minutes', 'seconds'].forEach((id) => {
-          $(id).textContent = '00';
-        });
-        status.textContent = '';
-      });
+          var time = document.createElement('div');
+          time.className = 'time';
 
-      try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-        if (saved?.end) {
-          const savedDate = new Date(saved.end);
-          if (!Number.isNaN(savedDate.getTime())) {
-            eventName.value = saved.name || '';
-            endDate.value = toLocalInputValue(savedDate);
-            target = savedDate;
-            startTimer();
+          if (remaining.expired) {
+            var complete = document.createElement('div');
+            complete.className = 'complete';
+            complete.textContent = 'Complete';
+            time.appendChild(complete);
+          } else {
+            time.appendChild(makeTimePart(String(remaining.days), 'days'));
+            time.appendChild(makeTimePart(pad(remaining.hours), 'hours'));
+            time.appendChild(makeTimePart(pad(remaining.minutes), 'min'));
+            time.appendChild(makeTimePart(pad(remaining.seconds), 'sec'));
           }
-        }
-      } catch (_) {}
 
-      if (!target) {
-        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        tomorrow.setSeconds(0, 0);
-        endDate.value = toLocalInputValue(tomorrow);
+          var actions = document.createElement('div');
+          actions.className = 'row-actions';
+
+          var edit = document.createElement('button');
+          edit.type = 'button';
+          edit.className = 'button text';
+          edit.textContent = 'Edit';
+          edit.addEventListener('click', function () {
+            openEditor(item.id);
+          });
+
+          var remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'button text danger';
+          remove.textContent = 'Delete';
+          remove.addEventListener('click', function () {
+            deleteItem(item.id);
+          });
+
+          actions.appendChild(edit);
+          actions.appendChild(remove);
+
+          row.appendChild(name);
+          row.appendChild(date);
+          row.appendChild(time);
+          row.appendChild(actions);
+          list.appendChild(row);
+        });
       }
+
+      function openEditor(id) {
+        editingId = id || null;
+        formStatus.textContent = '';
+
+        if (editingId) {
+          var item = items.find(function (entry) { return entry.id === editingId; });
+          if (!item) return;
+
+          editorTitle.textContent = 'Edit countdown';
+          saveButton.textContent = 'Save';
+          nameInput.value = item.name;
+          dateInput.value = toLocalInputValue(new Date(item.end));
+        } else {
+          editorTitle.textContent = 'New countdown';
+          saveButton.textContent = 'Add';
+          nameInput.value = '';
+          dateInput.value = defaultDateValue();
+        }
+
+        editor.classList.add('open');
+        nameInput.focus();
+      }
+
+      function closeForm() {
+        editingId = null;
+        formStatus.textContent = '';
+        editor.classList.remove('open');
+      }
+
+      function deleteItem(id) {
+        var item = items.find(function (entry) { return entry.id === id; });
+        if (!item) return;
+
+        if (!window.confirm('Delete "' + item.name + '"?')) return;
+
+        items = items.filter(function (entry) { return entry.id !== id; });
+        saveStorage();
+
+        if (editingId === id) closeForm();
+        render();
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        var name = nameInput.value.trim();
+        var parsed = new Date(dateInput.value);
+
+        if (!name) {
+          formStatus.textContent = 'Enter a name.';
+          nameInput.focus();
+          return;
+        }
+
+        if (!dateInput.value || Number.isNaN(parsed.getTime())) {
+          formStatus.textContent = 'Choose a valid date and time.';
+          dateInput.focus();
+          return;
+        }
+
+        if (editingId) {
+          var existing = items.find(function (entry) { return entry.id === editingId; });
+          if (!existing) {
+            formStatus.textContent = 'That countdown could not be found.';
+            return;
+          }
+
+          existing.name = name;
+          existing.end = parsed.toISOString();
+        } else {
+          items.push({
+            id: createId(),
+            name: name,
+            end: parsed.toISOString(),
+            created: new Date().toISOString()
+          });
+        }
+
+        saveStorage();
+        closeForm();
+        render();
+      });
+
+      newButton.addEventListener('click', function () {
+        openEditor(null);
+      });
+
+      closeEditor.addEventListener('click', closeForm);
+      cancelButton.addEventListener('click', closeForm);
+
+      readStorage();
+      render();
+
+      timer = window.setInterval(render, 1000);
+
+      window.addEventListener('beforeunload', function () {
+        if (timer) window.clearInterval(timer);
+      });
     })();
   </script>
 </body>
