@@ -16,6 +16,8 @@ services:
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       APP_BASE_URL: "${APP_BASE_URL:-}"
       APP_SECRET: "${APP_SECRET:-}"
+      UPDATER_URL: "http://countdown-updater:8090"
+      UPDATE_TOKEN: "${UPDATE_TOKEN:-countdown-internal-updater}"
     volumes:
       - type: bind
         source: /DATA/AppData/$AppID/data
