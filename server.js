@@ -29,7 +29,9 @@ function defaultDb() {
       token: crypto.randomBytes(24).toString("hex"),
       title: "Upcoming",
       maxEvents: 6,
-      maxCountdowns: 5
+      maxCountdowns: 5,
+      orientation: "landscape",
+      colorTheme: "spectrum"
     }
   };
 }
@@ -283,6 +285,11 @@ async function buildFeed() {
   return {
     generatedAt: new Date().toISOString(),
     title: db.display.title || "Upcoming",
+    display: {
+      orientation: db.display.orientation || "landscape",
+      colorTheme: db.display.colorTheme || "spectrum",
+      nativeColors: ["white", "black", "red", "blue", "green", "yellow"]
+    },
     calendarError,
     nextEvent: events[0] || null,
     events: events.slice(0, Number(db.display.maxEvents || 6)),
@@ -332,6 +339,8 @@ const server = http.createServer(async (req, res) => {
           title: db.display.title,
           maxEvents: db.display.maxEvents,
           maxCountdowns: db.display.maxCountdowns,
+          orientation: db.display.orientation || "landscape",
+          colorTheme: db.display.colorTheme || "spectrum",
           feedPath: "/api/frameos/feed?token=" + db.display.token,
           viewPath: "/frame?token=" + db.display.token
         }
@@ -431,6 +440,8 @@ const server = http.createServer(async (req, res) => {
       if (body.displayTitle !== undefined) db.display.title = String(body.displayTitle || "Upcoming").slice(0, 80);
       if (body.maxEvents !== undefined) db.display.maxEvents = Math.max(1, Math.min(20, Number(body.maxEvents) || 6));
       if (body.maxCountdowns !== undefined) db.display.maxCountdowns = Math.max(1, Math.min(20, Number(body.maxCountdowns) || 5));
+      if (body.orientation !== undefined && ["landscape", "portrait"].includes(body.orientation)) db.display.orientation = body.orientation;
+      if (body.colorTheme !== undefined && ["mono", "red", "blue", "green", "yellow", "spectrum"].includes(body.colorTheme)) db.display.colorTheme = body.colorTheme;
       saveDb(db);
       return json(res, 200, { ok: true });
     }
