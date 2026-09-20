@@ -4,6 +4,8 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 
 ## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
 - Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.
+- Add current conditions and forecasts from Google Weather API, with daily, weekly and monthly e-ink planner layouts.
+- Keep colour e-ink and monochrome output modes; weather and calendar accents are quantized to the supported e-ink palette.
 - Build custom e-ink layouts with a drag-and-resize section editor: move Agenda, Tasks, Goals and Countdowns on a resolution-independent 12 × 8 grid, resize each section, and control per-section item limits.\n- Install the web app as a standalone PWA.\n
 
 - Create and edit multiple countdowns with per-countdown accent colors.
@@ -54,6 +56,7 @@ Set these environment variables in the CasaOS app:
 
 - `GOOGLE_CLIENT_ID` — OAuth client ID.
 - `GOOGLE_CLIENT_SECRET` — OAuth client secret.
+- `GOOGLE_WEATHER_API_KEY` — server-side API key for Google Weather API. Enable Weather API in the same Google Cloud project; this is separate from Calendar OAuth.
 - `APP_SECRET` — a long random secret used to encrypt stored Google tokens.
 - `APP_BASE_URL` — the externally reachable base URL, for example `https://countdown.example.com`.
 
@@ -103,6 +106,8 @@ Treat the display token like a password. Use **Rotate display token** if a URL i
 For FrameOS, use the rendered SVG endpoint for the built-in CountdownApp layout, or point a custom app at the JSON feed if you want to build your own scene.
 
 Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
+
+Planner display modes now include **Daily**, **Weekly**, and **Monthly**. When Weather is enabled and a latitude/longitude is configured, Daily shows current conditions and today's high/low, Weekly adds a compact forecast per day, and Monthly adds weather markers for forecast days. Weather data is fetched server-side and cached for 15 minutes.
 
 The **Displays → Section editor** can switch between automatic layout and a custom grid. In custom mode, drag sections to reposition them and use the bottom-right handle to resize them. **Arrange for resolution** creates a two-column landscape layout or a stacked portrait layout based on the preview dimensions. Long agenda/task labels are clipped and shortened inside their section so they do not bleed into neighboring content.
 

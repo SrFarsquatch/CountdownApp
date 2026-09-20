@@ -244,12 +244,12 @@
   <div class="hero"><div><h2>E-ink display</h2><p>Choose what your FrameOS display should show and arrange each section exactly where you want it.</p></div></div>
   <div class="settings-grid">
     <div class="card setting-card"><div class="eyebrow">Layout</div><h3>Display content</h3>
-      <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="countdowns">Countdowns only</option></select></div>
+      <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="weekly">Weekly planner</option><option value="monthly">Monthly planner</option><option value="countdowns">Countdowns only</option></select></div>
       <div class="setting-row"><span>Orientation</span><select id="displayLayout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
       <div class="setting-row"><span>Section layout</span><select id="displaySectionLayoutMode"><option value="auto">Automatic</option><option value="custom">Custom — drag & resize</option></select></div>
       <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Colour e-ink</option><option value="mono">Black & white</option></select></div>
       <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
-      <div class="setting-row"><span>Sections</span><div><label><input type="checkbox" id="showAgenda"> Agenda</label><br><label><input type="checkbox" id="showTasks"> Tasks</label><br><label><input type="checkbox" id="showGoals"> Goals</label><br><label><input type="checkbox" id="showCountdowns"> Countdowns</label></div></div>
+      <div class="setting-row"><span>Sections</span><div><label><input type="checkbox" id="showAgenda"> Agenda</label><br><label><input type="checkbox" id="showTasks"> Tasks</label><br><label><input type="checkbox" id="showGoals"> Goals</label><br><label><input type="checkbox" id="showCountdowns"> Countdowns</label><br><label><input type="checkbox" id="showWeather"> Weather</label></div></div><div class="setting-row"><span>Weather location</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;max-width:280px"><input id="weatherLocationLabel" placeholder="Location label"><select id="weatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select><input id="weatherLatitude" type="number" step="0.000001" min="-90" max="90" placeholder="Latitude"><input id="weatherLongitude" type="number" step="0.000001" min="-180" max="180" placeholder="Longitude"></div></div><div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather uses Google Weather API from the same Google Cloud project, but not your Calendar OAuth token.</div>
       <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Preview</div><h3>FrameOS output</h3>
@@ -857,9 +857,11 @@ function renderSectionLayoutEditor(){
  else setLayoutStatus('Automatic layout is active. Switch Section layout to Custom to edit.');
 }
 function renderDisplay(){
- const d=state.display;
+ const d=state.display,wc=state.weather||{};
  $('displayMode').value=d.mode||'dashboard';$('displayLayout').value=d.layout||'auto';$('displaySectionLayoutMode').value=d.sectionLayoutMode||'auto';$('displayPalette').value=d.palette||'spectra6';$('displayRefresh').value=String(d.refreshMinutes||15);
- $('showAgenda').checked=d.showAgenda!==false;$('showTasks').checked=d.showTasks!==false;$('showGoals').checked=d.showGoals!==false;$('showCountdowns').checked=d.showCountdowns!==false;
+ $('showAgenda').checked=d.showAgenda!==false;$('showTasks').checked=d.showTasks!==false;$('showGoals').checked=d.showGoals!==false;$('showCountdowns').checked=d.showCountdowns!==false;$('showWeather').checked=d.showWeather!==false;
+ $('weatherLocationLabel').value=wc.locationLabel||'';$('weatherLatitude').value=wc.latitude??'';$('weatherLongitude').value=wc.longitude??'';$('weatherUnits').value=wc.units||'metric';
+ if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.configured?'Google Weather API configured. Forecasts will appear when a location is set.':'Add GOOGLE_WEATHER_API_KEY in CasaOS after enabling Weather API in Google Cloud.';
  $('maxEvents').value=String(d.maxEvents||5);$('maxTasks').value=String(d.maxTasks||6);$('maxGoals').value=String(d.maxGoals||3);$('maxCountdowns').value=String(d.maxCountdowns||3);
  displayLayoutDraft=cloneDisplayLayout(d.sectionLayout);
  const root=location.origin;
@@ -881,7 +883,7 @@ $('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;pre
 $('openFrame').onclick=()=>window.open(state.display.viewPath+'&w='+$('previewW').value+'&h='+$('previewH').value,'_blank');
 $('displaySectionLayoutMode').onchange=renderSectionLayoutEditor;
 $('displayMode').onchange=renderSectionLayoutEditor;
-Object.values(DISPLAY_SECTION_CHECKS).forEach(id=>{$(id).onchange=()=>{renderSectionLayoutEditor();setLayoutStatus('Unsaved display changes.')}});
+Object.values(DISPLAY_SECTION_CHECKS).forEach(id=>{$(id).onchange=()=>{renderSectionLayoutEditor();setLayoutStatus('Unsaved display changes.')}});if($('showWeather'))$('showWeather').onchange=()=>setLayoutStatus('Unsaved display changes.');
 $('autoArrangeSections').onclick=()=>{displayLayoutDraft=defaultDisplayLayoutForResolution();renderSectionLayoutEditor();setLayoutStatus('Layout arranged for the current preview orientation. Save to apply.')};
 $('resetSectionLayout').onclick=()=>{displayLayoutDraft={agenda:{x:0,y:0,w:6,h:4},tasks:{x:6,y:0,w:6,h:4},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};renderSectionLayoutEditor();setLayoutStatus('Layout reset. Save to apply.')};
 $('saveDisplay').onclick=async()=>{
@@ -889,7 +891,8 @@ $('saveDisplay').onclick=async()=>{
    mode:$('displayMode').value,layout:$('displayLayout').value,sectionLayoutMode:$('displaySectionLayoutMode').value,sectionLayout:displayLayoutDraft,
    palette:$('displayPalette').value,refreshMinutes:Number($('displayRefresh').value),
    maxEvents:Number($('maxEvents').value),maxTasks:Number($('maxTasks').value),maxGoals:Number($('maxGoals').value),maxCountdowns:Number($('maxCountdowns').value),
-   showAgenda:$('showAgenda').checked,showTasks:$('showTasks').checked,showGoals:$('showGoals').checked,showCountdowns:$('showCountdowns').checked
+   showAgenda:$('showAgenda').checked,showTasks:$('showTasks').checked,showGoals:$('showGoals').checked,showCountdowns:$('showCountdowns').checked,showWeather:$('showWeather').checked,
+   weatherLocationLabel:$('weatherLocationLabel').value.trim(),weatherLatitude:$('weatherLatitude').value,weatherLongitude:$('weatherLongitude').value,weatherUnits:$('weatherUnits').value
  })});
  state=await api('/api/state');displayLayoutDraft=null;renderDisplay();setLayoutStatus('Saved. FrameOS will use this layout on its next refresh.');
 };
