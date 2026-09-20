@@ -72,6 +72,12 @@
       </div>
 
       <div class="card">
+        <h2>Updates</h2>
+        <div class="settings-row"><div><strong>Application updates</strong><div class="meta" id="updateStatus">Checking updater…</div></div><button class="btn primary" id="updateNow">Update now</button></div>
+        <div class="status" id="updateDetail"></div>
+      </div>
+
+      <div class="card">
         <h2>FrameOS / e-ink</h2>
         <div class="settings-row wrap"><div><strong>JSON feed</strong><div class="meta">Use this URL in a FrameOS app or HTTP data source.</div></div><div class="code" id="feedUrl"></div></div>
         <div class="settings-row wrap"><div><strong>Monochrome display page</strong><div class="meta">Browser-friendly e-ink layout.</div></div><div class="code" id="viewUrl"></div></div>
@@ -136,11 +142,30 @@ async function loadAgenda(){
 function renderAgenda(){const a=$("agenda");a.innerHTML="";if(!calendarEvents.length){a.innerHTML='<div class="empty">No upcoming events in the selected calendars.</div>';return}calendarEvents.forEach(e=>{const row=document.createElement("div");row.className="event";const time=document.createElement("div");time.className="event-time";const d=new Date(e.start);time.textContent=e.allDay?d.toLocaleDateString([],{month:"short",day:"numeric"}):d.toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});const detail=document.createElement("div");const title=document.createElement("div");title.className="event-title";title.textContent=e.title;detail.appendChild(title);if(e.location){const loc=document.createElement("div");loc.className="meta";loc.textContent=e.location;detail.appendChild(loc)}row.append(time,detail);a.appendChild(row)})}
 function escapeHtml(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
 
+async function refreshUpdateStatus(){
+ const label=$("updateStatus"),detail=$("updateDetail"),button=$("updateNow");
+ try{
+   const s=await api("/api/update/status");
+   if(!s.configured){
+     label.textContent="Updater not configured";
+     detail.textContent="Re-import the latest CasaOS compose once to enable one-click updates.";
+     button.disabled=true;
+     return;
+   }
+   button.disabled=["pulling","preparing","restarting"].includes(s.phase);
+   const labels={idle:"Ready to update",pulling:"Downloading update…",preparing:"Preparing update…",restarting:"Restarting app…",complete:s.message||"Update complete",error:s.message||"Update failed"};
+   label.textContent=labels[s.phase]||s.message||"Updater ready";
+   detail.textContent=s.error||"";
+   if(["pulling","preparing","restarting"].includes(s.phase))setTimeout(refreshUpdateStatus,2000);
+ }catch(e){label.textContent="Updater unavailable";detail.textContent=e.message;button.disabled=true}
+}
+
 function renderSettings(){
  $("googleDisconnected").hidden=state.google.connected;$("googleConnected").hidden=!state.google.connected;
  $("windowDays").value=String(state.google.countdownWindowDays||30);
  $("feedUrl").textContent=location.origin+state.display.feedPath;
  $("viewUrl").textContent=location.origin+state.display.viewPath;
+ refreshUpdateStatus();
  $("displayTitle").value=state.display.title||"Upcoming";$("maxEvents").value=state.display.maxEvents||6;$("maxCountdowns").value=state.display.maxCountdowns||5;$("orientation").value=state.display.orientation||"landscape";$("colorTheme").value=state.display.colorTheme||"spectrum";
 }
 async function loadCalendars(saveAfter){
@@ -155,6 +180,7 @@ $("refreshCalendar").onclick=loadAgenda;
 $("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value),orientation:$("orientation").value,colorTheme:$("colorTheme").value})});await load()};
 $("previewDisplay").onclick=()=>window.open(state.display.viewPath,"_blank");
 $("rotateToken").onclick=async()=>{if(!confirm("Rotate the FrameOS token? Existing display URLs will stop working."))return;await api("/api/display/rotate-token",{method:"POST"});await load()};
+$("updateNow").onclick=async()=>{if(!confirm("Pull and install the latest CountdownApp image now? The app will briefly restart."))return;try{$("updateNow").disabled=true;$("updateStatus").textContent="Starting update…";await api("/api/update/start",{method:"POST"});setTimeout(refreshUpdateStatus,1000)}catch(e){$("updateDetail").textContent=e.message;$("updateNow").disabled=false}};
 
 load().catch(e=>document.body.insertAdjacentHTML("beforeend",'<p style="padding:20px">'+escapeHtml(e.message)+'</p>'));
 setInterval(()=>{if(state)renderCountdowns()},30000);
