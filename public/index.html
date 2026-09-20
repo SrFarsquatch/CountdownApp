@@ -93,7 +93,25 @@ function defaultDate(){return localInput(new Date(Date.now()+86400000).toISOStri
 function formatDate(iso){return new Date(iso).toLocaleString([], {weekday:"short",month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}
 function remaining(iso){const ms=new Date(iso)-Date.now(); if(ms<=0)return "Complete"; const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); return d+"d "+String(h).padStart(2,"0")+"h "+String(m).padStart(2,"0")+"m"}
 async function api(path,options={}){const r=await fetch(path,{headers:{"Content-Type":"application/json",...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Request failed");return data}
-async function load(){state=await api("/api/state");renderCountdowns();renderSettings(); if(state.google.connected) await loadCalendars(false)}
+async function migrateLegacyCountdowns(){
+ if(localStorage.getItem("countdown-server-migration-v1"))return;
+ const keys=["countdown-app-v2","countdown-app-v1"]; let legacy=[];
+ try{
+   const v2=JSON.parse(localStorage.getItem(keys[0])||"[]");
+   if(Array.isArray(v2))legacy=v2;
+   if(!legacy.length){
+     const v1=JSON.parse(localStorage.getItem(keys[1])||"null");
+     if(v1&&v1.end)legacy=[{name:v1.name||"My Countdown",end:v1.end}];
+   }
+ }catch(e){}
+ if(!legacy.length){localStorage.setItem("countdown-server-migration-v1","none");return}
+ for(const item of legacy){
+   if(!item||!item.name||!item.end)continue;
+   try{await api("/api/countdowns",{method:"POST",body:JSON.stringify({name:item.name,end:item.end})})}catch(e){}
+ }
+ localStorage.setItem("countdown-server-migration-v1","done");
+}
+async function load(){state=await api("/api/state");if(!state.countdowns.length){await migrateLegacyCountdowns();state=await api("/api/state")}renderCountdowns();renderSettings(); if(state.google.connected) await loadCalendars(false)}
 function renderCountdowns(){
  const list=$("countdownList"); list.innerHTML="";
  if(!state.countdowns.length){list.innerHTML='<div class="empty">No countdowns yet. Add one above.</div>';return}
