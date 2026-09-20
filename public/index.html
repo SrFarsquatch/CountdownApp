@@ -405,7 +405,7 @@ async function taskModal(item){
  }else{
    const accounts=(state.google.accounts||[]).filter(a=>a.canTasks);
    let options=[],preferred='';
-   await Promise.all(accounts.map(async account=>{
+   for(const account of accounts){
      try{
        const lists=await googleTaskListsFor(account.id);
        const selected=new Set(account.selectedTaskListIds||[]);
@@ -415,7 +415,7 @@ async function taskModal(item){
          if(!preferred&&account.defaultTaskListId===list.id)preferred=value;
        });
      }catch(error){console.warn(error)}
-   }));
+   }
    select.innerHTML='<option value="">Planner only</option>'+options.map(x=>'<option value="'+esc(x.value)+'">'+esc(x.label)+'</option>').join('');
    if(preferred)select.value=preferred;
  }
