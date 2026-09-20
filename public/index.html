@@ -145,6 +145,13 @@
 @media(max-width:760px){.layout-limit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout-block{padding:5px 6px}.layout-block strong{font-size:10px}}
 
 
+
+.nav button.nav-with-badge{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nav-update-badge{font-size:9px;font-weight:850;padding:3px 6px;border-radius:999px;background:#fff3cd;color:#6d5200;border:1px solid #e5c76b}
+.nav-update-badge[hidden],.mobile-update-dot[hidden]{display:none}
+.mobile-nav button{position:relative}
+.mobile-update-dot{position:absolute;top:7px;right:calc(50% - 24px);width:7px;height:7px;border-radius:50%;background:#d28b00;border:1px solid var(--panel)}
+
 /* Update center */
 .update-card{position:relative;overflow:hidden}
 .update-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -183,7 +190,7 @@
     <button data-view="countdowns">Countdowns</button>
     <div class="sep"></div>
     <button data-view="displays">Displays</button>
-    <button data-view="settings">Settings</button>
+    <button class="nav-with-badge" data-view="settings">Settings <span class="nav-update-badge" id="settingsUpdateBadge" hidden>Update</span></button>
   </nav>
   <div class="side-foot">Self-hosted • Google Calendar • E-ink</div>
 </aside>
@@ -314,7 +321,7 @@
 </div>
 
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
-<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More</button></nav>
+<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -982,6 +989,9 @@ function renderUpdateStatus(s){
  else if(s.available===false){badge.textContent='Up to date';badge.classList.add('current')}
  else badge.textContent='Not checked';
 
+ const navBadge=$('settingsUpdateBadge'),mobileDot=$('mobileUpdateDot');
+ if(navBadge)navBadge.hidden=s.available!==true;
+ if(mobileDot)mobileDot.hidden=s.available!==true;
  $('updateStatus').textContent=!s.configured?'Updater not configured':(s.message||(s.available?'Update available':'Ready to check for updates'));
  const details=[];
  if(!s.configured)details.push('Re-import the latest CasaOS compose once so Planner can access the Docker socket.');
@@ -1087,7 +1097,7 @@ async function loadAll(force=false){
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
  if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
 }
-const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>setView(initial));setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
+const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>{setView(initial);refreshUpdateStatus()});setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
 </body>
 </html>
