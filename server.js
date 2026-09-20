@@ -983,7 +983,7 @@ function weatherCodeInfo(code) {
 async function weatherData() {
   if (!weatherLocationReady()) throw new Error('Set a weather latitude and longitude in Display settings.');
   const units = en(db.weather.units, WEATHER_UNITS, 'metric');
-  const key = [db.weather.latitude, db.weather.longitude, units].join('|');
+  const key = [db.weather.latitude, db.weather.longitude, units, db.weather.locationLabel || ''].join('|');
   if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
 
   const params = new URLSearchParams({
@@ -994,7 +994,7 @@ async function weatherData() {
     timezone: 'auto',
     forecast_days: '10'
   });
-  if (units === 'imperial') params.set('temperature_unit', 'fahrenheit');
+  if (units === 'imperial') { params.set('temperature_unit', 'fahrenheit'); params.set('wind_speed_unit', 'mph'); }
 
   const response = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
   if (!response.ok) throw new Error('Open-Meteo request failed (' + response.status + ').');
@@ -1247,6 +1247,8 @@ function renderPlannerSvg(data, w, h, mode) {
     svg += '<text x="' + pad + '" y="' + (18*scale) + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.4*scale) + '">' + now.getFullYear() + '</text>';
     svg += '<text x="' + pad + '" y="' + (43*scale) + '" font-size="' + (26*scale) + '" font-weight="800">' + esc(now.toLocaleDateString('en-CA',{month:'long'})) + '</text>';
   }
+  const viewLabel = mode === 'daily' ? 'DAY VIEW' : (mode === 'weekly' ? 'WEEK VIEW' : 'MONTH VIEW');
+  svg += '<text x="' + (w-pad) + '" y="' + (15*scale) + '" text-anchor="end" font-size="' + (8*scale) + '" font-weight="800" letter-spacing="' + (1.1*scale) + '" class="muted">' + viewLabel + '</text>';
   let weatherHeaderX = w - pad - 92*scale;
   if (currentWeather && currentWeather.temperature !== null) {
     svg += svgWeatherIcon(currentWeather.condition, weatherHeaderX, 10*scale, 29*scale, palette);
@@ -1304,6 +1306,11 @@ function renderPlannerSvg(data, w, h, mode) {
           svg += '<text x="' + (rightX+15*scale) + '" y="' + ry + '" font-size="' + (11*scale) + '" font-weight="700">' + esc(truncateForWidth(c.name,rightW*.6,11*scale)) + '</text>';
           svg += '<text x="' + (w-pad) + '" y="' + ry + '" text-anchor="end" font-size="' + (11*scale) + '" font-weight="800" fill="' + color(c.accentColor,palette) + '">' + esc(timeLabel(c)) + '</text>'; ry += 24*scale;
         }
+      }
+      const nextLater = (data.calendarEvents||[]).find(event => new Date(event.start) > new Date(dayStart.getTime()+86400000));
+      if (nextLater && ry < bottom-20*scale) {
+        ry += 5*scale; svg += '<line x1="' + rightX + '" y1="' + ry + '" x2="' + (w-pad) + '" y2="' + ry + '" class="rule"/>'; ry += 18*scale;
+        svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (8.5*scale) + '" class="muted">NEXT · ' + esc(new Date(nextLater.start).toLocaleDateString('en-CA',{month:'short',day:'numeric'})) + ' · ' + esc(truncateForWidth(nextLater.title,rightW-70*scale,8.5*scale)) + '</text>';
       }
     }
     if (currentWeather && landscape) {
