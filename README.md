@@ -2,7 +2,7 @@
 
 A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
-## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use a weekly Planner view that overlays Google Calendar events and scheduled tasks.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.\n- Install the web app as a standalone PWA.\n
+## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.\n- Install the web app as a standalone PWA.\n
 
 - Create and edit multiple countdowns with per-countdown accent colors.
 - Choose days-only, days + hours, days + hours + minutes, live seconds, weeks + days, or target-date countdown displays.
