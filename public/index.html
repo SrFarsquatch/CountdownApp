@@ -1,142 +1,78 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f3f3f0">
-  <title>Countdown</title>
-  <style>
-    :root{color-scheme:light;--bg:#f3f3f0;--surface:#fff;--muted:#6e6e68;--text:#171717;--border:#d8d8d2;--strong:#aaa9a1;--accent:#2457e6;--danger:#b42318;--radius:8px}
-    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#151515;--surface:#202020;--muted:#aaa9a1;--text:#f3f3ef;--border:#393936;--strong:#5a5a55;--accent:#86a4ff;--danger:#ff8d82}}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Arial,Helvetica,sans-serif}
-    button,input,select{font:inherit}.shell{width:min(1050px,calc(100% - 28px));margin:auto;padding:34px 0 70px}
-    header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--strong);padding-bottom:18px}
-    h1{margin:0;font-size:clamp(2rem,6vw,3.2rem);letter-spacing:-.05em;line-height:1}.subtitle{margin:7px 0 0;color:var(--muted)}
-    .tabs{display:flex;gap:18px;margin:22px 0}.tab{border:0;background:none;padding:0 0 6px;color:var(--muted);border-bottom:2px solid transparent;font-weight:700}.tab.active{color:var(--text);border-color:var(--text)}
-    .panel{display:none}.panel.active{display:block}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
-    .btn{min-height:40px;padding:0 13px;border:1px solid var(--strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-weight:700;cursor:pointer}.btn.primary{background:var(--text);color:var(--surface);border-color:var(--text)}.btn.danger{color:var(--danger)}.btn.link{border:0;background:none;padding:0;min-height:auto;color:var(--muted)}
-    .card{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:16px}.grid{display:grid;gap:10px}.countdown{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;align-items:center;gap:16px}.name{font-weight:700}.meta{color:var(--muted);font-size:.9rem}.remaining{font:700 1.15rem "SFMono-Regular",Consolas,monospace;white-space:nowrap}.actions{display:flex;gap:10px}
-    .editor{display:none;margin:0 0 14px}.editor.open{display:block}.form{display:grid;grid-template-columns:1.2fr 1fr auto;gap:10px}.field{display:grid;gap:5px}.field span,label.small{font-size:.8rem;font-weight:700;color:var(--muted)}input,select{min-height:40px;border:1px solid var(--strong);background:var(--bg);color:var(--text);border-radius:6px;padding:8px 10px}
-    .section{margin-top:18px}.section h2{font-size:1rem;margin:0 0 10px}.event{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}.event:last-child{border-bottom:0}.event-time{font-weight:700}.event-title{font-weight:700}.empty{color:var(--muted);padding:24px 8px;text-align:center}
-    .settings{display:grid;gap:14px}.settings .card h2{margin:0 0 12px;font-size:1rem}.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0}.settings-row.wrap{align-items:flex-start;flex-direction:column}.calendar-list{display:grid;gap:8px;width:100%}.calendar-item{display:flex;gap:9px;align-items:center}.code{width:100%;font:12px/1.4 Consolas,monospace;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)}.status{color:var(--muted);font-size:.88rem;min-height:1.2em}
-    @media(max-width:700px){header{align-items:flex-start;flex-direction:column}.form{grid-template-columns:1fr}.countdown{grid-template-columns:1fr}.remaining{font-size:1rem}.toolbar{align-items:flex-start;flex-direction:column}.event{grid-template-columns:90px 1fr}}
-  </style>
-</head>
-<body>
-<main class="shell">
-  <header>
-    <div><h1>Countdown</h1><p class="subtitle">Dates, calendar and e-ink display in one place.</p></div>
-    <button class="btn primary" id="newButton">New countdown</button>
-  </header>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#efefec"><title>Countdown</title>
+<style>
+:root{color-scheme:light;--bg:#efefec;--s:#fff;--s2:#f7f7f4;--t:#161616;--m:#6d6d67;--l:#d7d7d1;--ls:#aaa9a1;--focus:#1a5fd1;--danger:#a72a22}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#151515;--s:#1f1f1f;--s2:#252525;--t:#f2f2ed;--m:#aaa9a2;--l:#383835;--ls:#5a5a55;--focus:#8bb0ff;--danger:#ff9188}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.45 Inter,system-ui,sans-serif}button,input,select{font:inherit}button{cursor:pointer}.shell{width:min(1120px,calc(100% - 28px));margin:auto;padding:36px 0 72px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding-bottom:20px;border-bottom:1px solid var(--ls)}h1{margin:0;font-size:clamp(2.2rem,7vw,4.1rem);letter-spacing:-.065em;line-height:.92}.sub,.meta,.status{color:var(--m)}.sub{margin:10px 0 0}.tabs{display:flex;gap:24px;margin:22px 0 20px;border-bottom:1px solid var(--l)}.tab{border:0;background:none;padding:0 0 10px;color:var(--m);font-weight:750;border-bottom:2px solid transparent}.tab.on{color:var(--t);border-color:var(--t)}.panel{display:none}.panel.on{display:block}
+.btn{min-height:40px;padding:0 13px;border:1px solid var(--ls);border-radius:6px;background:var(--s);color:var(--t);font-weight:750}.btn.primary{background:var(--t);color:var(--s);border-color:var(--t)}.btn.quiet{min-height:auto;padding:0;border:0;background:none;color:var(--m)}.btn.danger{color:var(--danger)}.card{background:var(--s);border:1px solid var(--l);border-radius:8px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.eyebrow{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--m);font-weight:800}
+.editor{display:none;margin-bottom:16px}.editor.open{display:block}.editor-head{display:flex;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--l)}.editor-head h2{margin:3px 0 0;font-size:1rem}.editor-body{padding:18px}.form{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:grid;gap:6px}.field>span,.label{font-size:.76rem;font-weight:800;color:var(--m)}input,select{width:100%;min-height:40px;border:1px solid var(--ls);background:var(--s2);color:var(--t);border-radius:6px;padding:8px 10px}.options{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--l)}.check{display:flex;gap:8px;align-items:center;font-weight:650}.check input{width:16px;height:16px;min-height:0}.actions{display:flex;gap:9px;justify-content:flex-end;margin-top:18px}
+.swatches{display:flex;gap:8px}.swatch{width:31px;height:31px;border:1px solid var(--ls);border-radius:5px;background:var(--c)}.swatch.sel{outline:2px solid var(--t);outline-offset:2px}.swatch input{opacity:0}
+.list{display:grid;gap:8px}.row{--c:#111;display:grid;grid-template-columns:minmax(200px,1.2fr) minmax(150px,.65fr) minmax(220px,1fr) auto;gap:18px;align-items:center;padding:16px 16px 15px 19px;position:relative}.row:before{content:"";position:absolute;left:-1px;top:11px;bottom:11px;width:4px;background:var(--c);border-radius:3px}.row.exp{opacity:.55}.name{font-weight:800}.date{font-size:.86rem;color:var(--m);margin-top:3px}.remain{font:750 1.08rem ui-monospace,monospace}.bar{height:8px;background:var(--l);border-radius:2px;overflow:hidden}.bar.thin{height:3px}.fill{height:100%;background:var(--c)}.seg{display:grid;grid-template-columns:repeat(12,1fr);gap:3px}.seg i{height:8px;background:var(--l);border-radius:1px}.seg i.on{background:var(--c)}.progress-meta{display:flex;justify-content:space-between;font-size:.72rem;color:var(--m);margin-top:5px}.row-actions{display:flex;gap:10px}.empty{padding:42px 18px;text-align:center;color:var(--m)}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:14px}.settings .card{padding:18px}.settings h2{font-size:1rem;margin:3px 0}.setrow{display:grid;grid-template-columns:1fr minmax(160px,260px);gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--l)}.setrow.stack{grid-template-columns:1fr}.cal-list{display:grid;gap:8px}.cal-item{display:flex;gap:8px;align-items:center}.cal-item input{width:16px;height:16px;min-height:0}.code{font:12px/1.4 ui-monospace,monospace;background:var(--s2);border:1px solid var(--l);padding:9px;border-radius:5px;overflow-wrap:anywhere}.preview{margin-top:14px;background:#d6d6d0;padding:12px;overflow:auto}.preview img{display:block;width:100%;max-height:620px;object-fit:contain;background:#fff;border:1px solid #999}.preview-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.preview-controls .field{width:130px}
+.agenda{padding:0 18px}.event{display:grid;grid-template-columns:120px 1fr auto;gap:15px;padding:13px 0;border-bottom:1px solid var(--l)}.event:last-child{border:0}.event-time,.event-title{font-weight:750}.event-count{font:700 .84rem ui-monospace,monospace;color:var(--m)}
+@media(max-width:850px){.settings{grid-template-columns:1fr}.row{grid-template-columns:1fr 180px 1fr}.row-actions{grid-column:1/-1;justify-content:flex-start}.options{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.shell{width:min(100% - 20px,1120px);padding-top:24px}header{align-items:flex-start;flex-direction:column}header .btn{width:100%}.form,.row,.setrow{grid-template-columns:1fr}.options{grid-template-columns:1fr}.row-actions{grid-column:auto}.event{grid-template-columns:88px 1fr}.event-count{grid-column:2}.tabs{overflow:auto}}
+</style></head><body><main class="shell">
+<header><div><h1>Countdown</h1><p class="sub">Important dates, your calendar, and a purpose-built e-ink view.</p></div><button class="btn primary" id="new">New countdown</button></header>
+<nav class="tabs"><button class="tab on" data-tab="countdowns">Countdowns</button><button class="tab" data-tab="calendar">Calendar</button><button class="tab" data-tab="display">Display</button></nav>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="countdowns">Countdowns</button>
-    <button class="tab" data-tab="calendar">Calendar</button>
-    <button class="tab" data-tab="displays">Displays</button>
-  </nav>
+<section class="panel on" id="p-countdowns">
+<div class="card editor" id="editor"><div class="editor-head"><div><div class="eyebrow">Countdown details</div><h2 id="editorTitle">New countdown</h2></div><button class="btn quiet" id="close">Close</button></div>
+<form class="editor-body" id="form"><div class="form">
+<label class="field"><span>Name</span><input id="name" maxlength="100" required placeholder="Vacation"></label>
+<label class="field"><span>End date and time</span><input id="end" type="datetime-local" required></label>
+<div class="field"><span>Accent color</span><div class="swatches" id="swatches"></div></div>
+<label class="field"><span>Time display</span><select id="timeStyle"><option value="days">42 days</option><option value="compact">42d 4h</option><option value="full">42d 04h 12m</option><option value="date">Target date</option></select></label>
+<label class="field"><span>Date format</span><select id="dateStyle"><option value="short">Sep 25</option><option value="medium">Sep 25, 2026</option><option value="long">Friday, September 25, 2026</option><option value="numeric">2026-09-25</option></select></label>
+<label class="field"><span>Progress source</span><select id="progressMode"><option value="time">Time elapsed</option><option value="manual">Manual goal</option><option value="none">None</option></select></label>
+<label class="field p-time"><span>Progress start</span><input id="progressStart" type="datetime-local"></label>
+<label class="field"><span>Progress style</span><select id="progressStyle"><option value="solid">Solid</option><option value="segmented">Segmented</option><option value="thin">Thin line</option></select></label>
+<label class="field p-man"><span>Current value</span><input id="progressCurrent" type="number" step="any" value="0"></label>
+<label class="field p-man"><span>Total value</span><input id="progressTotal" type="number" step="any" min="0" value="100"></label>
+</div><div class="options"><label class="check"><input id="showDate" type="checkbox" checked> Show target date</label><label class="check"><input id="showProgress" type="checkbox" checked> Show progress</label><label class="check"><input id="showEink" type="checkbox" checked> Show on e-ink</label><label class="check"><input id="pin" type="checkbox"> Pin to top</label></div><div class="status" id="formStatus"></div><div class="actions"><button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="submit" id="save">Add countdown</button></div></form></div>
+<div class="toolbar"><div><div class="eyebrow">Your dates</div><strong>Upcoming countdowns</strong></div><div class="meta" id="summary"></div></div><div class="list" id="list"></div>
+</section>
 
-  <section class="panel active" id="panel-countdowns">
-    <div class="card editor" id="editor">
-      <form class="form" id="form">
-        <label class="field"><span>Name</span><input id="nameInput" maxlength="100" required placeholder="Vacation"></label>
-        <label class="field"><span>End date and time</span><input id="dateInput" type="datetime-local" required></label>
-        <div style="display:flex;gap:8px;align-items:end"><button class="btn primary" type="submit" id="saveButton">Add</button><button class="btn" type="button" id="cancelButton">Cancel</button></div>
-      </form>
-      <div class="status" id="formStatus"></div>
-    </div>
-    <div class="grid" id="countdownList"></div>
-  </section>
+<section class="panel" id="p-calendar"><div class="toolbar"><div><div class="eyebrow">Google Calendar</div><strong>Upcoming agenda</strong></div><button class="btn" id="refreshCal">Refresh</button></div><div class="card agenda" id="agenda"></div></section>
 
-  <section class="panel" id="panel-calendar">
-    <div class="toolbar"><div><strong>Upcoming agenda</strong><div class="meta">Events from the calendars you selected.</div></div><button class="btn" id="refreshCalendar">Refresh</button></div>
-    <div class="card" id="agenda"></div>
-  </section>
-
-  <section class="panel" id="panel-displays">
-    <div class="settings">
-      <div class="card">
-        <h2>Google Calendar</h2>
-        <div id="googleDisconnected">
-          <p class="meta">Connect Google Calendar with read-only access. OAuth credentials stay on this server.</p>
-          <button class="btn primary" id="connectGoogle">Connect Google Calendar</button>
-        </div>
-        <div id="googleConnected" hidden>
-          <div class="settings-row"><div><strong>Connected</strong><div class="meta">Choose the calendars this app may read.</div></div><button class="btn danger" id="disconnectGoogle">Disconnect</button></div>
-          <div class="calendar-list" id="calendarList"></div>
-          <div class="settings-row">
-            <label class="small" for="windowDays">Upcoming event window</label>
-            <select id="windowDays"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="365">1 year</option></select>
-          </div>
-        </div>
-        <div class="status" id="googleStatus"></div>
-      </div>
-
-      <div class="card">
-        <h2>FrameOS / e-ink</h2>
-        <div class="settings-row wrap"><div><strong>JSON feed</strong><div class="meta">Use this URL in a FrameOS app or HTTP data source.</div></div><div class="code" id="feedUrl"></div></div>
-        <div class="settings-row wrap"><div><strong>Monochrome display page</strong><div class="meta">Browser-friendly e-ink layout.</div></div><div class="code" id="viewUrl"></div></div>
-        <div class="settings-row"><label class="small" for="displayTitle">Display title</label><input id="displayTitle" maxlength="80"></div>
-        <div class="settings-row"><label class="small" for="maxEvents">Calendar events</label><input id="maxEvents" type="number" min="1" max="20"></div>
-        <div class="settings-row"><label class="small" for="maxCountdowns">Countdowns</label><input id="maxCountdowns" type="number" min="1" max="20"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="saveDisplay">Save display settings</button><button class="btn" id="previewDisplay">Open e-ink preview</button><button class="btn danger" id="rotateToken">Rotate display token</button></div>
-      </div>
-    </div>
-  </section>
-</main>
-
+<section class="panel" id="p-display"><div class="settings">
+<div class="card"><div class="eyebrow">Connection</div><h2>Google Calendar</h2><p class="meta">Read-only access. Google tokens stay encrypted on this server and are never sent to the frame.</p>
+<div id="gOff"><div class="setrow"><div><strong>Calendar access</strong><div class="meta" id="gMsg"></div></div><button class="btn primary" id="connect">Connect Google</button></div></div>
+<div id="gOn" hidden><div class="setrow"><div><strong>Connected</strong><div class="meta">Choose calendars to show.</div></div><button class="btn danger" id="disconnect">Disconnect</button></div><div class="setrow stack"><div class="cal-list" id="calList"></div></div><div class="setrow"><span class="label">Upcoming window</span><select id="window"><option>7</option><option>14</option><option selected>30</option><option>60</option><option>90</option><option value="365">365</option></select></div></div><div class="status" id="gStatus"></div></div>
+<div class="card"><div class="eyebrow">E-ink renderer</div><h2>Display settings</h2><p class="meta">Designed separately from the web UI for crisp low-refresh screens.</p>
+<div class="setrow"><span class="label">Title</span><input id="displayTitle"></div><div class="setrow"><span class="label">Palette</span><select id="palette"><option value="spectra6">6-color / Spectra</option><option value="mono">Black & white</option></select></div><div class="setrow"><span class="label">Layout</span><select id="layout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div><div class="setrow"><span class="label">Date header</span><select id="dateWidget"><option value="flipper">Split-flap card</option><option value="plain">Plain date</option></select></div><div class="setrow"><span class="label">Refresh</span><select id="refresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div><div class="setrow"><span class="label">Countdown rows</span><input id="maxCountdowns" type="number" min="1" max="20"></div><div class="setrow"><span class="label">Agenda rows</span><input id="maxEvents" type="number" min="1" max="20"></div><div class="setrow"><span class="label">Sections</span><div><label class="check"><input id="showCountdowns" type="checkbox"> Countdowns</label><label class="check" style="margin-top:7px"><input id="showAgenda" type="checkbox"> Agenda</label></div></div><div class="actions"><button class="btn primary" id="saveDisplay">Save display</button><button class="btn danger" id="rotate">Rotate token</button></div></div>
+</div>
+<div class="card" style="padding:18px;margin-top:14px"><div class="eyebrow">FrameOS</div><h2 style="font-size:1rem;margin:3px 0">Private display sources</h2><p class="meta">Use the rendered SVG for an exact match, or JSON for your own FrameOS scene.</p>
+<div class="setrow stack"><strong>Rendered SVG</strong><div class="code" id="svgUrl"></div></div><div class="setrow stack"><strong>JSON feed</strong><div class="code" id="feedUrl"></div></div>
+<div class="toolbar" style="margin-top:16px"><div><strong>Exact e-ink preview</strong><div class="meta">Same SVG endpoint the frame uses.</div></div><button class="btn" id="full">Open full screen</button></div><div class="preview-controls"><label class="field"><span>Width</span><input id="pw" type="number" value="800" min="300" max="2000"></label><label class="field"><span>Height</span><input id="ph" type="number" value="480" min="300" max="2000"></label><button class="btn" id="land">800 × 480</button><button class="btn" id="port">480 × 800</button></div><div class="preview"><img id="preview" alt="E-ink preview"></div></div>
+</section></main>
 <script>
-let state=null, editingId=null, calendarEvents=[];
-const $=id=>document.getElementById(id);
-
-function localInput(iso){const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}
-function defaultDate(){return localInput(new Date(Date.now()+86400000).toISOString())}
-function formatDate(iso){return new Date(iso).toLocaleString([], {weekday:"short",month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}
-function remaining(iso){const ms=new Date(iso)-Date.now(); if(ms<=0)return "Complete"; const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); return d+"d "+String(h).padStart(2,"0")+"h "+String(m).padStart(2,"0")+"m"}
-async function api(path,options={}){const r=await fetch(path,{headers:{"Content-Type":"application/json",...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Request failed");return data}
-async function load(){state=await api("/api/state");renderCountdowns();renderSettings(); if(state.google.connected) await loadCalendars(false)}
-function renderCountdowns(){
- const list=$("countdownList"); list.innerHTML="";
- if(!state.countdowns.length){list.innerHTML='<div class="empty">No countdowns yet. Add one above.</div>';return}
- state.countdowns.forEach(item=>{const row=document.createElement("article");row.className="card countdown";row.innerHTML='<div><div class="name"></div><div class="meta"></div></div><div class="remaining"></div><div class="actions"><button class="btn link edit">Edit</button><button class="btn link danger del">Delete</button></div>';row.querySelector(".name").textContent=item.name;row.querySelector(".meta").textContent=formatDate(item.end);row.querySelector(".remaining").textContent=remaining(item.end);row.querySelector(".edit").onclick=()=>openEditor(item);row.querySelector(".del").onclick=()=>removeItem(item);list.appendChild(row)})
-}
-function openEditor(item){editingId=item?.id||null;$("editor").classList.add("open");$("nameInput").value=item?.name||"";$("dateInput").value=item?localInput(item.end):defaultDate();$("saveButton").textContent=item?"Save":"Add";$("nameInput").focus()}
-function closeEditor(){editingId=null;$("editor").classList.remove("open");$("formStatus").textContent=""}
-async function removeItem(item){if(!confirm('Delete "'+item.name+'"?'))return;await api("/api/countdowns/"+encodeURIComponent(item.id),{method:"DELETE"});await load()}
-$("form").onsubmit=async e=>{e.preventDefault();try{const body={name:$("nameInput").value.trim(),end:new Date($("dateInput").value).toISOString()};await api(editingId?"/api/countdowns/"+encodeURIComponent(editingId):"/api/countdowns",{method:editingId?"PUT":"POST",body:JSON.stringify(body)});closeEditor();await load()}catch(err){$("formStatus").textContent=err.message}}
-$("newButton").onclick=()=>openEditor();$("cancelButton").onclick=closeEditor;
-
-document.querySelectorAll(".tab").forEach(btn=>btn.onclick=async()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$("panel-"+btn.dataset.tab).classList.add("active");if(btn.dataset.tab==="calendar")await loadAgenda()});
-
-async function loadAgenda(){
- const a=$("agenda"); if(!state.google.connected){a.innerHTML='<div class="empty">Connect Google Calendar from Displays first.</div>';return}
- a.innerHTML='<div class="empty">Loading…</div>';
- try{const data=await api("/api/google/events");calendarEvents=data.events||[];renderAgenda()}catch(e){a.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>'}
-}
-function renderAgenda(){const a=$("agenda");a.innerHTML="";if(!calendarEvents.length){a.innerHTML='<div class="empty">No upcoming events in the selected calendars.</div>';return}calendarEvents.forEach(e=>{const row=document.createElement("div");row.className="event";const time=document.createElement("div");time.className="event-time";const d=new Date(e.start);time.textContent=e.allDay?d.toLocaleDateString([],{month:"short",day:"numeric"}):d.toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});const detail=document.createElement("div");const title=document.createElement("div");title.className="event-title";title.textContent=e.title;detail.appendChild(title);if(e.location){const loc=document.createElement("div");loc.className="meta";loc.textContent=e.location;detail.appendChild(loc)}row.append(time,detail);a.appendChild(row)})}
-function escapeHtml(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
-
-function renderSettings(){
- $("googleDisconnected").hidden=state.google.connected;$("googleConnected").hidden=!state.google.connected;
- $("windowDays").value=String(state.google.countdownWindowDays||30);
- $("feedUrl").textContent=location.origin+state.display.feedPath;
- $("viewUrl").textContent=location.origin+state.display.viewPath;
- $("displayTitle").value=state.display.title||"Upcoming";$("maxEvents").value=state.display.maxEvents||6;$("maxCountdowns").value=state.display.maxCountdowns||5;
-}
-async function loadCalendars(saveAfter){
- if(!state.google.connected)return;
- try{const data=await api("/api/google/calendars");const holder=$("calendarList");holder.innerHTML="";data.calendars.forEach(c=>{const label=document.createElement("label");label.className="calendar-item";const box=document.createElement("input");box.type="checkbox";box.checked=state.google.selectedCalendarIds.includes(c.id);box.onchange=saveCalendarSelection;const span=document.createElement("span");span.textContent=c.summary+(c.primary?" (primary)":"");label.append(box,span);label.dataset.id=c.id;holder.appendChild(label)});if(saveAfter)await saveCalendarSelection()}catch(e){$("googleStatus").textContent=e.message}
-}
-async function saveCalendarSelection(){const ids=[...document.querySelectorAll("#calendarList .calendar-item")].filter(x=>x.querySelector("input").checked).map(x=>x.dataset.id);await api("/api/settings",{method:"PUT",body:JSON.stringify({selectedCalendarIds:ids,countdownWindowDays:Number($("windowDays").value)})});await load()}
-$("windowDays").onchange=saveCalendarSelection;
-$("connectGoogle").onclick=()=>location.href="/api/google/auth";
-$("disconnectGoogle").onclick=async()=>{if(!confirm("Disconnect Google Calendar?"))return;await api("/api/google/disconnect",{method:"POST"});await load()};
-$("refreshCalendar").onclick=loadAgenda;
-$("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value)})});await load()};
-$("previewDisplay").onclick=()=>window.open(state.display.viewPath,"_blank");
-$("rotateToken").onclick=async()=>{if(!confirm("Rotate the FrameOS token? Existing display URLs will stop working."))return;await api("/api/display/rotate-token",{method:"POST"});await load()};
-
-load().catch(e=>document.body.insertAdjacentHTML("beforeend",'<p style="padding:20px">'+escapeHtml(e.message)+'</p>'));
-setInterval(()=>{if(state)renderCountdowns()},30000);
-</script>
-</body>
-</html>
+let state,editing=null,accent='black',calEvents=[];const $=x=>document.getElementById(x),colors={black:'#171717',red:'#d62828',blue:'#1769aa',green:'#2f7d32',yellow:'#e0a800'};
+const local=iso=>{const d=new Date(iso);return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16)},defDate=()=>local(new Date(Date.now()+86400000));
+async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json',...(o.headers||{})},...o}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d}
+function fdate(iso,style='medium'){const d=new Date(iso);if(style==='short')return d.toLocaleDateString([],{month:'short',day:'numeric'});if(style==='long')return d.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});if(style==='numeric')return d.toLocaleDateString('en-CA');return d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})}
+function rem(c){const ms=new Date(c.end)-Date.now(),s=Math.max(0,Math.floor(ms/1000)),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);if(ms<=0)return'Complete';if(c.timeDisplayStyle==='date')return fdate(c.end,c.dateDisplayStyle);if(c.timeDisplayStyle==='compact')return d+'d '+h+'h';if(c.timeDisplayStyle==='full')return d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m';const cd=Math.ceil(ms/86400000);return cd+' '+(cd===1?'day':'days')}
+function pct(c){if(!c.showProgressBar||c.progressMode==='none')return null;if(c.progressMode==='manual')return c.progressTotal>0?Math.max(0,Math.min(100,c.progressCurrent/c.progressTotal*100)):0;const s=new Date(c.progressStart||c.created),e=new Date(c.end);return e>s?Math.max(0,Math.min(100,(Date.now()-s)/(e-s)*100)):0}
+function prog(c){const p=pct(c);if(p==null)return'<span class="meta">Progress hidden</span>';const meta=c.progressMode==='manual'?c.progressCurrent+' / '+c.progressTotal:Math.round(p)+'% elapsed';if(c.progressStyle==='segmented')return'<div class="seg">'+Array.from({length:12},(_,i)=>'<i class="'+(i<Math.round(p/100*12)?'on':'')+'"></i>').join('')+'</div><div class="progress-meta"><span>'+meta+'</span><span>'+Math.round(p)+'%</span></div>';return'<div class="bar '+(c.progressStyle==='thin'?'thin':'')+'"><div class="fill" style="width:'+p+'%"></div></div><div class="progress-meta"><span>'+meta+'</span><span>'+Math.round(p)+'%</span></div>'}
+function setAccent(c){accent=c;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('sel',x.dataset.c===c))}
+function swatches(){const h=$('swatches');for(const c of Object.keys(colors)){const b=document.createElement('button');b.type='button';b.className='swatch';b.dataset.c=c;b.style.setProperty('--c',colors[c]);b.title=c;b.onclick=()=>setAccent(c);h.appendChild(b)}setAccent('black')}
+function progressFields(){const m=$('progressMode').value;document.querySelectorAll('.p-time').forEach(x=>x.style.display=m==='time'?'grid':'none');document.querySelectorAll('.p-man').forEach(x=>x.style.display=m==='manual'?'grid':'none')}
+function openEditor(c){editing=c?.id||null;$('editor').classList.add('open');$('editorTitle').textContent=c?'Edit countdown':'New countdown';$('save').textContent=c?'Save changes':'Add countdown';$('name').value=c?.name||'';$('end').value=c?local(c.end):defDate();setAccent(c?.accentColor||'black');$('timeStyle').value=c?.timeDisplayStyle||'days';$('dateStyle').value=c?.dateDisplayStyle||'medium';$('progressMode').value=c?.progressMode||'time';$('progressStyle').value=c?.progressStyle||'solid';$('progressStart').value=c?local(c.progressStart||c.created):local(new Date());$('progressCurrent').value=c?.progressCurrent??0;$('progressTotal').value=c?.progressTotal??100;$('showDate').checked=c?.showExactDate!==false;$('showProgress').checked=c?.showProgressBar!==false;$('showEink').checked=c?.displayEnabled!==false;$('pin').checked=!!c?.pinned;progressFields();$('name').focus()}
+function closeEditor(){editing=null;$('editor').classList.remove('open');$('formStatus').textContent=''}
+function render(){const l=$('list');l.innerHTML='';const active=state.countdowns.filter(c=>new Date(c.end)>new Date()).length;$('summary').textContent=active+' active · '+state.countdowns.length+' total';if(!state.countdowns.length){l.innerHTML='<div class="empty">No countdowns yet. Add one to start building the display.</div>';return}for(const c of state.countdowns){const a=document.createElement('article');a.className='card row'+(new Date(c.end)<=new Date()?' exp':'');a.style.setProperty('--c',colors[c.accentColor]||colors.black);a.innerHTML='<div><div class="name"></div><div class="date"></div></div><div class="remain"></div><div class="pc"></div><div class="row-actions"><button class="btn quiet edit">Edit</button><button class="btn quiet danger del">Delete</button></div>';a.querySelector('.name').textContent=(c.pinned?'● ':'')+c.name;a.querySelector('.date').textContent=c.showExactDate?fdate(c.end,c.dateDisplayStyle):(c.displayEnabled?'Shown on e-ink':'Hidden from e-ink');a.querySelector('.remain').textContent=rem(c);a.querySelector('.pc').innerHTML=prog(c);a.querySelector('.edit').onclick=()=>openEditor(c);a.querySelector('.del').onclick=async()=>{if(confirm('Delete "'+c.name+'"?')){await api('/api/countdowns/'+encodeURIComponent(c.id),{method:'DELETE'});await load()}};l.appendChild(a)}}
+async function migrate(){if(localStorage.getItem('countdown-server-migrated-v1')||state.countdowns.length)return;let old=[];try{old=JSON.parse(localStorage.getItem('countdown-app-v2')||'[]')}catch{}if(Array.isArray(old))for(const c of old){if(c?.name&&c?.end)await api('/api/countdowns',{method:'POST',body:JSON.stringify({name:c.name,end:c.end})}).catch(()=>{})}localStorage.setItem('countdown-server-migrated-v1','1');state=await api('/api/state')}
+async function load(){state=await api('/api/state');await migrate();render();settings();if(state.google.connected)await loadCalendars()}
+$('form').onsubmit=async e=>{e.preventDefault();try{const b={name:$('name').value.trim(),end:new Date($('end').value).toISOString(),accentColor:accent,timeDisplayStyle:$('timeStyle').value,dateDisplayStyle:$('dateStyle').value,progressMode:$('progressMode').value,progressStyle:$('progressStyle').value,progressStart:$('progressStart').value?new Date($('progressStart').value).toISOString():'',progressCurrent:Number($('progressCurrent').value||0),progressTotal:Number($('progressTotal').value||0),showExactDate:$('showDate').checked,showProgressBar:$('showProgress').checked,displayEnabled:$('showEink').checked,pinned:$('pin').checked};await api(editing?'/api/countdowns/'+encodeURIComponent(editing):'/api/countdowns',{method:editing?'PUT':'POST',body:JSON.stringify(b)});closeEditor();await load();preview()}catch(x){$('formStatus').textContent=x.message}}
+$('new').onclick=()=>openEditor();$('close').onclick=$('cancel').onclick=closeEditor;$('progressMode').onchange=progressFields;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));$('p-'+b.dataset.tab).classList.add('on');if(b.dataset.tab==='calendar')await agenda();if(b.dataset.tab==='display')preview()});
+async function agenda(){const h=$('agenda');if(!state.google.connected){h.innerHTML='<div class="empty">Connect Google Calendar from the Display tab.</div>';return}h.innerHTML='<div class="empty">Loading…</div>';try{calEvents=(await api('/api/google/events')).events||[];h.innerHTML='';if(!calEvents.length){h.innerHTML='<div class="empty">No upcoming events.</div>';return}for(const e of calEvents){const r=document.createElement('div');r.className='event';const d=new Date(e.start),ms=d-Date.now(),hours=Math.ceil(ms/3600000);r.innerHTML='<div class="event-time"></div><div><div class="event-title"></div><div class="meta loc"></div></div><div class="event-count"></div>';r.querySelector('.event-time').textContent=e.allDay?d.toLocaleDateString([],{month:'short',day:'numeric'}):d.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});r.querySelector('.event-title').textContent=e.title;r.querySelector('.loc').textContent=e.location||'';r.querySelector('.event-count').textContent=hours<24?'in '+Math.max(0,hours)+'h':'in '+Math.ceil(ms/86400000)+'d';h.appendChild(r)}}catch(x){h.innerHTML='<div class="empty">'+x.message+'</div>'}}
+$('refreshCal').onclick=agenda;
+function settings(){$('gOff').hidden=state.google.connected;$('gOn').hidden=!state.google.connected;$('gMsg').textContent=state.google.configured?'Connect the calendars you want to show.':'Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_SECRET and APP_BASE_URL in CasaOS first.';$('connect').disabled=!state.google.configured;$('window').value=String(state.google.countdownWindowDays||30);$('displayTitle').value=state.display.title||'Upcoming';$('palette').value=state.display.palette||'spectra6';$('layout').value=state.display.layout||'auto';$('dateWidget').value=state.display.dateWidgetStyle||'flipper';$('refresh').value=String(state.display.refreshMinutes||15);$('maxCountdowns').value=state.display.maxCountdowns||4;$('maxEvents').value=state.display.maxEvents||5;$('showCountdowns').checked=state.display.showCountdowns!==false;$('showAgenda').checked=state.display.showAgenda!==false;urls()}
+async function loadCalendars(){try{const cs=(await api('/api/google/calendars')).calendars||[],h=$('calList');h.innerHTML='';for(const c of cs){const lab=document.createElement('label');lab.className='cal-item';lab.dataset.id=c.id;lab.innerHTML='<input type="checkbox"><span></span>';lab.querySelector('input').checked=state.google.selectedCalendarIds.includes(c.id);lab.querySelector('span').textContent=c.summary+(c.primary?' (primary)':'');lab.querySelector('input').onchange=saveCalendars;h.appendChild(lab)}}catch(x){$('gStatus').textContent=x.message}}
+async function saveCalendars(){const ids=[...document.querySelectorAll('.cal-item')].filter(x=>x.querySelector('input').checked).map(x=>x.dataset.id);await api('/api/settings',{method:'PUT',body:JSON.stringify({selectedCalendarIds:ids,countdownWindowDays:Number($('window').value)})});state=await api('/api/state');settings();preview()}
+$('window').onchange=saveCalendars;$('connect').onclick=()=>location.href='/api/google/auth';$('disconnect').onclick=async()=>{if(confirm('Disconnect Google Calendar?')){await api('/api/google/disconnect',{method:'POST'});await load();preview()}};
+$('saveDisplay').onclick=async()=>{await api('/api/settings',{method:'PUT',body:JSON.stringify({displayTitle:$('displayTitle').value,palette:$('palette').value,layout:$('layout').value,dateWidgetStyle:$('dateWidget').value,refreshMinutes:Number($('refresh').value),maxCountdowns:Number($('maxCountdowns').value),maxEvents:Number($('maxEvents').value),showCountdowns:$('showCountdowns').checked,showAgenda:$('showAgenda').checked})});state=await api('/api/state');settings();preview()};$('rotate').onclick=async()=>{if(confirm('Rotate the display token? Existing FrameOS URLs will stop working.')){await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');settings();preview()}};
+function svg(){return location.origin+state.display.svgPath+'&w='+Math.max(300,Number($('pw').value)||800)+'&h='+Math.max(300,Number($('ph').value)||480)}function urls(){$('svgUrl').textContent=svg();$('feedUrl').textContent=location.origin+state.display.feedPath}function preview(){if(!state)return;urls();$('preview').src=svg()+'&_='+Date.now()}$('pw').onchange=$('ph').onchange=preview;$('land').onclick=()=>{$('pw').value=800;$('ph').value=480;preview()};$('port').onclick=()=>{$('pw').value=480;$('ph').value=800;preview()};$('full').onclick=()=>window.open(state.display.viewPath+'&w='+$('pw').value+'&h='+$('ph').value,'_blank');
+swatches();load().then(preview);setInterval(()=>{if(state)render()},30000);
+</script></body></html>
