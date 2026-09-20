@@ -856,10 +856,10 @@ function setLayoutStatus(message,error=false){
 function renderSectionLayoutEditor(){
  if(!state)return;
  if(!displayLayoutDraft)displayLayoutDraft=cloneDisplayLayout(state.display.sectionLayout);
- const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor'),mode=$('displaySectionLayoutMode').value,countdownsOnly=$('displayMode').value==='countdowns';
+ const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor'),mode=$('displaySectionLayoutMode').value,displayMode=$('displayMode').value,countdownsOnly=displayMode==='countdowns',customizable=displayMode==='dashboard';
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
  shell.style.aspectRatio=w+'/'+h;
- $('einkLayoutCard').classList.toggle('disabled',mode!=='custom'||countdownsOnly);
+ $('einkLayoutCard').classList.toggle('disabled',mode!=='custom'||!customizable||countdownsOnly);
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];
    return'<div class="layout-block" data-kind="'+kind+'"><strong>'+DISPLAY_SECTION_LABELS[kind]+'</strong><small></small><span class="layout-resize" data-resize="1" aria-label="Resize '+DISPLAY_SECTION_LABELS[kind]+'"></span></div>';
@@ -867,7 +867,7 @@ function renderSectionLayoutEditor(){
  editor.querySelectorAll('.layout-block').forEach(block=>{
    const kind=block.dataset.kind;applyLayoutBlock(block,displayLayoutDraft[kind]);
    block.onpointerdown=e=>{
-     if(mode!=='custom'||countdownsOnly)return;
+     if(mode!=='custom'||!customizable||countdownsOnly)return;
      e.preventDefault();
      const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),g=displayGrid();
      const startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
