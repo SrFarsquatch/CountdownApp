@@ -221,6 +221,30 @@ function base(req) {
   return proto + '://' + host;
 }
 const googleConfigured = () => Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && APP_SECRET);
+function makeOauthState() {
+  const issued = Date.now().toString(36);
+  const nonce = crypto.randomBytes(18).toString('base64url');
+  const payload = issued + '.' + nonce;
+  const signature = crypto.createHmac('sha256', APP_SECRET).update(payload).digest('base64url');
+  return payload + '.' + signature;
+}
+function validOauthState(value) {
+  try {
+    const parts = String(value || '').split('.');
+    if (parts.length !== 3) return false;
+    const [issued, nonce, signature] = parts;
+    if (!issued || !nonce || !signature) return false;
+    const timestamp = parseInt(issued, 36);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp < 0 || Date.now() - timestamp > 10 * 60 * 1000) return false;
+    const payload = issued + '.' + nonce;
+    const expected = crypto.createHmac('sha256', APP_SECRET).update(payload).digest('base64url');
+    const a = Buffer.from(signature);
+    const b = Buffer.from(expected);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 function updaterConfigured() {
   try { fs.accessSync(DOCKER_SOCKET, fs.constants.R_OK | fs.constants.W_OK); return true; }
@@ -830,17 +854,16 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/google/auth') {
       if (!googleConfigured()) return json(res, 400, { error: 'Google OAuth is not configured on the server.' });
-      const oauthState = crypto.randomBytes(16).toString('hex');
+      const oauthState = makeOauthState();
       const query = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID, redirect_uri: base(req) + '/api/google/callback', response_type: 'code',
         scope: SCOPES, access_type: 'offline', prompt: 'select_account consent', include_granted_scopes: 'true', state: oauthState
       });
-      res.writeHead(302, { 'Set-Cookie': 'countdown_oauth_state=' + oauthState + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=600', Location: 'https://accounts.google.com/o/oauth2/v2/auth?' + query });
+      res.writeHead(302, { Location: 'https://accounts.google.com/o/oauth2/v2/auth?' + query });
       return res.end();
     }
     if (p === '/api/google/callback') {
-      const match = String(req.headers.cookie || '').match(/(?:^|;\s*)countdown_oauth_state=([^;]+)/);
-      if (!match || match[1] !== url.searchParams.get('state')) return text(res, 400, 'Invalid OAuth state.');
+      if (!validOauthState(url.searchParams.get('state'))) return text(res, 400, 'Invalid or expired OAuth state. Start the Google connection again.');
       if (url.searchParams.get('error')) return text(res, 400, 'Google authorization was cancelled.');
       const token = await exchange(url.searchParams.get('code'), req);
       token.expires_at = Date.now() + num(token.expires_in, 3600) * 1000;
@@ -860,7 +883,7 @@ const server = http.createServer(async (req, res) => {
         db.google.accounts.push(account);
       }
       save(db);
-      res.writeHead(302, { Location: '/?view=settings&calendar=connected', 'Set-Cookie': 'countdown_oauth_state=; Path=/; Max-Age=0' });
+      res.writeHead(302, { Location: '/?view=settings&calendar=connected' });
       return res.end();
     }
     if (p === '/api/google/disconnect' && req.method === 'POST') {
