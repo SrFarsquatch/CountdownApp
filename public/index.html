@@ -763,10 +763,10 @@ function setLayoutStatus(message,error=false){
 function renderSectionLayoutEditor(){
  if(!state)return;
  if(!displayLayoutDraft)displayLayoutDraft=cloneDisplayLayout(state.display.sectionLayout);
- const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor'),mode=$('displaySectionLayoutMode').value;
+ const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor'),mode=$('displaySectionLayoutMode').value,countdownsOnly=$('displayMode').value==='countdowns';
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
  shell.style.aspectRatio=w+'/'+h;
- $('einkLayoutCard').classList.toggle('disabled',mode!=='custom');
+ $('einkLayoutCard').classList.toggle('disabled',mode!=='custom'||countdownsOnly);
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];
    return'<div class="layout-block" data-kind="'+kind+'"><strong>'+DISPLAY_SECTION_LABELS[kind]+'</strong><small></small><span class="layout-resize" data-resize="1" aria-label="Resize '+DISPLAY_SECTION_LABELS[kind]+'"></span></div>';
@@ -774,7 +774,7 @@ function renderSectionLayoutEditor(){
  editor.querySelectorAll('.layout-block').forEach(block=>{
    const kind=block.dataset.kind;applyLayoutBlock(block,displayLayoutDraft[kind]);
    block.onpointerdown=e=>{
-     if(mode!=='custom')return;
+     if(mode!=='custom'||countdownsOnly)return;
      e.preventDefault();
      const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),g=displayGrid();
      const startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
@@ -801,7 +801,8 @@ function renderSectionLayoutEditor(){
      block.addEventListener('pointermove',move);block.addEventListener('pointerup',up);block.addEventListener('pointercancel',up);
    };
  });
- if(mode==='custom')setLayoutStatus('Drag sections to move them; use the corner handle to resize.');
+ if(countdownsOnly)setLayoutStatus('Countdowns-only mode uses the dedicated countdown layout.');
+ else if(mode==='custom')setLayoutStatus('Drag sections to move them; use the corner handle to resize.');
  else setLayoutStatus('Automatic layout is active. Switch Section layout to Custom to edit.');
 }
 function renderDisplay(){
@@ -828,6 +829,7 @@ $('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;pre
 $('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;previewDisplay()};
 $('openFrame').onclick=()=>window.open(state.display.viewPath+'&w='+$('previewW').value+'&h='+$('previewH').value,'_blank');
 $('displaySectionLayoutMode').onchange=renderSectionLayoutEditor;
+$('displayMode').onchange=renderSectionLayoutEditor;
 Object.values(DISPLAY_SECTION_CHECKS).forEach(id=>{$(id).onchange=()=>{renderSectionLayoutEditor();setLayoutStatus('Unsaved display changes.')}});
 $('autoArrangeSections').onclick=()=>{displayLayoutDraft=defaultDisplayLayoutForResolution();renderSectionLayoutEditor();setLayoutStatus('Layout arranged for the current preview orientation. Save to apply.')};
 $('resetSectionLayout').onclick=()=>{displayLayoutDraft={agenda:{x:0,y:0,w:6,h:4},tasks:{x:6,y:0,w:6,h:4},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};renderSectionLayoutEditor();setLayoutStatus('Layout reset. Save to apply.')};
