@@ -96,21 +96,13 @@ For FrameOS, use the rendered SVG endpoint for the built-in CountdownApp layout,
 
 Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
 
-## One-click updates
+## Updating
 
-The current CasaOS deployment includes an internal `countdown-updater` sidecar. It is not exposed on a host port. The main web app talks to it only over the private Compose network.
+The CasaOS install now uses a single application container. This avoids the installer race that could produce a Docker "No such container" error during initial setup.
 
-The updater has access to the Docker socket so it can:
+To update the app, pull/recreate the `ghcr.io/srfarsquatch/countdownapp:edge` container from CasaOS after a successful GitHub Actions build. The persistent data folder is:
 
-- pull the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
-- recreate only the CountdownApp application container,
-- preserve the existing environment, network, port binding and `/data` mount,
-- health-check the replacement,
-- restore the previous container automatically if the new container does not become healthy.
-
-Because older installations do not have the updater sidecar, **install/re-import the latest `docker-compose.casaos.yml` once**. After that, use **Displays → Updates → Update now** in CountdownApp for future application image updates.
-
-The updater intentionally can only target the fixed CountdownApp container/image defined in Compose. Its HTTP port is not published to the LAN or Tailscale network.
+`/DATA/AppData/countdownapp/data`
 
 ## Updating the source
 

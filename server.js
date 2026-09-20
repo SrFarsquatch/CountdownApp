@@ -2,6 +2,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),crypto=require(
 const {URL}=require('url');
 const PORT=Number(process.env.PORT||8080),DATA_DIR=process.env.DATA_DIR||'/data',DB_PATH=path.join(DATA_DIR,'countdown-data.json'),PUBLIC_DIR=path.join(__dirname,'public');
 const GOOGLE_CLIENT_ID=process.env.GOOGLE_CLIENT_ID||'',GOOGLE_CLIENT_SECRET=process.env.GOOGLE_CLIENT_SECRET||'',APP_BASE_URL=(process.env.APP_BASE_URL||'').replace(/\/$/,''),APP_SECRET=process.env.APP_SECRET||'';
+const UPDATER_URL=process.env.UPDATER_URL||'',UPDATE_TOKEN=process.env.UPDATE_TOKEN||'';
 const SCOPES='https://www.googleapis.com/auth/calendar.readonly';
 const COLORS=['black','red','blue','green','yellow'],PROGRESS_MODES=['time','manual','none'],PROGRESS_STYLES=['solid','segmented','thin'],DATE_STYLES=['short','medium','long','numeric'],TIME_STYLES=['days','compact','full','date'],LAYOUTS=['auto','landscape','portrait'],PALETTES=['spectra6','mono'],DATE_WIDGETS=['flipper','plain'];
 const HEX={black:'#111111',red:'#d62828',blue:'#1769aa',green:'#2f7d32',yellow:'#e0a800'};
