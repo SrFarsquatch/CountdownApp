@@ -107,6 +107,19 @@
 .write-state.warn{color:var(--orange)}
 .account-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
 
+
+/* Google Tasks sync */
+.integration-section{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.integration-section:first-child{margin-top:0;padding-top:0;border-top:0}
+.integration-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.tasklist-list{display:grid;gap:7px}
+.tasklist-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:5px 0}
+.tasklist-row input{width:16px;height:16px;min-height:0;padding:0}
+.tasklist-default{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:750}
+.sync-source{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.sync-source:before{content:"↔";font-weight:900}
+.task-sync-note{margin-top:8px}
+
 </style>
 </head>
 <body>
@@ -218,7 +231,7 @@
 </div></div>
 
 <script>
-let state=null,calEvents=[],taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={};
+let state=null,calEvents=[],taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const fmtDate=(v,o={})=>new Date(v).toLocaleDateString([],{month:'short',day:'numeric',...o});
@@ -238,6 +251,18 @@ async function googleCalendarsFor(accountId,force=false){
  calendarCache[accountId]=data.calendars||[];
  return calendarCache[accountId];
 }
+async function googleTaskListsFor(accountId,force=false){
+ if(!force&&taskListCache[accountId])return taskListCache[accountId];
+ const data=await api('/api/google/tasklists?accountId='+encodeURIComponent(accountId));
+ taskListCache[accountId]=data.taskLists||[];
+ return taskListCache[accountId];
+}
+async function syncGoogleTasksClient(){
+ if(!(state?.google?.accounts||[]).some(a=>a.canTasks&&(a.selectedTaskListIds||[]).length))return null;
+ try{return await api('/api/google/tasks/sync',{method:'POST'})}
+ catch(error){console.warn('Google Tasks sync failed',error);return null}
+}
+
 
 function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -358,20 +383,63 @@ async function eventModal(item=null,preset={}){
  };
 }
 
-function taskModal(item){
- const goals=(state.goals||[]).map(g=>`<option value="${esc(g.id)}" ${item?.goalId===g.id?'selected':''}>${esc(g.title)}</option>`).join('');
- openModal(item?'Edit task':'New task',`<form id="entityForm"><div class="form-grid">
- <div class="field full"><label>Title</label><input id="fTitle" required value="${esc(item?.title||'')}" placeholder="Finish monthly forecast"></div>
- <div class="field full"><label>Description</label><textarea id="fDesc" placeholder="Optional notes">${esc(item?.description||'')}</textarea></div>
- <div class="field"><label>Due</label><input id="fDue" type="datetime-local" value="${item?.due?localInput(item.due):''}"></div>
- <div class="field"><label>Priority</label><select id="fPriority"><option low>Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
- <div class="field"><label>Status</label><select id="fStatus"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Complete</option></select></div>
- <div class="field"><label>Project / list</label><input id="fProject" value="${esc(item?.project||'')}" placeholder="Personal"></div>
- <div class="field full"><label>Linked goal</label><select id="fGoal"><option value="">None</option>${goals}</select></div>
- </div><div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save task</button></div></form>`);
+async function taskModal(item){
+ const goals=(state.goals||[]).map(g=>'<option value="'+esc(g.id)+'" '+(item?.goalId===g.id?'selected':'')+'>'+esc(g.title)+'</option>').join('');
+ const linked=Boolean(item?.googleTaskId);
+ let form='<form id="entityForm"><div class="form-grid">';
+ form+='<div class="field full"><label>Title</label><input id="fTitle" required value="'+esc(item?.title||'')+'" placeholder="Finish monthly forecast"></div>';
+ form+='<div class="field full"><label>Description</label><textarea id="fDesc" placeholder="Optional notes">'+esc(item?.description||'')+'</textarea></div>';
+ form+='<div class="field"><label>Due</label><input id="fDue" type="datetime-local" value="'+(item?.due?localInput(item.due):'')+'"></div>';
+ form+='<div class="field"><label>Priority</label><select id="fPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>';
+ form+='<div class="field"><label>Status</label><select id="fStatus"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Complete</option></select></div>';
+ form+='<div class="field"><label>Project / list</label><input id="fProject" value="'+esc(item?.project||'')+'" placeholder="Personal"></div>';
+ form+='<div class="field full"><label>Linked goal</label><select id="fGoal"><option value="">None</option>'+goals+'</select></div>';
+ form+='<div class="field full"><label>Google Tasks sync</label><select id="fGoogleTaskList" '+(linked?'disabled':'')+'><option value="">Planner only</option></select><div class="meta task-sync-note">'+(linked?'Linked to '+esc(item.googleTaskListTitle||'Google Tasks')+'. Changes and completion status sync both ways.':'Choose a Google Task list to sync this task both ways. Google Tasks stores due dates but not due times; Planner keeps the local time.')+'</div></div>';
+ form+='</div><div id="taskFormStatus" class="meta" style="margin-top:8px"></div><div class="modal-actions">'+(item?'<button type="button" class="btn" id="deleteEntity">Delete</button>':'')+'<button class="btn primary">Save task</button></div></form>';
+ openModal(item?'Edit task':'New task',form);
  $('fPriority').value=item?.priority||'medium';$('fStatus').value=item?.status||'todo';
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,status:$('fStatus').value,priority:$('fPriority').value,due:$('fDue').value?new Date($('fDue').value).toISOString():null,project:$('fProject').value.trim(),goalId:$('fGoal').value};await api(item?'/api/tasks/'+encodeURIComponent(item.id):'/api/tasks',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
- if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this task?')){await api('/api/tasks/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
+
+ const select=$('fGoogleTaskList');
+ if(linked){
+   select.innerHTML='<option value="'+esc(item.googleAccountId+'|||'+item.googleTaskListId)+'">'+esc(item.googleTaskListTitle||'Google Tasks')+'</option>';
+ }else{
+   const accounts=(state.google.accounts||[]).filter(a=>a.canTasks);
+   let options=[],preferred='';
+   for(const account of accounts){
+     try{
+       const lists=await googleTaskListsFor(account.id);
+       const selected=new Set(account.selectedTaskListIds||[]);
+       lists.filter(list=>selected.has(list.id)).forEach(list=>{
+         const value=account.id+'|||'+list.id;
+         options.push({value,label:(account.label||account.googleId||'Google')+' — '+list.title});
+         if(!preferred&&account.defaultTaskListId===list.id)preferred=value;
+       });
+     }catch(error){console.warn(error)}
+   }
+   select.innerHTML='<option value="">Planner only</option>'+options.map(x=>'<option value="'+esc(x.value)+'">'+esc(x.label)+'</option>').join('');
+   if(preferred)select.value=preferred;
+ }
+ $('entityForm').onsubmit=async e=>{
+   e.preventDefault();
+   const b={
+     title:$('fTitle').value.trim(),description:$('fDesc').value,status:$('fStatus').value,
+     priority:$('fPriority').value,due:$('fDue').value?new Date($('fDue').value).toISOString():null,
+     project:$('fProject').value.trim(),goalId:$('fGoal').value
+   };
+   if(!linked&&select.value){
+     const parts=select.value.split('|||');b.googleAccountId=parts[0]||'';b.googleTaskListId=parts[1]||'';
+   }
+   $('taskFormStatus').textContent=linked?'Saving to Planner and Google Tasks…':'Saving task…';
+   try{
+     await api(item?'/api/tasks/'+encodeURIComponent(item.id):'/api/tasks',{method:item?'PUT':'POST',body:JSON.stringify(b)});
+     closeModal();await loadAll();
+   }catch(error){$('taskFormStatus').textContent=error.message}
+ };
+ if(item)$('deleteEntity').onclick=async()=>{
+   if(!confirm(linked?'Delete this task from Planner and Google Tasks?':'Delete this task?'))return;
+   try{await api('/api/tasks/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}
+   catch(error){$('taskFormStatus').textContent=error.message}
+ };
 }
 function goalModal(item){
  openModal(item?'Edit goal':'New goal',`<form id="entityForm"><div class="form-grid">
@@ -420,7 +488,7 @@ function renderToday(){
  const goals=state.goals.filter(g=>g.status==='active').slice(0,4);$('todayGoals').innerHTML=goals.length?goals.map(g=>`<div class="item"><div></div><div><div class="title">${esc(g.title)}</div><div class="progress" style="margin-top:7px"><i style="width:${Math.round(g.progress||0)}%"></i></div></div><strong>${Math.round(g.progress||0)}%</strong></div>`).join(''):'<div class="empty">No active goals.</div>';
  const cds=state.countdowns.filter(c=>new Date(c.end)>now).slice(0,4);$('todayCountdowns').innerHTML=cds.length?cds.map(c=>countCard(c)).join(''):'<div class="empty">No upcoming countdowns.</div>';
 }
-function taskRow(t){return `<div class="item" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>`}
+function taskRow(t){const source=t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'';return `<div class="item" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>`}
 function bindTaskChecks(root){root.querySelectorAll('[data-check]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===b.dataset.check);await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PUT',body:JSON.stringify({status:t.status==='done'?'todo':'done'})});await loadAll()});root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>taskModal(state.tasks.find(x=>x.id===r.dataset.task)))}
 function renderTasks(){let list=state.tasks;if(taskFilter==='open')list=list.filter(t=>t.status!=='done');if(taskFilter==='done')list=list.filter(t=>t.status==='done');$('taskCount').textContent=list.length+' task'+(list.length===1?'':'s');$('taskList').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">Nothing here yet.</div>';bindTaskChecks($('taskList'))}
 document.querySelectorAll('#taskFilters button').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.filter;document.querySelectorAll('#taskFilters button').forEach(x=>x.classList.toggle('on',x===b));renderTasks()});
@@ -620,33 +688,46 @@ $('saveDisplay').onclick=async()=>{await api('/api/settings',{method:'PUT',body:
 async function renderSettings(){
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
- let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect one or more accounts and choose calendars from each.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
+ let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect accounts, choose calendars, and choose which Google Task lists Planner should sync.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
  if(!accounts.length){
    html+='<div class="empty">No Google accounts connected yet.</div>';
    box.innerHTML=html;
    if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
    refreshUpdateStatus();return;
  }
- box.innerHTML=html+accounts.map(a=>'<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google Calendar account')+'</div><div style="margin-top:6px"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Event editing enabled':'Reconnect for event editing')+'</span></div></div><div class="account-actions">'+(!a.canWrite?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div>').join('');
+ box.innerHTML=html+accounts.map(a=>{
+   const needsReconnect=!a.canWrite||!a.canTasks;
+   return '<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google account')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Calendar editing enabled':'Calendar reconnect needed')+'</span><span class="write-state '+(a.canTasks?'ok':'warn')+'">'+(a.canTasks?'Task sync enabled':'Task reconnect needed')+'</span></div></div><div class="account-actions">'+(needsReconnect?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="integration-section"><div class="integration-head"><strong>Calendars</strong><span class="meta">Shown in Planner</span></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div><div class="integration-section"><div class="integration-head"><strong>Google Tasks</strong><span class="meta">Two-way sync</span></div><div class="tasklist-list" data-tasklist-list="'+esc(a.id)+'"><div class="meta">'+(a.canTasks?'Loading task lists…':'Reconnect this account to grant Google Tasks access.')+'</div></div></div></div>';
+ }).join('');
  $('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
  box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
-
  box.querySelectorAll('[data-disconnect-account]').forEach(btn=>btn.onclick=async()=>{
    const account=accounts.find(a=>a.id===btn.dataset.disconnectAccount);
-   if(!confirm('Disconnect '+(account?.label||'this Google account')+'?'))return;
+   if(!confirm('Disconnect '+(account?.label||'this Google account')+'? Linked Google Tasks will remain in Planner as local tasks.'))return;
    await api('/api/google/accounts/'+encodeURIComponent(btn.dataset.disconnectAccount)+'/disconnect',{method:'POST'});
-   await loadAll();
+   calendarCache={};taskListCache={};await loadAll();
  });
  await Promise.all(accounts.map(async account=>{
-   const list=box.querySelector('[data-calendar-list="'+CSS.escape(account.id)+'"]');
-   if(!list)return;
+   const calendarRoot=box.querySelector('[data-calendar-list="'+CSS.escape(account.id)+'"]');
    try{
      const calendars=(await api('/api/google/calendars?accountId='+encodeURIComponent(account.id))).calendars||[];
-     list.innerHTML=calendars.length?calendars.map(cal=>'<label><input type="checkbox" class="calCheck" data-account-id="'+esc(account.id)+'" data-id="'+esc(cal.id)+'" '+((account.selectedCalendarIds||[]).includes(cal.id)?'checked':'')+'> <span class="cal-dot" style="background:'+safeColor(cal.backgroundColor)+'"></span><span>'+esc(cal.summary)+(cal.primary?' <span class="meta">(primary)</span>':'')+(cal.accessRole&&cal.accessRole==='reader'?' <span class="meta">· read only</span>':'')+'</span></label>').join(''):'<div class="meta">No calendars found for this account.</div>';
-     list.querySelectorAll('.calCheck').forEach(input=>input.onchange=()=>saveCalendars(account.id,list));
-   }catch(e){
-     list.innerHTML='<div class="notice">Could not load calendars: '+esc(e.message)+'</div>';
-   }
+     calendarRoot.innerHTML=calendars.length?calendars.map(cal=>'<label><input type="checkbox" class="calCheck" data-id="'+esc(cal.id)+'" '+((account.selectedCalendarIds||[]).includes(cal.id)?'checked':'')+'> <span class="cal-dot" style="background:'+safeColor(cal.backgroundColor)+'"></span><span>'+esc(cal.summary)+(cal.primary?' <span class="meta">(primary)</span>':'')+(cal.accessRole&&cal.accessRole==='reader'?' <span class="meta">· read only</span>':'')+'</span></label>').join(''):'<div class="meta">No calendars found for this account.</div>';
+     calendarRoot.querySelectorAll('.calCheck').forEach(input=>input.onchange=()=>saveCalendars(account.id,calendarRoot));
+   }catch(error){calendarRoot.innerHTML='<div class="notice">Could not load calendars: '+esc(error.message)+'</div>'}
+
+   const taskRoot=box.querySelector('[data-tasklist-list="'+CSS.escape(account.id)+'"]');
+   if(!account.canTasks)return;
+   try{
+     const lists=await googleTaskListsFor(account.id,true);
+     const selected=new Set(account.selectedTaskListIds||[]);
+     taskRoot.innerHTML=lists.length?lists.map(list=>'<div class="tasklist-row"><input type="checkbox" class="taskListCheck" data-id="'+esc(list.id)+'" '+(selected.has(list.id)?'checked':'')+'><span>'+esc(list.title)+'</span><label class="tasklist-default"><input type="radio" name="defaultTaskList-'+esc(account.id)+'" class="taskListDefault" value="'+esc(list.id)+'" '+(account.defaultTaskListId===list.id?'checked':'')+' '+(selected.has(list.id)?'':'disabled')+'> Default</label></div>').join(''):'<div class="meta">No Google Task lists found.</div>';
+     taskRoot.querySelectorAll('.taskListCheck').forEach(input=>input.onchange=()=>{
+       const row=input.closest('.tasklist-row'),radio=row.querySelector('.taskListDefault');radio.disabled=!input.checked;
+       if(!input.checked&&radio.checked)radio.checked=false;
+       saveTaskLists(account.id,taskRoot);
+     });
+     taskRoot.querySelectorAll('.taskListDefault').forEach(radio=>radio.onchange=()=>saveTaskLists(account.id,taskRoot));
+   }catch(error){taskRoot.innerHTML='<div class="notice">Could not load Google Tasks. Make sure the Google Tasks API is enabled in the same Google Cloud project. '+esc(error.message)+'</div>'}
  }));
  refreshUpdateStatus();
 }
@@ -657,11 +738,32 @@ async function saveCalendars(accountId,root){
  await loadCalendarEvents();
  renderToday();
 }
+async function saveTaskLists(accountId,root){
+ const ids=[...root.querySelectorAll('.taskListCheck')].filter(x=>x.checked).map(x=>x.dataset.id);
+ let defaultId=root.querySelector('.taskListDefault:checked')?.value||'';
+ if(!ids.includes(defaultId))defaultId=ids[0]||'';
+ try{
+   await api('/api/google/accounts/'+encodeURIComponent(accountId)+'/tasklists',{method:'PUT',body:JSON.stringify({taskListIds:ids,defaultTaskListId:defaultId})});
+   taskListCache={};state=await api('/api/state');await syncGoogleTasksClient();state=await api('/api/state');renderToday();renderTasks();
+ }catch(error){alert(error.message)}
+}
 async function refreshUpdateStatus(){try{const s=await api('/api/update/status');$('updateStatus').textContent=s.configured?(s.message||'Ready to update'):'Updater not configured';$('updateDetail').textContent=s.error||(!s.configured?'Re-import the latest CasaOS compose once.':'');$('updateNow').disabled=!s.configured||['pulling','preparing','restarting'].includes(s.phase)}catch(e){$('updateStatus').textContent='Updater unavailable';$('updateDetail').textContent=e.message}}
 $('updateNow').onclick=async()=>{if(!confirm('Install the newest published image?'))return;await api('/api/update/start',{method:'POST',headers:{'X-Countdown-Action':'update'}});$('updateStatus').textContent='Update started…';setTimeout(refreshUpdateStatus,1200)};
 
 async function loadCalendarEvents(){if(!state.google.connected){calEvents=[];return}const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+30);try{calEvents=(await api('/api/google/events?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString()))).events||[]}catch(e){calEvents=[]}}
-async function loadAll(force=false){state=await api('/api/state');if(force)calendarCache={};await loadCalendarEvents();renderToday();renderTasks();renderGoals();renderCountdowns();const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()}
+async function loadAll(force=false){
+ state=await api('/api/state');
+ if(force){calendarCache={};taskListCache={}}
+ if(force||!taskSyncBootstrapped){
+   taskSyncBootstrapped=true;
+   await syncGoogleTasksClient();
+   state=await api('/api/state');
+ }
+ await loadCalendarEvents();
+ renderToday();renderTasks();renderGoals();renderCountdowns();
+ const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
+ if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
+}
 const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>setView(initial));setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
 </body>

@@ -16,7 +16,7 @@ const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const TARGET_CONTAINER = process.env.TARGET_CONTAINER || 'countdownapp';
 const TARGET_IMAGE = process.env.TARGET_IMAGE || 'ghcr.io/srfarsquatch/countdownapp:edge';
 const UPDATE_STATUS_PATH = path.join(DATA_DIR, 'update-status.json');
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/tasks';
 
 const COLORS = ['black', 'red', 'blue', 'green', 'yellow', 'purple'];
 const PROGRESS_MODES = ['time', 'manual', 'none'];
@@ -99,8 +99,16 @@ function normalizeTask(x = {}) {
     project: cleanText(x.project, 80), goalId: x.goalId ? String(x.goalId) : '',
     tags: Array.isArray(x.tags) ? x.tags.map(v => cleanText(v, 40)).filter(Boolean).slice(0, 12) : [],
     subtasks: Array.isArray(x.subtasks) ? x.subtasks.map(normalizeSubtask).slice(0, 50) : [],
-    created, completedAt: status === 'done' ? (iso(x.completedAt) || new Date().toISOString()) : null,
-    displayEnabled: x.displayEnabled !== false
+    created, updated: iso(x.updated) || created,
+    completedAt: status === 'done' ? (iso(x.completedAt) || new Date().toISOString()) : null,
+    displayEnabled: x.displayEnabled !== false,
+    googleAccountId: x.googleAccountId ? String(x.googleAccountId) : '',
+    googleTaskListId: x.googleTaskListId ? String(x.googleTaskListId) : '',
+    googleTaskListTitle: cleanText(x.googleTaskListTitle, 160),
+    googleTaskId: x.googleTaskId ? String(x.googleTaskId) : '',
+    googleParentId: x.googleParentId ? String(x.googleParentId) : '',
+    googleUpdated: iso(x.googleUpdated),
+    googleEtag: cleanText(x.googleEtag, 500)
   };
 }
 
@@ -118,12 +126,15 @@ function normalizeGoal(x = {}) {
 }
 
 function normalizeGoogleAccount(x = {}) {
+  const selectedTaskListIds = Array.isArray(x.selectedTaskListIds) ? x.selectedTaskListIds.map(String).slice(0, 50) : [];
   return {
     id: String(x.id || id()),
     googleId: cleanText(x.googleId, 240),
     label: cleanText(x.label || x.googleId || 'Google account', 160),
     token: typeof x.token === 'string' ? x.token : null,
     selectedCalendarIds: Array.isArray(x.selectedCalendarIds) ? x.selectedCalendarIds.map(String).slice(0, 50) : [],
+    selectedTaskListIds,
+    defaultTaskListId: x.defaultTaskListId && selectedTaskListIds.includes(String(x.defaultTaskListId)) ? String(x.defaultTaskListId) : (selectedTaskListIds[0] || ''),
     connectedAt: iso(x.connectedAt) || new Date().toISOString()
   };
 }
@@ -322,6 +333,11 @@ function accountCanWrite(account) {
   return scopes.includes('https://www.googleapis.com/auth/calendar.events') ||
     scopes.includes('https://www.googleapis.com/auth/calendar');
 }
+function accountCanTasks(account) {
+  const token = account ? decrypt(account.token) : null;
+  const scopes = String(token?.scope || '').split(/\s+/).filter(Boolean);
+  return scopes.includes('https://www.googleapis.com/auth/tasks');
+}
 async function accessToken(accountOrId) {
   const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
   if (!account) return null;
@@ -458,6 +474,207 @@ function googleEventPayload(incoming = {}, allowRecurrence = false) {
     if (freq !== 'none') payload.recurrence = ['RRULE:FREQ=' + freq.toUpperCase()];
   }
   return payload;
+}
+async function googleTasksRequest(accountOrId, endpoint, method = 'GET', payload) {
+  const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
+  const access = await accessToken(account);
+  if (!account || !access) throw new Error('Google account is not connected.');
+  if (!accountCanTasks(account)) throw new Error('Reconnect this Google account to grant Google Tasks access.');
+  const hasBody = payload !== undefined && payload !== null;
+  const response = await fetch('https://tasks.googleapis.com/tasks/v1' + endpoint, {
+    method,
+    headers: { Authorization: 'Bearer ' + access, ...(hasBody ? { 'Content-Type': 'application/json' } : {}) },
+    body: hasBody ? JSON.stringify(payload) : undefined
+  });
+  if (response.status === 204) return null;
+  const raw = await response.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+  if (!response.ok) {
+    const detail = data?.error?.message || raw.slice(0, 180) || ('HTTP ' + response.status);
+    const error = new Error('Google Tasks request failed: ' + detail);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+async function taskLists(accountId) {
+  const account = typeof accountId === 'string' ? googleAccount(accountId) : accountId;
+  if (!account) throw new Error('Google account was not found.');
+  let out = [], pageToken = '';
+  do {
+    const query = new URLSearchParams({ maxResults: '100' });
+    if (pageToken) query.set('pageToken', pageToken);
+    const data = await googleTasksRequest(account, '/users/@me/lists?' + query);
+    out.push(...(data.items || []));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return out.map(list => ({ id: list.id, title: list.title || 'Tasks', updated: list.updated || null }));
+}
+async function googleTasksForList(account, taskListId) {
+  let out = [], pageToken = '';
+  do {
+    const query = new URLSearchParams({
+      maxResults: '100', showCompleted: 'true', showDeleted: 'true', showHidden: 'true'
+    });
+    if (pageToken) query.set('pageToken', pageToken);
+    const data = await googleTasksRequest(account, '/lists/' + encodeURIComponent(taskListId) + '/tasks?' + query);
+    out.push(...(data.items || []));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return out;
+}
+function localDateKey(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+}
+function googleTaskDue(value) {
+  const key = localDateKey(value);
+  return key ? key + 'T00:00:00.000Z' : null;
+}
+function googleDueToLocalIso(value, existingDue) {
+  const key = String(value || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const [year, month, day] = key.split('-').map(Number);
+  const existing = existingDue ? new Date(existingDue) : null;
+  const hour = existing && !Number.isNaN(existing.getTime()) ? existing.getHours() : 12;
+  const minute = existing && !Number.isNaN(existing.getTime()) ? existing.getMinutes() : 0;
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString();
+}
+function googleTaskPayload(task) {
+  return {
+    title: cleanText(task.title || 'Task', 1024),
+    notes: cleanText(task.description, 8192),
+    status: task.status === 'done' ? 'completed' : 'needsAction',
+    completed: task.status === 'done' ? (iso(task.completedAt) || new Date().toISOString()) : null,
+    due: googleTaskDue(task.due)
+  };
+}
+function applyGoogleTask(localTask, remote, account, list) {
+  const done = remote.status === 'completed';
+  const base = localTask || {};
+  return normalizeTask({
+    ...base,
+    id: base.id || id(),
+    title: cleanText(remote.title || base.title || 'Task', 160),
+    description: cleanText(remote.notes || '', 2000),
+    status: done ? 'done' : (base.status === 'progress' ? 'progress' : 'todo'),
+    due: remote.due ? googleDueToLocalIso(remote.due, base.due) : null,
+    project: base.project || cleanText(list?.title, 80),
+    created: base.created || iso(remote.updated) || new Date().toISOString(),
+    updated: iso(remote.updated) || new Date().toISOString(),
+    completedAt: done ? (iso(remote.completed) || iso(remote.updated) || new Date().toISOString()) : null,
+    googleAccountId: account.id,
+    googleTaskListId: list.id,
+    googleTaskListTitle: list.title || 'Tasks',
+    googleTaskId: remote.id,
+    googleParentId: remote.parent || '',
+    googleUpdated: iso(remote.updated),
+    googleEtag: remote.etag || ''
+  });
+}
+async function createGoogleTaskLink(task, accountId, taskListId) {
+  const account = googleAccount(accountId);
+  if (!account) throw new Error('Google account was not found.');
+  if (!accountCanTasks(account)) throw new Error('Reconnect this Google account to grant Google Tasks access.');
+  const lists = await taskLists(account);
+  const list = lists.find(x => x.id === taskListId);
+  if (!list) throw new Error('Google task list was not found.');
+  const remote = await googleTasksRequest(account, '/lists/' + encodeURIComponent(taskListId) + '/tasks', 'POST', googleTaskPayload(task));
+  return applyGoogleTask(task, remote, account, list);
+}
+async function updateLinkedGoogleTask(task) {
+  if (!task.googleAccountId || !task.googleTaskListId || !task.googleTaskId) return task;
+  const account = googleAccount(task.googleAccountId);
+  if (!account) throw new Error('The Google account linked to this task is disconnected.');
+  const remote = await googleTasksRequest(
+    account,
+    '/lists/' + encodeURIComponent(task.googleTaskListId) + '/tasks/' + encodeURIComponent(task.googleTaskId),
+    'PATCH',
+    googleTaskPayload(task)
+  );
+  const list = { id: task.googleTaskListId, title: task.googleTaskListTitle || task.project || 'Tasks' };
+  return applyGoogleTask(task, remote, account, list);
+}
+async function deleteLinkedGoogleTask(task) {
+  if (!task.googleAccountId || !task.googleTaskListId || !task.googleTaskId) return;
+  const account = googleAccount(task.googleAccountId);
+  if (!account || !accountCanTasks(account)) return;
+  try {
+    await googleTasksRequest(account, '/lists/' + encodeURIComponent(task.googleTaskListId) + '/tasks/' + encodeURIComponent(task.googleTaskId), 'DELETE');
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+}
+let googleTaskSyncPromise = null;
+async function syncGoogleTasks() {
+  if (googleTaskSyncPromise) return googleTaskSyncPromise;
+  googleTaskSyncPromise = (async () => {
+    const result = { imported: 0, pulled: 0, pushed: 0, deleted: 0, errors: [] };
+    let changed = false;
+    for (const account of googleAccounts()) {
+      if (!account.token || !accountCanTasks(account) || !account.selectedTaskListIds.length) continue;
+      let lists = [];
+      try { lists = await taskLists(account); }
+      catch (error) { result.errors.push(account.label + ': ' + error.message); continue; }
+      const listMap = new Map(lists.map(list => [list.id, list]));
+      for (const taskListId of account.selectedTaskListIds) {
+        const list = listMap.get(taskListId) || { id: taskListId, title: 'Google Tasks' };
+        let remoteItems = [];
+        try { remoteItems = await googleTasksForList(account, taskListId); }
+        catch (error) { result.errors.push(account.label + ' / ' + list.title + ': ' + error.message); continue; }
+        const remoteMap = new Map(remoteItems.filter(remote => remote.id).map(remote => [remote.id, remote]));
+        const linked = db.tasks.filter(task => task.googleAccountId === account.id && task.googleTaskListId === taskListId);
+
+        for (const remote of remoteItems) {
+          const local = linked.find(task => task.googleTaskId === remote.id);
+          if (remote.deleted) {
+            if (local) {
+              db.tasks = db.tasks.filter(task => task.id !== local.id);
+              result.deleted++; changed = true;
+            }
+            continue;
+          }
+          if (!local) {
+            db.tasks.push(applyGoogleTask(null, remote, account, list));
+            result.imported++; changed = true;
+            continue;
+          }
+          const baseline = local.googleUpdated ? new Date(local.googleUpdated).getTime() : 0;
+          const localUpdated = local.updated ? new Date(local.updated).getTime() : 0;
+          const remoteUpdated = remote.updated ? new Date(remote.updated).getTime() : 0;
+          const localChanged = localUpdated > baseline + 500;
+          const remoteChanged = remoteUpdated > baseline + 500;
+          if (localChanged && (!remoteChanged || localUpdated > remoteUpdated)) {
+            try {
+              const next = await updateLinkedGoogleTask(local);
+              const index = db.tasks.findIndex(task => task.id === local.id);
+              if (index >= 0) db.tasks[index] = next;
+              result.pushed++; changed = true;
+            } catch (error) {
+              result.errors.push(account.label + ' / ' + local.title + ': ' + error.message);
+            }
+          } else if (remoteChanged) {
+            const index = db.tasks.findIndex(task => task.id === local.id);
+            if (index >= 0) db.tasks[index] = applyGoogleTask(local, remote, account, list);
+            result.pulled++; changed = true;
+          }
+        }
+
+        for (const local of linked) {
+          if (!local.googleTaskId || remoteMap.has(local.googleTaskId)) continue;
+          db.tasks = db.tasks.filter(task => task.id !== local.id);
+          result.deleted++; changed = true;
+        }
+      }
+    }
+    if (changed) save(db);
+    return result;
+  })();
+  try { return await googleTaskSyncPromise; }
+  finally { googleTaskSyncPromise = null; }
 }
 async function identifyGoogleToken(token) {
   if (!token?.access_token) return { googleId: '', label: 'Google account' };
@@ -763,8 +980,12 @@ function state() {
       connected: googleAccounts().some(account => Boolean(decrypt(account.token))),
       accounts: googleAccounts().map(account => ({
         id: account.id, googleId: account.googleId, label: account.label,
-        selectedCalendarIds: account.selectedCalendarIds || [], connectedAt: account.connectedAt,
-        canWrite: accountCanWrite(account)
+        selectedCalendarIds: account.selectedCalendarIds || [],
+        selectedTaskListIds: account.selectedTaskListIds || [],
+        defaultTaskListId: account.defaultTaskListId || '',
+        connectedAt: account.connectedAt,
+        canWrite: accountCanWrite(account),
+        canTasks: accountCanTasks(account)
       })),
       countdownWindowDays: db.google.countdownWindowDays || 30
     },
@@ -805,7 +1026,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/tasks' && req.method === 'POST') {
       const incoming = await body(req);
       if (!cleanText(incoming.title, 160)) return json(res, 400, { error: 'Task title is required.' });
-      const item = normalizeTask({ ...incoming, id: id(), created: new Date().toISOString() });
+      const now = new Date().toISOString();
+      let item = normalizeTask({ ...incoming, id: id(), created: now, updated: now });
+      if (incoming.googleAccountId && incoming.googleTaskListId) {
+        item = await createGoogleTaskLink(item, String(incoming.googleAccountId), String(incoming.googleTaskListId));
+      }
       db.tasks.push(item); save(db); return json(res, 201, item);
     }
     if (p.startsWith('/api/tasks/') && req.method === 'PUT') {
@@ -814,16 +1039,31 @@ const server = http.createServer(async (req, res) => {
       if (index < 0) return json(res, 404, { error: 'Not found' });
       const incoming = await body(req);
       if (incoming.title !== undefined && !cleanText(incoming.title, 160)) return json(res, 400, { error: 'Task title is required.' });
-      const merged = { ...db.tasks[index], ...incoming, id: itemId, created: db.tasks[index].created };
+      const existing = db.tasks[index];
+      const merged = { ...existing, ...incoming, id: itemId, created: existing.created, updated: new Date().toISOString() };
       if (incoming.status && incoming.status !== 'done') merged.completedAt = null;
       if (incoming.status === 'done' && !merged.completedAt) merged.completedAt = new Date().toISOString();
-      db.tasks[index] = normalizeTask(merged); save(db); return json(res, 200, db.tasks[index]);
+      let next = normalizeTask(merged);
+      if (existing.googleTaskId) {
+        next.googleAccountId = existing.googleAccountId;
+        next.googleTaskListId = existing.googleTaskListId;
+        next.googleTaskListTitle = existing.googleTaskListTitle;
+        next.googleTaskId = existing.googleTaskId;
+        next.googleParentId = existing.googleParentId;
+        next.googleUpdated = existing.googleUpdated;
+        next.googleEtag = existing.googleEtag;
+        next = await updateLinkedGoogleTask(next);
+      } else if (incoming.googleAccountId && incoming.googleTaskListId) {
+        next = await createGoogleTaskLink(next, String(incoming.googleAccountId), String(incoming.googleTaskListId));
+      }
+      db.tasks[index] = next; save(db); return json(res, 200, db.tasks[index]);
     }
     if (p.startsWith('/api/tasks/') && req.method === 'DELETE') {
       const itemId = decodeURIComponent(p.split('/').pop());
-      const count = db.tasks.length;
+      const item = db.tasks.find(x => x.id === itemId);
+      if (!item) return json(res, 404, { error: 'Not found' });
+      await deleteLinkedGoogleTask(item);
       db.tasks = db.tasks.filter(x => x.id !== itemId);
-      if (count === db.tasks.length) return json(res, 404, { error: 'Not found' });
       save(db); return json(res, 200, { ok: true });
     }
 
@@ -883,11 +1123,23 @@ const server = http.createServer(async (req, res) => {
         db.google.accounts.push(account);
       }
       save(db);
+      if (accountCanTasks(account) && !account.selectedTaskListIds.length) {
+        try {
+          const lists = await taskLists(account);
+          if (lists.length) {
+            account.selectedTaskListIds = [lists[0].id];
+            account.defaultTaskListId = lists[0].id;
+            save(db);
+          }
+        } catch (error) {
+          console.warn('Google Tasks initial list setup failed:', error.message);
+        }
+      }
       res.writeHead(302, { Location: '/?view=settings&calendar=connected' });
       return res.end();
     }
     if (p === '/api/google/disconnect' && req.method === 'POST') {
-      db.google.accounts = []; save(db); return json(res, 200, { ok: true });
+      db.google.accounts = []; db.tasks = db.tasks.map(task => normalizeTask({ ...task, googleAccountId: '', googleTaskListId: '', googleTaskListTitle: '', googleTaskId: '', googleParentId: '', googleUpdated: null, googleEtag: '' })); save(db); return json(res, 200, { ok: true });
     }
     if (p.startsWith('/api/google/accounts/') && p.endsWith('/disconnect') && req.method === 'POST') {
       const parts = p.split('/');
@@ -895,6 +1147,11 @@ const server = http.createServer(async (req, res) => {
       const before = db.google.accounts.length;
       db.google.accounts = db.google.accounts.filter(account => account.id !== accountId);
       if (before === db.google.accounts.length) return json(res, 404, { error: 'Google account was not found.' });
+      db.tasks = db.tasks.map(task => task.googleAccountId === accountId ? normalizeTask({
+        ...task,
+        googleAccountId: '', googleTaskListId: '', googleTaskListTitle: '',
+        googleTaskId: '', googleParentId: '', googleUpdated: null, googleEtag: ''
+      }) : task);
       save(db); return json(res, 200, { ok: true });
     }
     if (p.startsWith('/api/google/accounts/') && p.endsWith('/calendars') && req.method === 'PUT') {
@@ -907,6 +1164,41 @@ const server = http.createServer(async (req, res) => {
       account.selectedCalendarIds = incoming.calendarIds.map(String).slice(0, 50);
       save(db); return json(res, 200, { ok: true });
     }
+    if (p === '/api/google/tasklists') {
+      const accountId = url.searchParams.get('accountId');
+      if (!accountId) return json(res, 400, { error: 'accountId is required.' });
+      const account = googleAccount(accountId);
+      if (!account) return json(res, 404, { error: 'Google account was not found.' });
+      return json(res, 200, { taskLists: await taskLists(account) });
+    }
+    if (p.startsWith('/api/google/accounts/') && p.endsWith('/tasklists') && req.method === 'PUT') {
+      const parts = p.split('/');
+      const accountId = decodeURIComponent(parts[4] || '');
+      const account = googleAccount(accountId);
+      if (!account) return json(res, 404, { error: 'Google account was not found.' });
+      const incoming = await body(req);
+      if (!Array.isArray(incoming.taskListIds)) return json(res, 400, { error: 'taskListIds must be an array.' });
+      const previousTaskLists = new Set(account.selectedTaskListIds || []);
+      account.selectedTaskListIds = incoming.taskListIds.map(String).slice(0, 50);
+      const selectedTaskLists = new Set(account.selectedTaskListIds);
+      const removedTaskLists = [...previousTaskLists].filter(taskListId => !selectedTaskLists.has(taskListId));
+      if (removedTaskLists.length) {
+        db.tasks = db.tasks.map(task => task.googleAccountId === accountId && removedTaskLists.includes(task.googleTaskListId) ? normalizeTask({
+          ...task,
+          googleAccountId: '', googleTaskListId: '', googleTaskListTitle: '',
+          googleTaskId: '', googleParentId: '', googleUpdated: null, googleEtag: ''
+        }) : task);
+      }
+      const requestedDefault = incoming.defaultTaskListId ? String(incoming.defaultTaskListId) : '';
+      account.defaultTaskListId = account.selectedTaskListIds.includes(requestedDefault) ? requestedDefault : (account.selectedTaskListIds[0] || '');
+      save(db);
+      const sync = await syncGoogleTasks();
+      return json(res, 200, { ok: true, sync });
+    }
+    if (p === '/api/google/tasks/sync' && req.method === 'POST') {
+      return json(res, 200, { ok: true, sync: await syncGoogleTasks() });
+    }
+
     if (p === '/api/google/calendars') {
       const accountId = url.searchParams.get('accountId');
       if (!accountId) return json(res, 400, { error: 'accountId is required.' });
@@ -1007,4 +1299,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => console.log('CountdownApp Planner listening on :' + PORT));
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('CountdownApp Planner listening on :' + PORT);
+  setTimeout(() => syncGoogleTasks().catch(error => console.warn('Google Tasks startup sync failed:', error.message)), 5000);
+});
+setInterval(() => syncGoogleTasks().catch(error => console.warn('Google Tasks background sync failed:', error.message)), 5 * 60 * 1000);

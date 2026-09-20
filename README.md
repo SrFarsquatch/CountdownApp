@@ -12,6 +12,7 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 - Pin important countdowns and independently hide them from e-ink.
 - Store countdowns persistently on the server instead of only in one browser.
 - Connect multiple Google accounts using OAuth and choose calendars independently from each account.
+- Sync selected Google Task lists two ways: Google-created tasks appear in Planner, and linked Planner tasks write title, notes, due date, completion, edits, and deletes back to Google.
 - Select which Google calendars are included.
 - Show an upcoming agenda from those calendars.
 - Publish a private JSON feed for FrameOS or another e-ink client.
@@ -44,9 +45,9 @@ Do not delete that AppData folder if you want to retain countdowns, Google Calen
 
 ## Google Calendar setup
 
-Planner requests Google's `calendar.events` and `calendar.calendarlist.readonly` scopes so it can read calendars and create, edit, and delete events while leaving calendar-subscription management read-only. OAuth tokens are stored server-side and encrypted with `APP_SECRET`.
+Planner requests Google's `calendar.events`, `calendar.calendarlist.readonly`, and `tasks` scopes. Calendar events and selected Google Task lists can sync both ways while calendar-subscription management remains read-only. OAuth tokens are stored server-side and encrypted with `APP_SECRET`.
 
-Create a Google Cloud OAuth 2.0 **Web application** credential with the Google Calendar API enabled.
+Create a Google Cloud OAuth 2.0 **Web application** credential with both the **Google Calendar API** and **Google Tasks API** enabled.
 
 Set these environment variables in the CasaOS app:
 
@@ -69,11 +70,14 @@ After the environment variables are configured and the container is restarted:
 
 1. Open **Settings → Google Calendar**.
 2. Click **Connect Google Calendar**.
-3. Approve Calendar event access and read-only calendar-list access.
+3. Approve Calendar event access, read-only calendar-list access, and Google Tasks access.
 4. Select the calendars you want Planner to display.
-5. Planner only enables event editing on calendars where Google reports `writer` or `owner` access.
+5. Choose which Google Task lists should sync and select a default task list for new linked Planner tasks.
+6. Planner only enables event editing on calendars where Google reports `writer` or `owner` access.
 
-If an account was connected before event writeback was enabled, reconnect that account once so Google can issue a token containing the new write scope.
+If an account was connected before Calendar writeback or Google Tasks sync was enabled, reconnect that account once so Google can issue a token containing the current scopes.
+
+Google Tasks only stores a due **date** through the API, not a due time. Planner keeps the local time component while syncing the date to Google.
 
 ## FrameOS
 
