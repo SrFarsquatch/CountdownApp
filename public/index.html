@@ -180,7 +180,7 @@ $("refreshCalendar").onclick=loadAgenda;
 $("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value),orientation:$("orientation").value,colorTheme:$("colorTheme").value})});await load()};
 $("previewDisplay").onclick=()=>window.open(state.display.viewPath,"_blank");
 $("rotateToken").onclick=async()=>{if(!confirm("Rotate the FrameOS token? Existing display URLs will stop working."))return;await api("/api/display/rotate-token",{method:"POST"});await load()};
-$("updateNow").onclick=async()=>{if(!confirm("Pull and install the latest CountdownApp image now? The app will briefly restart."))return;try{$("updateNow").disabled=true;$("updateStatus").textContent="Starting update…";await api("/api/update/start",{method:"POST"});setTimeout(refreshUpdateStatus,1000)}catch(e){$("updateDetail").textContent=e.message;$("updateNow").disabled=false}};
+$("updateNow").onclick=async()=>{if(!confirm("Pull and install the latest CountdownApp image now? The app will briefly restart."))return;try{$("updateNow").disabled=true;$("updateStatus").textContent="Starting update…";await api("/api/update/start",{method:"POST",headers:{"X-Countdown-Action":"update"}});setTimeout(refreshUpdateStatus,1000)}catch(e){$("updateDetail").textContent=e.message;$("updateNow").disabled=false}};
 
 load().catch(e=>document.body.insertAdjacentHTML("beforeend",'<p style="padding:20px">'+escapeHtml(e.message)+'</p>'));
 setInterval(()=>{if(state)renderCountdowns()},30000);
