@@ -263,8 +263,8 @@
       <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Colour e-ink</option><option value="mono">Black & white</option></select></div>
       <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
       <div class="setting-row"><span>Sections</span><div><label><input type="checkbox" id="showAgenda"> Agenda</label><br><label><input type="checkbox" id="showTasks"> Tasks</label><br><label><input type="checkbox" id="showGoals"> Goals</label><br><label><input type="checkbox" id="showCountdowns"> Countdowns</label><br><label><input type="checkbox" id="showWeather"> Weather</label></div></div>
-      <div class="setting-row"><span>Weather location</span><div class="weather-search"><div class="weather-search-row"><input id="weatherLocationSearch" placeholder="Search city or town"><button class="btn tiny" id="weatherSearchButton" type="button">Search</button></div><div id="weatherSearchResults" class="weather-search-results"></div><div id="weatherSelectedLocation" class="weather-selected">No location selected.</div><select id="weatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select><input id="weatherLocationLabel" type="hidden"><input id="weatherLatitude" type="hidden"><input id="weatherLongitude" type="hidden"></div></div>
-      <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather provider: Open-Meteo · no API key required.</div>
+      <div class="setting-row"><span>Weather style</span><select id="weatherStyle"><option value="compact">Compact</option><option value="current">Current conditions</option><option value="forecast">Forecast strip</option></select></div>
+      <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather location and units are managed in Settings.</div>
       <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Preview</div><h3>FrameOS output</h3>
@@ -309,6 +309,7 @@
   <div class="hero"><div><h2>Settings</h2><p>Integrations, calendars and app maintenance.</p></div></div>
   <div class="settings-grid">
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Planner.</p><div id="googleSettings"></div></div>
+    <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" style="margin-top:8px">Provider: Open-Meteo · no API key required.</div></div>
     <div class="card setting-card update-card">
       <div class="update-head">
         <div><div class="eyebrow">Maintenance</div><h3 style="margin-bottom:2px">Application updates</h3></div>
@@ -819,10 +820,10 @@ $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()-1);else if(plannerView==='week')x.setDate(x.getDate()-7);else x.setMonth(x.getMonth()-1);plannerAnchor=x;renderPlanner()};
 $('plannerNext').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()+1);else if(plannerView==='week')x.setDate(x.getDate()+7);else x.setMonth(x.getMonth()+1);plannerAnchor=x;renderPlanner()};
 
-const DISPLAY_SECTION_LABELS={agenda:'Agenda',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns'};
-const DISPLAY_SECTION_CHECKS={agenda:'showAgenda',tasks:'showTasks',goals:'showGoals',countdowns:'showCountdowns'};
+const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns'};
+const DISPLAY_SECTION_CHECKS={agenda:'showAgenda',weather:'showWeather',tasks:'showTasks',goals:'showGoals',countdowns:'showCountdowns'};
 function cloneDisplayLayout(layout){
- const fallback={agenda:{x:0,y:0,w:6,h:4},tasks:{x:6,y:0,w:6,h:4},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
+ const fallback={agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
@@ -846,8 +847,8 @@ function applyLayoutBlock(block,rect){
 }
 function defaultDisplayLayoutForResolution(){
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
- if(h>w)return{agenda:{x:0,y:0,w:12,h:2},tasks:{x:0,y:2,w:12,h:2},goals:{x:0,y:4,w:12,h:2},countdowns:{x:0,y:6,w:12,h:2}};
- return{agenda:{x:0,y:0,w:6,h:4},tasks:{x:6,y:0,w:6,h:4},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
+ if(h>w)return{agenda:{x:0,y:0,w:12,h:2},weather:{x:0,y:2,w:12,h:1},tasks:{x:0,y:3,w:12,h:1},goals:{x:0,y:4,w:12,h:2},countdowns:{x:0,y:6,w:12,h:2}};
+ return{agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
 }
 function setLayoutStatus(message,error=false){
  const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':'';
@@ -901,10 +902,8 @@ function renderDisplay(){
  const d=state.display,wc=state.weather||{};
  $('displayMode').value=d.mode||'dashboard';$('displayLayout').value=d.layout||'auto';$('displaySectionLayoutMode').value=d.sectionLayoutMode||'auto';$('displayPalette').value=d.palette||'spectra6';$('displayRefresh').value=String(d.refreshMinutes||15);
  $('showAgenda').checked=d.showAgenda!==false;$('showTasks').checked=d.showTasks!==false;$('showGoals').checked=d.showGoals!==false;$('showCountdowns').checked=d.showCountdowns!==false;$('showWeather').checked=d.showWeather!==false;
- $('weatherLocationLabel').value=wc.locationLabel||'';$('weatherLatitude').value=wc.latitude??'';$('weatherLongitude').value=wc.longitude??'';$('weatherUnits').value=wc.units||'metric';
- if($('weatherSelectedLocation'))$('weatherSelectedLocation').textContent=(wc.locationLabel&&wc.latitude!=null&&wc.longitude!=null)?wc.locationLabel+' · '+Number(wc.latitude).toFixed(4)+', '+Number(wc.longitude).toFixed(4):'No location selected.';
- if($('weatherLocationSearch')&&!$('weatherLocationSearch').value)$('weatherLocationSearch').value=wc.locationLabel||'';
- if($('weatherConfigStatus'))$('weatherConfigStatus').textContent='Weather provider: Open-Meteo · no API key required.';
+ $('weatherStyle').value=d.weatherStyle||'forecast';
+ if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.locationLabel?'Weather: '+wc.locationLabel+' · location managed in Settings.':'Choose a weather location in Settings.';
  $('maxEvents').value=String(d.maxEvents||5);$('maxTasks').value=String(d.maxTasks||6);$('maxGoals').value=String(d.maxGoals||3);$('maxCountdowns').value=String(d.maxCountdowns||3);
  displayLayoutDraft=cloneDisplayLayout(d.sectionLayout);
  const root=location.origin;
@@ -928,37 +927,48 @@ $('displaySectionLayoutMode').onchange=renderSectionLayoutEditor;
 $('displayMode').onchange=renderSectionLayoutEditor;
 Object.values(DISPLAY_SECTION_CHECKS).forEach(id=>{$(id).onchange=()=>{renderSectionLayoutEditor();setLayoutStatus('Unsaved display changes.')}});if($('showWeather'))$('showWeather').onchange=()=>setLayoutStatus('Unsaved display changes.');
 $('autoArrangeSections').onclick=()=>{displayLayoutDraft=defaultDisplayLayoutForResolution();renderSectionLayoutEditor();setLayoutStatus('Layout arranged for the current preview orientation. Save to apply.')};
-$('resetSectionLayout').onclick=()=>{displayLayoutDraft={agenda:{x:0,y:0,w:6,h:4},tasks:{x:6,y:0,w:6,h:4},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};renderSectionLayoutEditor();setLayoutStatus('Layout reset. Save to apply.')};
-async function searchWeatherLocations(){
- const q=$('weatherLocationSearch').value.trim(),root=$('weatherSearchResults');if(q.length<2){root.innerHTML='<div class="meta">Type at least 2 characters.</div>';return}
- root.innerHTML='<div class="meta">Searching…</div>';
- try{
-   const results=(await api('/api/weather/search?q='+encodeURIComponent(q))).results||[];
-   root.innerHTML=results.length?results.map((r,i)=>'<button type="button" class="weather-result" data-weather-result="'+i+'"><strong>'+esc(r.label||r.name)+'</strong><div class="meta">'+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4)+(r.timezone?' · '+esc(r.timezone):'')+'</div></button>').join(''):'<div class="meta">No matching locations.</div>';
-   root.querySelectorAll('[data-weather-result]').forEach(btn=>btn.onclick=()=>{
-     const r=results[Number(btn.dataset.weatherResult)];if(!r)return;
-     $('weatherLocationLabel').value=r.label||r.name;$('weatherLatitude').value=r.latitude;$('weatherLongitude').value=r.longitude;$('weatherLocationSearch').value=r.label||r.name;
-     $('weatherSelectedLocation').textContent=(r.label||r.name)+' · '+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4);
-     root.innerHTML='';setLayoutStatus('Weather location selected. Save display to apply.');
-   });
- }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
-}
-$('weatherSearchButton').onclick=searchWeatherLocations;
-$('weatherLocationSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchWeatherLocations()}};
+$('resetSectionLayout').onclick=()=>{displayLayoutDraft={agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};renderSectionLayoutEditor();setLayoutStatus('Layout reset. Save to apply.')};
 $('saveDisplay').onclick=async()=>{
  await api('/api/settings',{method:'PUT',body:JSON.stringify({
    mode:$('displayMode').value,layout:$('displayLayout').value,sectionLayoutMode:$('displaySectionLayoutMode').value,sectionLayout:displayLayoutDraft,
    palette:$('displayPalette').value,refreshMinutes:Number($('displayRefresh').value),
    maxEvents:Number($('maxEvents').value),maxTasks:Number($('maxTasks').value),maxGoals:Number($('maxGoals').value),maxCountdowns:Number($('maxCountdowns').value),
    showAgenda:$('showAgenda').checked,showTasks:$('showTasks').checked,showGoals:$('showGoals').checked,showCountdowns:$('showCountdowns').checked,showWeather:$('showWeather').checked,
-   weatherLocationLabel:$('weatherLocationLabel').value.trim(),weatherLatitude:$('weatherLatitude').value,weatherLongitude:$('weatherLongitude').value,weatherUnits:$('weatherUnits').value
+   weatherStyle:$('weatherStyle').value
  })});
- state=await api('/api/state');displayLayoutDraft=null;await loadWeather();renderDisplay();renderToday();setLayoutStatus('Saved. Dashboard and FrameOS will use this location on their next refresh.');
+ state=await api('/api/state');displayLayoutDraft=null;renderDisplay();renderToday();setLayoutStatus('Saved. FrameOS will use this layout on its next refresh.');
 };
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const el=$(b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent);const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200)}catch{prompt('Copy this URL:',el.textContent)}});
 $('rotateDisplayToken').onclick=async()=>{if(!confirm('Rotate the private display token? Existing FrameOS URLs will stop working.'))return;await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');renderDisplay()};
 
+async function searchSettingsWeather(){
+ const q=$('settingsWeatherSearch').value.trim(),root=$('settingsWeatherResults');if(q.length<2){root.innerHTML='<div class="meta">Type at least 2 characters.</div>';return}
+ root.innerHTML='<div class="meta">Searching…</div>';
+ try{
+   const results=(await api('/api/weather/search?q='+encodeURIComponent(q))).results||[];
+   root.innerHTML=results.length?results.map((r,i)=>'<button type="button" class="weather-result" data-settings-weather="'+i+'"><strong>'+esc(r.label||r.name)+'</strong><div class="meta">'+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4)+(r.timezone?' · '+esc(r.timezone):'')+'</div></button>').join(''):'<div class="meta">No matching locations.</div>';
+   root.querySelectorAll('[data-settings-weather]').forEach(btn=>btn.onclick=()=>{
+     const r=results[Number(btn.dataset.settingsWeather)];if(!r)return;
+     $('settingsWeatherLocationLabel').value=r.label||r.name;$('settingsWeatherLatitude').value=r.latitude;$('settingsWeatherLongitude').value=r.longitude;$('settingsWeatherSearch').value=r.label||r.name;
+     $('settingsWeatherSelected').textContent=(r.label||r.name)+' · '+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4);
+     root.innerHTML='';
+   });
+ }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
+}
+function renderWeatherSettings(){
+ const wc=state.weather||{};
+ $('settingsWeatherLocationLabel').value=wc.locationLabel||'';$('settingsWeatherLatitude').value=wc.latitude??'';$('settingsWeatherLongitude').value=wc.longitude??'';$('settingsWeatherUnits').value=wc.units||'metric';
+ $('settingsWeatherSelected').textContent=(wc.locationLabel&&wc.latitude!=null&&wc.longitude!=null)?wc.locationLabel+' · '+Number(wc.latitude).toFixed(4)+', '+Number(wc.longitude).toFixed(4):'No location selected.';
+ if(!$('settingsWeatherSearch').value)$('settingsWeatherSearch').value=wc.locationLabel||'';
+}
+$('settingsWeatherSearchButton').onclick=searchSettingsWeather;
+$('settingsWeatherSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchSettingsWeather()}};
+$('saveWeatherSettings').onclick=async()=>{
+ await api('/api/settings',{method:'PUT',body:JSON.stringify({weatherLocationLabel:$('settingsWeatherLocationLabel').value.trim(),weatherLatitude:$('settingsWeatherLatitude').value,weatherLongitude:$('settingsWeatherLongitude').value,weatherUnits:$('settingsWeatherUnits').value})});
+ state=await api('/api/state');await loadWeather();renderWeatherSettings();renderToday();
+};
 async function renderSettings(){
+ renderWeatherSettings();
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
  let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect accounts, choose calendars, and choose which Google Task lists Planner should sync.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
