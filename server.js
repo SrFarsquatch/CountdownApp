@@ -10,7 +10,6 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_WEATHER_API_KEY = process.env.GOOGLE_WEATHER_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
@@ -956,78 +955,87 @@ function dueForDisplay(task) {
   return new Date(task.due).getTime() < Date.now() + 14 * 86400000;
 }
 let weatherCache = { key: '', expiresAt: 0, data: null };
-function weatherConfigured() { return Boolean(GOOGLE_WEATHER_API_KEY); }
 function weatherLocationReady() {
   return Number.isFinite(db.weather?.latitude) && Number.isFinite(db.weather?.longitude);
 }
-function weatherDateKey(d) {
-  const x = new Date(d);
-  return [x.getFullYear(), String(x.getMonth() + 1).padStart(2, '0'), String(x.getDate()).padStart(2, '0')].join('-');
-}
-function weatherDisplayDateKey(value) {
-  if (!value || !Number.isFinite(Number(value.year)) || !Number.isFinite(Number(value.month)) || !Number.isFinite(Number(value.day))) return '';
-  return String(value.year).padStart(4, '0') + '-' + String(value.month).padStart(2, '0') + '-' + String(value.day).padStart(2, '0');
-}
-function weatherTemperature(value) {
-  const n = Number(value?.degrees);
-  return Number.isFinite(n) ? Math.round(n) : null;
-}
-function weatherPart(part = {}) {
-  return {
-    condition: cleanText(part.weatherCondition?.type || '', 80),
-    description: cleanText(part.weatherCondition?.description?.text || '', 120),
-    precipitation: clamp(num(part.precipitation?.probability?.percent, 0), 0, 100)
-  };
+function weatherCodeInfo(code) {
+  const value = Number(code);
+  if (value === 0) return { condition: 'CLEAR', description: 'Clear sky' };
+  if (value === 1) return { condition: 'PARTLY_CLOUDY', description: 'Mainly clear' };
+  if (value === 2) return { condition: 'PARTLY_CLOUDY', description: 'Partly cloudy' };
+  if (value === 3) return { condition: 'CLOUDY', description: 'Overcast' };
+  if (value === 45 || value === 48) return { condition: 'FOG', description: value === 48 ? 'Rime fog' : 'Fog' };
+  if ([51, 53, 55, 56, 57].includes(value)) return { condition: 'DRIZZLE', description: 'Drizzle' };
+  if ([61, 63, 65, 66, 67].includes(value)) return { condition: 'RAIN', description: value >= 65 ? 'Heavy rain' : 'Rain' };
+  if ([71, 73, 75, 77].includes(value)) return { condition: 'SNOW', description: value === 75 ? 'Heavy snow' : 'Snow' };
+  if ([80, 81, 82].includes(value)) return { condition: 'SHOWERS', description: value === 82 ? 'Heavy showers' : 'Rain showers' };
+  if ([85, 86].includes(value)) return { condition: 'SNOW_SHOWERS', description: value === 86 ? 'Heavy snow showers' : 'Snow showers' };
+  if ([95, 96, 99].includes(value)) return { condition: 'THUNDERSTORM', description: value === 95 ? 'Thunderstorm' : 'Thunderstorm with hail' };
+  return { condition: 'CLOUDY', description: 'Weather' };
 }
 async function weatherData() {
-  if (!weatherConfigured()) throw new Error('Google Weather API key is not configured.');
   if (!weatherLocationReady()) throw new Error('Set a weather latitude and longitude in Display settings.');
   const units = en(db.weather.units, WEATHER_UNITS, 'metric');
   const key = [db.weather.latitude, db.weather.longitude, units].join('|');
   if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
-  const common = new URLSearchParams({
-    key: GOOGLE_WEATHER_API_KEY,
-    'location.latitude': String(db.weather.latitude),
-    'location.longitude': String(db.weather.longitude),
-    unitsSystem: units === 'imperial' ? 'IMPERIAL' : 'METRIC',
-    languageCode: 'en'
+
+  const params = new URLSearchParams({
+    latitude: String(db.weather.latitude),
+    longitude: String(db.weather.longitude),
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+    timezone: 'auto',
+    forecast_days: '10'
   });
-  const dailyParams = new URLSearchParams(common);
-  dailyParams.set('days', '10');
-  dailyParams.set('pageSize', '10');
-  const [currentResponse, dailyResponse] = await Promise.all([
-    fetch('https://weather.googleapis.com/v1/currentConditions:lookup?' + common),
-    fetch('https://weather.googleapis.com/v1/forecast/days:lookup?' + dailyParams)
-  ]);
-  if (!currentResponse.ok || !dailyResponse.ok) {
-    const status = !currentResponse.ok ? currentResponse.status : dailyResponse.status;
-    throw new Error('Google Weather request failed (' + status + ').');
-  }
-  const [currentRaw, dailyRaw] = await Promise.all([currentResponse.json(), dailyResponse.json()]);
-  const currentPart = weatherPart({
-    weatherCondition: currentRaw.weatherCondition,
-    precipitation: currentRaw.precipitation
-  });
+  if (units === 'imperial') params.set('temperature_unit', 'fahrenheit');
+
+  const response = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
+  if (!response.ok) throw new Error('Open-Meteo request failed (' + response.status + ').');
+  const raw = await response.json();
+  if (raw.error) throw new Error(cleanText(raw.reason || 'Open-Meteo request failed.', 180));
+
+  const currentInfo = weatherCodeInfo(raw.current?.weather_code);
+  const times = Array.isArray(raw.daily?.time) ? raw.daily.time : [];
+  const maxTemps = Array.isArray(raw.daily?.temperature_2m_max) ? raw.daily.temperature_2m_max : [];
+  const minTemps = Array.isArray(raw.daily?.temperature_2m_min) ? raw.daily.temperature_2m_min : [];
+  const precip = Array.isArray(raw.daily?.precipitation_probability_max) ? raw.daily.precipitation_probability_max : [];
+  const codes = Array.isArray(raw.daily?.weather_code) ? raw.daily.weather_code : [];
+
   const data = {
+    provider: 'Open-Meteo',
+    attribution: 'Weather data by Open-Meteo',
     locationLabel: db.weather.locationLabel || '',
     units,
     unitSymbol: units === 'imperial' ? '°F' : '°C',
-    timeZone: dailyRaw.timeZone?.id || currentRaw.timeZone?.id || '',
+    timeZone: cleanText(raw.timezone || '', 100),
     current: {
-      temperature: weatherTemperature(currentRaw.temperature),
-      feelsLike: weatherTemperature(currentRaw.feelsLikeTemperature),
-      humidity: clamp(num(currentRaw.relativeHumidity, 0), 0, 100),
-      isDaytime: currentRaw.isDaytime !== false,
-      ...currentPart
+      temperature: Number.isFinite(Number(raw.current?.temperature_2m)) ? Math.round(Number(raw.current.temperature_2m)) : null,
+      feelsLike: Number.isFinite(Number(raw.current?.apparent_temperature)) ? Math.round(Number(raw.current.apparent_temperature)) : null,
+      humidity: clamp(num(raw.current?.relative_humidity_2m, 0), 0, 100),
+      isDaytime: Number(raw.current?.is_day) !== 0,
+      precipitation: 0,
+      ...currentInfo
     },
-    days: (dailyRaw.forecastDays || []).map(day => ({
-      date: weatherDisplayDateKey(day.displayDate),
-      high: weatherTemperature(day.maxTemperature),
-      low: weatherTemperature(day.minTemperature),
-      daytime: weatherPart(day.daytimeForecast),
-      nighttime: weatherPart(day.nighttimeForecast)
-    })).filter(day => day.date)
+    days: times.map((date, index) => {
+      const info = weatherCodeInfo(codes[index]);
+      return {
+        date: String(date || ''),
+        high: Number.isFinite(Number(maxTemps[index])) ? Math.round(Number(maxTemps[index])) : null,
+        low: Number.isFinite(Number(minTemps[index])) ? Math.round(Number(minTemps[index])) : null,
+        daytime: {
+          condition: info.condition,
+          description: info.description,
+          precipitation: clamp(num(precip[index], 0), 0, 100)
+        },
+        nighttime: {
+          condition: info.condition,
+          description: info.description,
+          precipitation: clamp(num(precip[index], 0), 0, 100)
+        }
+      };
+    }).filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day.date))
   };
+
   weatherCache = { key, expiresAt: Date.now() + 15 * 60 * 1000, data };
   return data;
 }
@@ -1039,11 +1047,10 @@ async function feed() {
     catch (error) { calendarError = error.message; }
   }
   if (db.display.showWeather !== false) {
-    if (weatherConfigured() && weatherLocationReady()) {
+    if (weatherLocationReady()) {
       try { weather = await weatherData(); }
       catch (error) { weatherError = error.message; }
-    } else if (!weatherConfigured()) weatherError = 'Google Weather API key is not configured.';
-    else weatherError = 'Set a weather latitude and longitude in Display settings.';
+    } else weatherError = 'Set a weather latitude and longitude in Display settings.';
   }
   const now = Date.now();
   const countdowns = sortedCountdowns()
@@ -1273,7 +1280,7 @@ function renderPlannerSvg(data, w, h, mode) {
         svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+39*scale) + '" text-anchor="end" font-size="' + (10*scale) + '" class="muted">' + Math.round(todayWeather.daytime?.precipitation||0) + '% precipitation</text>';
       }
     }
-    return plannerFooter(svg,data,w,h,pad,scale,'DAILY') + '</svg>';
+    return plannerFooter(svg,data,w,h,pad,scale,'DAILY' + (data.weather ? ' · Weather: Open-Meteo' : '')) + '</svg>';
   }
 
   if (mode === 'weekly') {
@@ -1305,7 +1312,7 @@ function renderPlannerSvg(data, w, h, mode) {
         svg += '<text x="' + (eventX+12*scale) + '" y="' + (ey-3*scale) + '" font-size="' + (10.5*scale) + '" class="muted">' + esc(truncateForWidth(task.title,w-eventX-pad,10.5*scale)) + '</text>';
       }
     }
-    return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'WEEKLY') + '</svg>';
+    return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'WEEKLY' + (data.weather ? ' · Weather: Open-Meteo' : '')) + '</svg>';
   }
 
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -1351,7 +1358,7 @@ function renderPlannerSvg(data, w, h, mode) {
       svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (11*scale) + '" font-weight="700">' + esc(truncateForWidth(next.name,sw,11*scale,70*scale)) + '</text><text x="' + (w-pad) + '" y="' + sy + '" text-anchor="end" font-size="' + (11*scale) + '" font-weight="800" fill="' + color(next.accentColor,palette) + '">' + esc(timeLabel(next)) + '</text>';
     }
   }
-  return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'MONTHLY · forecast shown for next 10 days') + '</svg>';
+  return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'MONTHLY · 10-day forecast' + (data.weather ? ' · Open-Meteo' : '')) + '</svg>';
 }
 
 function renderSvg(data, w, h) {
@@ -1552,7 +1559,7 @@ function state() {
   return {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
-    weather: { ...normalizeWeather(db.weather), configured: weatherConfigured() },
+    weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
