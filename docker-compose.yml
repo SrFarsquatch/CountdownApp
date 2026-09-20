@@ -55,7 +55,7 @@ services:
       ports:
         - container: "8080"
           description:
-            en_US: Countdown web interface and FrameOS API
+            en_US: Planner web interface and FrameOS API
 
 x-casaos:
   id: countdownapp
@@ -75,6 +75,6 @@ x-casaos:
   port_map: "8088"
   index: /
   title:
-    custom: Countdown
+    custom: Planner
     en_US: Countdown
   version: "edge"
