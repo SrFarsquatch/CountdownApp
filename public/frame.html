@@ -1,12 +1,45 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Countdown Display</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}.page{padding:28px;min-height:100vh}.top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #000;padding-bottom:12px}.date{font-size:18px;font-weight:700}.title{font-size:38px;font-weight:800;letter-spacing:-.04em}.section{margin-top:26px}.label{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:6px;margin-bottom:8px}.next{font-size:30px;font-weight:800}.next small{display:block;font-size:16px;font-weight:600;margin-top:5px}.row{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #bbb;padding:9px 0;font-size:18px}.row strong{font-weight:800}.muted{font-size:14px}.error{border:2px solid #000;padding:10px;margin-top:20px}
-@media(max-width:600px){.page{padding:18px}.title{font-size:30px}.next{font-size:24px}}
-</style></head><body><main class="page"><header class="top"><div class="title" id="title">Upcoming</div><div class="date" id="date"></div></header><div id="content"></div></main>
+:root{--paper:#fff;--ink:#000;--accent:#d71920;--accent2:#1457d9;--accent3:#16833b;--accent4:#f2cf16}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#d7d7d2;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+.stage{min-height:100vh;display:grid;place-items:center;padding:16px}
+.page{width:min(100%,1200px);background:var(--paper);padding:28px;border:2px solid var(--ink);overflow:hidden}
+.page.landscape{aspect-ratio:5/3}.page.portrait{aspect-ratio:3/5;max-width:720px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:5px solid var(--accent);padding-bottom:12px}
+.date{font-size:18px;font-weight:800}.title{font-size:40px;font-weight:900;letter-spacing:-.045em}
+.content.landscape{display:grid;grid-template-columns:1.08fr .92fr;gap:28px}.content.portrait{display:block}
+.section{margin-top:26px}.label{font-size:13px;font-weight:900;letter-spacing:.13em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:8px}
+.next{font-size:32px;font-weight:900;line-height:1.04}.next small{display:block;font-size:16px;font-weight:700;margin-top:7px;color:var(--accent)}
+.row{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid var(--ink);padding:10px 0;font-size:18px}.row strong{font-weight:900}.row:nth-child(4n+2) strong{color:var(--accent)}.row:nth-child(4n+3) strong{color:var(--accent2)}.row:nth-child(4n+4) strong{color:var(--accent3)}.row:nth-child(4n+5) strong{color:var(--accent4)}
+.error{border:3px solid var(--accent);padding:10px;margin-top:20px}.muted{font-size:14px}
+body[data-theme="mono"]{--accent:#000;--accent2:#000;--accent3:#000;--accent4:#000}
+body[data-theme="red"]{--accent:#d71920;--accent2:#d71920;--accent3:#d71920;--accent4:#d71920}
+body[data-theme="blue"]{--accent:#1457d9;--accent2:#1457d9;--accent3:#1457d9;--accent4:#1457d9}
+body[data-theme="green"]{--accent:#16833b;--accent2:#16833b;--accent3:#16833b;--accent4:#16833b}
+body[data-theme="yellow"]{--accent:#f2cf16;--accent2:#f2cf16;--accent3:#f2cf16;--accent4:#f2cf16}
+@media(max-width:700px){.stage{padding:0}.page{border:0;min-height:100vh;aspect-ratio:auto!important}.title{font-size:30px}.next{font-size:25px}.content.landscape{grid-template-columns:1fr}.top{align-items:flex-start;gap:10px}.date{text-align:right}}
+@media print{html,body,.stage{background:#fff}.stage{padding:0}.page{border:0;width:100%;max-width:none}}
+</style></head>
+<body data-theme="spectrum"><div class="stage"><main class="page landscape" id="page"><header class="top"><div class="title" id="title">Upcoming</div><div class="date" id="date"></div></header><div class="content landscape" id="content"></div></main></div>
 <script>
 const token=new URLSearchParams(location.search).get("token");
 const fmt=d=>new Date(d).toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-async function load(){const r=await fetch("/api/frameos/feed?token="+encodeURIComponent(token||""));const data=await r.json();if(!r.ok){document.getElementById("content").innerHTML='<div class="error">'+(data.error||"Unable to load")+'</div>';return}document.getElementById("title").textContent=data.title||"Upcoming";document.getElementById("date").textContent=new Date().toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"});let html="";if(data.nextEvent){html+='<section class="section"><div class="label">Next</div><div class="next">'+esc(data.nextEvent.title)+'<small>'+fmt(data.nextEvent.start)+'</small></div></section>'}if(data.events.length){html+='<section class="section"><div class="label">Agenda</div>'+data.events.map(e=>'<div class="row"><span>'+esc(e.title)+'</span><strong>'+fmt(e.start)+'</strong></div>').join("")+'</section>'}if(data.countdowns.length){html+='<section class="section"><div class="label">Countdowns</div>'+data.countdowns.map(c=>'<div class="row"><span>'+esc(c.title)+'</span><strong>'+c.daysRemaining+'d</strong></div>').join("")+'</section>'}if(data.calendarError)html+='<div class="error muted">Calendar unavailable: '+esc(data.calendarError)+'</div>';document.getElementById("content").innerHTML=html||'<section class="section"><div class="label">Nothing upcoming</div></section>'}
-function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}load();setInterval(load,300000);
+async function load(){
+ const r=await fetch("/api/frameos/feed?token="+encodeURIComponent(token||""));const data=await r.json();
+ if(!r.ok){document.getElementById("content").innerHTML='<div class="error">'+esc(data.error||"Unable to load")+'</div>';return}
+ const display=data.display||{};const orientation=display.orientation==="portrait"?"portrait":"landscape";const theme=["mono","red","blue","green","yellow","spectrum"].includes(display.colorTheme)?display.colorTheme:"spectrum";
+ document.body.dataset.theme=theme;document.getElementById("page").className="page "+orientation;document.getElementById("content").className="content "+orientation;
+ document.getElementById("title").textContent=data.title||"Upcoming";document.getElementById("date").textContent=new Date().toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"});
+ let left="",right="";
+ if(data.nextEvent)left+='<section class="section"><div class="label">Next</div><div class="next">'+esc(data.nextEvent.title)+'<small>'+fmt(data.nextEvent.start)+'</small></div></section>';
+ if(data.countdowns.length)left+='<section class="section"><div class="label">Countdowns</div>'+data.countdowns.map(c=>'<div class="row"><span>'+esc(c.title)+'</span><strong>'+c.daysRemaining+'d</strong></div>').join("")+'</section>';
+ if(data.events.length)right+='<section class="section"><div class="label">Agenda</div>'+data.events.map(e=>'<div class="row"><span>'+esc(e.title)+'</span><strong>'+fmt(e.start)+'</strong></div>').join("")+'</section>';
+ if(data.calendarError)right+='<div class="error muted">Calendar unavailable: '+esc(data.calendarError)+'</div>';
+ const content=document.getElementById("content");
+ content.innerHTML=orientation==="landscape"?'<div>'+left+'</div><div>'+right+'</div>':left+right;
+ if(!left&&!right)content.innerHTML='<section class="section"><div class="label">Nothing upcoming</div></section>';
+}
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+load();setInterval(load,300000);
 </script></body></html>
