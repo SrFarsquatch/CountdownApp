@@ -10,7 +10,7 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 - Add solid, segmented, or thin progress bars using time elapsed or manual goals.
 - Pin important countdowns and independently hide them from e-ink.
 - Store countdowns persistently on the server instead of only in one browser.
-- Connect Google Calendar using read-only OAuth access.
+- Connect multiple Google accounts using OAuth and choose calendars independently from each account.
 - Select which Google calendars are included.
 - Show an upcoming agenda from those calendars.
 - Publish a private JSON feed for FrameOS or another e-ink client.
