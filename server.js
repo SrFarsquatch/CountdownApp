@@ -476,6 +476,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === "/api/update/start" && req.method === "POST") {
+      if (req.headers["x-countdown-action"] !== "update") return json(res, 403, { error: "Invalid update request" });
       if (!UPDATER_URL || !UPDATE_TOKEN) return json(res, 503, { error: "Updater is not configured" });
       const result = await updaterFetch("/update", { method: "POST" });
       return json(res, 202, result);
