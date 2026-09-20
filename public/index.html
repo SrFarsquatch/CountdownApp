@@ -533,24 +533,40 @@ function bindCalendarInteractions(){
  const root=$('calendarStage');if(!root)return;
  root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=calEvents.find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
  root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
+ root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
+   if(e.target.closest('[data-event-key],[data-cal-task],button'))return;
+   const rect=lane.getBoundingClientRect(),raw=(e.clientY-rect.top)/HOUR_HEIGHT*60;
+   const minutes=Math.max(0,Math.min(23*60+30,Math.round(raw/30)*30));
+   const start=parseDateKey(lane.dataset.day);start.setHours(0,minutes,0,0);
+   const end=new Date(start.getTime()+60*60000);
+   eventModal(null,{start,end});
+ });
+ root.querySelectorAll('.all-day-cell[data-day]').forEach(cell=>cell.onclick=e=>{
+   if(e.target.closest('[data-event-key],button'))return;
+   eventModal(null,{allDay:true,startDate:cell.dataset.day,endDate:cell.dataset.day});
+ });
 }
 function calendarEventModal(e){
- const link=safeHttpUrl(e.htmlLink);
+ const link=safeHttpUrl(e.htmlLink),account=(state.google.accounts||[]).find(a=>a.id===e.accountId);
+ const calendarWritable=['writer','owner'].includes(e.accessRole||''),canEdit=Boolean(account?.canWrite)&&calendarWritable;
  let body='<div class="event-detail-grid">';
  body+='<div class="event-detail-row"><strong>When</strong><div>'+(e.allDay?'All day · '+fmtDate(e.start,{year:'numeric'}):fmtDate(e.start,{weekday:'long',year:'numeric'})+' · '+fmtTime(e.start)+' – '+fmtTime(e.end))+'</div></div>';
  body+='<div class="event-detail-row"><strong>Calendar</strong><div><span class="cal-dot" style="background:'+eventColorFor(e)+'"></span> '+esc(e.calendarName||'Google Calendar')+'<div class="meta">'+esc(e.accountLabel||'')+'</div></div></div>';
  if(e.location)body+='<div class="event-detail-row"><strong>Location</strong><div>'+esc(e.location)+'</div></div>';
- if(link)body+='<div class="modal-actions"><button class="btn primary" id="openGoogleEvent">Open in Google Calendar</button></div>';
+ if(e.description)body+='<div class="event-detail-row"><strong>Notes</strong><div>'+esc(e.description).replace(/\n/g,'<br>')+'</div></div>';
+ if(calendarWritable&&!account?.canWrite)body+='<div class="notice">Reconnect this Google account once to let Planner edit events.</div>';
+ body+='<div class="modal-actions">'+(canEdit?'<button class="btn primary" id="editGoogleEvent">Edit</button>':'')+(link?'<button class="btn" id="openGoogleEvent">Open in Google Calendar</button>':'')+'</div>';
  body+='</div>';openModal(e.title,body);
+ if(canEdit&&$('editGoogleEvent'))$('editGoogleEvent').onclick=()=>eventModal(e);
  if(link&&$('openGoogleEvent'))$('openGoogleEvent').onclick=()=>window.open(link,'_blank','noopener');
 }
 function renderDay(range){
- const day=new Date(range.start),next=new Date(range.end);
+ const day=new Date(range.start),next=new Date(range.end),dayKey=dateKeyLocal(day);
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
  const items=calendarItemsForDay(day,next);
  let h='<div class="timeline-root">';
- if(allDay.length)h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell">'+allDay.map(allDayChip).join('')+'</div></div>';
- h+='<div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
+ h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div></div>';
+ h+='<div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
  $('calendarStage').innerHTML=h;bindCalendarInteractions();scrollTimeline();
 }
 function renderWeek(range){
@@ -559,10 +575,10 @@ function renderWeek(range){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1);
    const isToday=day.toDateString()===new Date().toDateString();
    heads+='<div class="'+(isToday?'today-head':'')+'">'+day.toLocaleDateString([],{weekday:'short'})+'<div class="meta">'+fmtDate(day)+'</div></div>';
-   const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
-   all+='<div class="all-day-cell">'+allDay.map(allDayChip).join('')+'</div>';
+   const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next)),dayKey=dateKeyLocal(day);
+   all+='<div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div>';
    const items=calendarItemsForDay(day,next);
-   body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
+   body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
  }
  $('calendarStage').innerHTML='<div class="timeline-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="week-time-grid">'+body+'</div></div>';
  bindCalendarInteractions();scrollTimeline();
@@ -611,8 +627,10 @@ async function renderSettings(){
    if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
    refreshUpdateStatus();return;
  }
- box.innerHTML=html+accounts.map(a=>'<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google Calendar account')+'</div></div><button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div>').join('');
+ box.innerHTML=html+accounts.map(a=>'<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google Calendar account')+'</div><div style="margin-top:6px"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Event editing enabled':'Reconnect for event editing')+'</span></div></div><div class="account-actions">'+(!a.canWrite?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div>').join('');
  $('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
+ box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
+
  box.querySelectorAll('[data-disconnect-account]').forEach(btn=>btn.onclick=async()=>{
    const account=accounts.find(a=>a.id===btn.dataset.disconnectAccount);
    if(!confirm('Disconnect '+(account?.label||'this Google account')+'?'))return;
@@ -643,7 +661,7 @@ async function refreshUpdateStatus(){try{const s=await api('/api/update/status')
 $('updateNow').onclick=async()=>{if(!confirm('Install the newest published image?'))return;await api('/api/update/start',{method:'POST',headers:{'X-Countdown-Action':'update'}});$('updateStatus').textContent='Update started…';setTimeout(refreshUpdateStatus,1200)};
 
 async function loadCalendarEvents(){if(!state.google.connected){calEvents=[];return}const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+30);try{calEvents=(await api('/api/google/events?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString()))).events||[]}catch(e){calEvents=[]}}
-async function loadAll(force=false){state=await api('/api/state');await loadCalendarEvents();renderToday();renderTasks();renderGoals();renderCountdowns();const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()}
+async function loadAll(force=false){state=await api('/api/state');if(force)calendarCache={};await loadCalendarEvents();renderToday();renderTasks();renderGoals();renderCountdowns();const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()}
 const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>setView(initial));setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
 </body>
