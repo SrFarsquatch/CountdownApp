@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3f3f0">
+  <title>Countdown</title>
+  <style>
+    :root{color-scheme:light;--bg:#f3f3f0;--surface:#fff;--muted:#6e6e68;--text:#171717;--border:#d8d8d2;--strong:#aaa9a1;--accent:#2457e6;--danger:#b42318;--radius:8px}
+    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#151515;--surface:#202020;--muted:#aaa9a1;--text:#f3f3ef;--border:#393936;--strong:#5a5a55;--accent:#86a4ff;--danger:#ff8d82}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Arial,Helvetica,sans-serif}
+    button,input,select{font:inherit}.shell{width:min(1050px,calc(100% - 28px));margin:auto;padding:34px 0 70px}
+    header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--strong);padding-bottom:18px}
+    h1{margin:0;font-size:clamp(2rem,6vw,3.2rem);letter-spacing:-.05em;line-height:1}.subtitle{margin:7px 0 0;color:var(--muted)}
+    .tabs{display:flex;gap:18px;margin:22px 0}.tab{border:0;background:none;padding:0 0 6px;color:var(--muted);border-bottom:2px solid transparent;font-weight:700}.tab.active{color:var(--text);border-color:var(--text)}
+    .panel{display:none}.panel.active{display:block}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+    .btn{min-height:40px;padding:0 13px;border:1px solid var(--strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-weight:700;cursor:pointer}.btn.primary{background:var(--text);color:var(--surface);border-color:var(--text)}.btn.danger{color:var(--danger)}.btn.link{border:0;background:none;padding:0;min-height:auto;color:var(--muted)}
+    .card{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:16px}.grid{display:grid;gap:10px}.countdown{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;align-items:center;gap:16px}.name{font-weight:700}.meta{color:var(--muted);font-size:.9rem}.remaining{font:700 1.15rem "SFMono-Regular",Consolas,monospace;white-space:nowrap}.actions{display:flex;gap:10px}
+    .editor{display:none;margin:0 0 14px}.editor.open{display:block}.form{display:grid;grid-template-columns:1.2fr 1fr auto;gap:10px}.field{display:grid;gap:5px}.field span,label.small{font-size:.8rem;font-weight:700;color:var(--muted)}input,select{min-height:40px;border:1px solid var(--strong);background:var(--bg);color:var(--text);border-radius:6px;padding:8px 10px}
+    .section{margin-top:18px}.section h2{font-size:1rem;margin:0 0 10px}.event{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}.event:last-child{border-bottom:0}.event-time{font-weight:700}.event-title{font-weight:700}.empty{color:var(--muted);padding:24px 8px;text-align:center}
+    .settings{display:grid;gap:14px}.settings .card h2{margin:0 0 12px;font-size:1rem}.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0}.settings-row.wrap{align-items:flex-start;flex-direction:column}.calendar-list{display:grid;gap:8px;width:100%}.calendar-item{display:flex;gap:9px;align-items:center}.code{width:100%;font:12px/1.4 Consolas,monospace;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)}.status{color:var(--muted);font-size:.88rem;min-height:1.2em}
+    @media(max-width:700px){header{align-items:flex-start;flex-direction:column}.form{grid-template-columns:1fr}.countdown{grid-template-columns:1fr}.remaining{font-size:1rem}.toolbar{align-items:flex-start;flex-direction:column}.event{grid-template-columns:90px 1fr}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div><h1>Countdown</h1><p class="subtitle">Dates, calendar and e-ink display in one place.</p></div>
+    <button class="btn primary" id="newButton">New countdown</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="countdowns">Countdowns</button>
+    <button class="tab" data-tab="calendar">Calendar</button>
+    <button class="tab" data-tab="displays">Displays</button>
+  </nav>
+
+  <section class="panel active" id="panel-countdowns">
+    <div class="card editor" id="editor">
+      <form class="form" id="form">
+        <label class="field"><span>Name</span><input id="nameInput" maxlength="100" required placeholder="Vacation"></label>
+        <label class="field"><span>End date and time</span><input id="dateInput" type="datetime-local" required></label>
+        <div style="display:flex;gap:8px;align-items:end"><button class="btn primary" type="submit" id="saveButton">Add</button><button class="btn" type="button" id="cancelButton">Cancel</button></div>
+      </form>
+      <div class="status" id="formStatus"></div>
+    </div>
+    <div class="grid" id="countdownList"></div>
+  </section>
+
+  <section class="panel" id="panel-calendar">
+    <div class="toolbar"><div><strong>Upcoming agenda</strong><div class="meta">Events from the calendars you selected.</div></div><button class="btn" id="refreshCalendar">Refresh</button></div>
+    <div class="card" id="agenda"></div>
+  </section>
+
+  <section class="panel" id="panel-displays">
+    <div class="settings">
+      <div class="card">
+        <h2>Google Calendar</h2>
+        <div id="googleDisconnected">
+          <p class="meta">Connect Google Calendar with read-only access. OAuth credentials stay on this server.</p>
+          <button class="btn primary" id="connectGoogle">Connect Google Calendar</button>
+        </div>
+        <div id="googleConnected" hidden>
+          <div class="settings-row"><div><strong>Connected</strong><div class="meta">Choose the calendars this app may read.</div></div><button class="btn danger" id="disconnectGoogle">Disconnect</button></div>
+          <div class="calendar-list" id="calendarList"></div>
+          <div class="settings-row">
+            <label class="small" for="windowDays">Upcoming event window</label>
+            <select id="windowDays"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="365">1 year</option></select>
+          </div>
+        </div>
+        <div class="status" id="googleStatus"></div>
+      </div>
+
+      <div class="card">
+        <h2>FrameOS / e-ink</h2>
+        <div class="settings-row wrap"><div><strong>JSON feed</strong><div class="meta">Use this URL in a FrameOS app or HTTP data source.</div></div><div class="code" id="feedUrl"></div></div>
+        <div class="settings-row wrap"><div><strong>Monochrome display page</strong><div class="meta">Browser-friendly e-ink layout.</div></div><div class="code" id="viewUrl"></div></div>
+        <div class="settings-row"><label class="small" for="displayTitle">Display title</label><input id="displayTitle" maxlength="80"></div>
+        <div class="settings-row"><label class="small" for="maxEvents">Calendar events</label><input id="maxEvents" type="number" min="1" max="20"></div>
+        <div class="settings-row"><label class="small" for="maxCountdowns">Countdowns</label><input id="maxCountdowns" type="number" min="1" max="20"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="saveDisplay">Save display settings</button><button class="btn" id="previewDisplay">Open e-ink preview</button><button class="btn danger" id="rotateToken">Rotate display token</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+let state=null, editingId=null, calendarEvents=[];
+const $=id=>document.getElementById(id);
+
+function localInput(iso){const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}
+function defaultDate(){return localInput(new Date(Date.now()+86400000).toISOString())}
+function formatDate(iso){return new Date(iso).toLocaleString([], {weekday:"short",month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}
+function remaining(iso){const ms=new Date(iso)-Date.now(); if(ms<=0)return "Complete"; const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); return d+"d "+String(h).padStart(2,"0")+"h "+String(m).padStart(2,"0")+"m"}
+async function api(path,options={}){const r=await fetch(path,{headers:{"Content-Type":"application/json",...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Request failed");return data}
+async function load(){state=await api("/api/state");renderCountdowns();renderSettings(); if(state.google.connected) await loadCalendars(false)}
+function renderCountdowns(){
+ const list=$("countdownList"); list.innerHTML="";
+ if(!state.countdowns.length){list.innerHTML='<div class="empty">No countdowns yet. Add one above.</div>';return}
+ state.countdowns.forEach(item=>{const row=document.createElement("article");row.className="card countdown";row.innerHTML='<div><div class="name"></div><div class="meta"></div></div><div class="remaining"></div><div class="actions"><button class="btn link edit">Edit</button><button class="btn link danger del">Delete</button></div>';row.querySelector(".name").textContent=item.name;row.querySelector(".meta").textContent=formatDate(item.end);row.querySelector(".remaining").textContent=remaining(item.end);row.querySelector(".edit").onclick=()=>openEditor(item);row.querySelector(".del").onclick=()=>removeItem(item);list.appendChild(row)})
+}
+function openEditor(item){editingId=item?.id||null;$("editor").classList.add("open");$("nameInput").value=item?.name||"";$("dateInput").value=item?localInput(item.end):defaultDate();$("saveButton").textContent=item?"Save":"Add";$("nameInput").focus()}
+function closeEditor(){editingId=null;$("editor").classList.remove("open");$("formStatus").textContent=""}
+async function removeItem(item){if(!confirm('Delete "'+item.name+'"?'))return;await api("/api/countdowns/"+encodeURIComponent(item.id),{method:"DELETE"});await load()}
+$("form").onsubmit=async e=>{e.preventDefault();try{const body={name:$("nameInput").value.trim(),end:new Date($("dateInput").value).toISOString()};await api(editingId?"/api/countdowns/"+encodeURIComponent(editingId):"/api/countdowns",{method:editingId?"PUT":"POST",body:JSON.stringify(body)});closeEditor();await load()}catch(err){$("formStatus").textContent=err.message}}
+$("newButton").onclick=()=>openEditor();$("cancelButton").onclick=closeEditor;
+
+document.querySelectorAll(".tab").forEach(btn=>btn.onclick=async()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));$("panel-"+btn.dataset.tab).classList.add("active");if(btn.dataset.tab==="calendar")await loadAgenda()});
+
+async function loadAgenda(){
+ const a=$("agenda"); if(!state.google.connected){a.innerHTML='<div class="empty">Connect Google Calendar from Displays first.</div>';return}
+ a.innerHTML='<div class="empty">Loading…</div>';
+ try{const data=await api("/api/google/events");calendarEvents=data.events||[];renderAgenda()}catch(e){a.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>'}
+}
+function renderAgenda(){const a=$("agenda");a.innerHTML="";if(!calendarEvents.length){a.innerHTML='<div class="empty">No upcoming events in the selected calendars.</div>';return}calendarEvents.forEach(e=>{const row=document.createElement("div");row.className="event";const time=document.createElement("div");time.className="event-time";const d=new Date(e.start);time.textContent=e.allDay?d.toLocaleDateString([],{month:"short",day:"numeric"}):d.toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});const detail=document.createElement("div");const title=document.createElement("div");title.className="event-title";title.textContent=e.title;detail.appendChild(title);if(e.location){const loc=document.createElement("div");loc.className="meta";loc.textContent=e.location;detail.appendChild(loc)}row.append(time,detail);a.appendChild(row)})}
+function escapeHtml(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+
+function renderSettings(){
+ $("googleDisconnected").hidden=state.google.connected;$("googleConnected").hidden=!state.google.connected;
+ $("windowDays").value=String(state.google.countdownWindowDays||30);
+ $("feedUrl").textContent=location.origin+state.display.feedPath;
+ $("viewUrl").textContent=location.origin+state.display.viewPath;
+ $("displayTitle").value=state.display.title||"Upcoming";$("maxEvents").value=state.display.maxEvents||6;$("maxCountdowns").value=state.display.maxCountdowns||5;
+}
+async function loadCalendars(saveAfter){
+ if(!state.google.connected)return;
+ try{const data=await api("/api/google/calendars");const holder=$("calendarList");holder.innerHTML="";data.calendars.forEach(c=>{const label=document.createElement("label");label.className="calendar-item";const box=document.createElement("input");box.type="checkbox";box.checked=state.google.selectedCalendarIds.includes(c.id);box.onchange=saveCalendarSelection;const span=document.createElement("span");span.textContent=c.summary+(c.primary?" (primary)":"");label.append(box,span);label.dataset.id=c.id;holder.appendChild(label)});if(saveAfter)await saveCalendarSelection()}catch(e){$("googleStatus").textContent=e.message}
+}
+async function saveCalendarSelection(){const ids=[...document.querySelectorAll("#calendarList .calendar-item")].filter(x=>x.querySelector("input").checked).map(x=>x.dataset.id);await api("/api/settings",{method:"PUT",body:JSON.stringify({selectedCalendarIds:ids,countdownWindowDays:Number($("windowDays").value)})});await load()}
+$("windowDays").onchange=saveCalendarSelection;
+$("connectGoogle").onclick=()=>location.href="/api/google/auth";
+$("disconnectGoogle").onclick=async()=>{if(!confirm("Disconnect Google Calendar?"))return;await api("/api/google/disconnect",{method:"POST"});await load()};
+$("refreshCalendar").onclick=loadAgenda;
+$("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value)})});await load()};
+$("previewDisplay").onclick=()=>window.open(state.display.viewPath,"_blank");
+$("rotateToken").onclick=async()=>{if(!confirm("Rotate the FrameOS token? Existing display URLs will stop working."))return;await api("/api/display/rotate-token",{method:"POST"});await load()};
+
+load().catch(e=>document.body.insertAdjacentHTML("beforeend",'<p style="padding:20px">'+escapeHtml(e.message)+'</p>'));
+setInterval(()=>{if(state)renderCountdowns()},30000);
+</script>
+</body>
+</html>
