@@ -22,7 +22,7 @@ const COLORS = ['black', 'red', 'blue', 'green', 'yellow', 'purple'];
 const PROGRESS_MODES = ['time', 'manual', 'none'];
 const PROGRESS_STYLES = ['solid', 'segmented', 'thin'];
 const DATE_STYLES = ['short', 'medium', 'long', 'numeric'];
-const TIME_STYLES = ['days', 'compact', 'full', 'date'];
+const TIME_STYLES = ['days', 'compact', 'full', 'precise', 'weeks', 'date'];
 const LAYOUTS = ['auto', 'landscape', 'portrait'];
 const PALETTES = ['spectra6', 'mono'];
 const DATE_WIDGETS = ['flipper', 'plain'];
@@ -368,7 +368,7 @@ function countdownView(c, now = Date.now()) {
   return {
     ...c, expired: ms <= 0, secondsRemaining: seconds,
     daysRemaining: Math.max(0, Math.ceil(ms / 86400000)),
-    remaining: { days, hours, minutes }, progress: countdownProgress(c, now)
+    remaining: { days, hours, minutes, seconds: seconds % 60 }, progress: countdownProgress(c, now)
   };
 }
 function dueForDisplay(task) {
@@ -418,8 +418,13 @@ function formatDateServer(value, style) {
 function timeLabel(c) {
   const r = c.remaining;
   if (c.timeDisplayStyle === 'date') return formatDateServer(c.end, c.dateDisplayStyle);
+  if (c.timeDisplayStyle === 'weeks') {
+    const weeks = Math.floor(r.days / 7), days = r.days % 7;
+    return weeks + 'w ' + days + 'd';
+  }
   if (c.timeDisplayStyle === 'compact') return r.days + 'd ' + String(r.hours).padStart(2, '0') + 'h';
   if (c.timeDisplayStyle === 'full') return r.days + 'd ' + String(r.hours).padStart(2, '0') + 'h ' + String(r.minutes).padStart(2, '0') + 'm';
+  if (c.timeDisplayStyle === 'precise') return r.days + 'd ' + String(r.hours).padStart(2, '0') + 'h ' + String(r.minutes).padStart(2, '0') + 'm ' + String(r.seconds || 0).padStart(2, '0') + 's';
   return c.daysRemaining + ' ' + (c.daysRemaining === 1 ? 'day' : 'days');
 }
 function svgBar(percent, x, y, width, height, fill) {
