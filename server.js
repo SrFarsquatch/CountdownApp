@@ -56,7 +56,7 @@ function defaults() {
     countdowns: [],
     tasks: [],
     goals: [],
-    google: { token: null, selectedCalendarIds: [], countdownWindowDays: 30 },
+    google: { accounts: [], countdownWindowDays: 30 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -117,16 +117,41 @@ function normalizeGoal(x = {}) {
   };
 }
 
+function normalizeGoogleAccount(x = {}) {
+  return {
+    id: String(x.id || id()),
+    googleId: cleanText(x.googleId, 240),
+    label: cleanText(x.label || x.googleId || 'Google account', 160),
+    token: typeof x.token === 'string' ? x.token : null,
+    selectedCalendarIds: Array.isArray(x.selectedCalendarIds) ? x.selectedCalendarIds.map(String).slice(0, 50) : [],
+    connectedAt: iso(x.connectedAt) || new Date().toISOString()
+  };
+}
+
 function load() {
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
     const base = defaults();
+    const legacyGoogle = parsed.google || {};
+    let accounts = Array.isArray(legacyGoogle.accounts) ? legacyGoogle.accounts.map(normalizeGoogleAccount) : [];
+    if (!accounts.length && legacyGoogle.token) {
+      accounts = [normalizeGoogleAccount({
+        id: 'legacy',
+        label: 'Google account',
+        token: legacyGoogle.token,
+        selectedCalendarIds: legacyGoogle.selectedCalendarIds || [],
+        connectedAt: new Date().toISOString()
+      })];
+    }
     return {
       ...base, ...parsed,
       countdowns: Array.isArray(parsed.countdowns) ? parsed.countdowns.map(normalizeCountdown) : [],
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals.map(normalizeGoal) : [],
-      google: { ...base.google, ...(parsed.google || {}) },
+      google: {
+        accounts,
+        countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
+      },
       display: { ...base.display, ...(parsed.display || {}) }
     };
   } catch {
@@ -258,11 +283,19 @@ async function exchange(code, req) {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: payload
   });
-  if (!response.ok) throw new Error('Google token exchange failed.');
+  if (!response.ok) throw new Error('Google token exchange failed: ' + (await response.text()).slice(0, 180));
   return response.json();
 }
-async function accessToken() {
-  const token = decrypt(db.google.token);
+function googleAccounts() {
+  return Array.isArray(db.google.accounts) ? db.google.accounts : [];
+}
+function googleAccount(accountId) {
+  return googleAccounts().find(account => account.id === accountId) || null;
+}
+async function accessToken(accountOrId) {
+  const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
+  if (!account) return null;
+  const token = decrypt(account.token);
   if (!token) return null;
   if (token.access_token && token.expires_at && Date.now() < token.expires_at - 60000) return token.access_token;
   if (!token.refresh_token) return null;
@@ -276,48 +309,87 @@ async function accessToken() {
   if (!response.ok) return null;
   const next = await response.json();
   const merged = { ...token, ...next, refresh_token: token.refresh_token, expires_at: Date.now() + num(next.expires_in, 3600) * 1000 };
-  db.google.token = encrypt(merged);
+  account.token = encrypt(merged);
   save(db);
   return merged.access_token;
 }
-async function gfetch(endpoint) {
-  const access = await accessToken();
-  if (!access) throw new Error('Google Calendar is not connected.');
+async function googleFetchWithAccess(access, endpoint) {
   const response = await fetch('https://www.googleapis.com/calendar/v3' + endpoint, { headers: { Authorization: 'Bearer ' + access } });
   if (!response.ok) throw new Error('Google Calendar request failed: ' + (await response.text()).slice(0, 180));
   return response.json();
 }
-async function calendars() {
+async function gfetch(accountOrId, endpoint) {
+  const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
+  const access = await accessToken(account);
+  if (!account || !access) throw new Error('Google Calendar account is not connected.');
+  return googleFetchWithAccess(access, endpoint);
+}
+function accountLabelFromCalendars(items = []) {
+  const primary = items.find(calendar => calendar.primary) || items[0];
+  if (!primary) return { googleId: '', label: 'Google account' };
+  const googleId = cleanText(primary.id, 240);
+  const summary = cleanText(primary.summary, 160);
+  const label = summary && summary !== googleId ? summary + ' (' + googleId + ')' : (googleId || summary || 'Google account');
+  return { googleId, label };
+}
+async function calendarListForAccount(account) {
   let out = [], pageToken = '';
   do {
     const query = new URLSearchParams({ maxResults: '250' });
     if (pageToken) query.set('pageToken', pageToken);
-    const data = await gfetch('/users/me/calendarList?' + query);
+    const data = await gfetch(account, '/users/me/calendarList?' + query);
     out.push(...(data.items || []));
     pageToken = data.nextPageToken || '';
   } while (pageToken);
-  return out.map(c => ({ id: c.id, summary: c.summary, primary: Boolean(c.primary), backgroundColor: c.backgroundColor || '' }));
+  const identity = accountLabelFromCalendars(out);
+  let changed = false;
+  if (identity.googleId && account.googleId !== identity.googleId) { account.googleId = identity.googleId; changed = true; }
+  if (identity.label && account.label !== identity.label) { account.label = identity.label; changed = true; }
+  if (changed) save(db);
+  return out;
+}
+async function calendars(accountId) {
+  const account = googleAccount(accountId);
+  if (!account) throw new Error('Google account was not found.');
+  const out = await calendarListForAccount(account);
+  return out.map(c => ({
+    id: c.id, summary: c.summary, primary: Boolean(c.primary),
+    backgroundColor: c.backgroundColor || '', accessRole: c.accessRole || 'reader'
+  }));
+}
+async function identifyGoogleToken(token) {
+  if (!token?.access_token) return { googleId: '', label: 'Google account' };
+  const query = new URLSearchParams({ maxResults: '250' });
+  const data = await googleFetchWithAccess(token.access_token, '/users/me/calendarList?' + query);
+  return accountLabelFromCalendars(data.items || []);
 }
 async function eventsBetween(from, to) {
-  const ids = db.google.selectedCalendarIds || [];
-  if (!ids.length) return [];
+  const accounts = googleAccounts().filter(account => account.token && account.selectedCalendarIds.length);
+  if (!accounts.length) return [];
   const min = from ? new Date(from) : new Date();
   const max = to ? new Date(to) : new Date(min.getTime() + clamp(num(db.google.countdownWindowDays, 30), 1, 365) * 86400000);
   if (Number.isNaN(min.getTime()) || Number.isNaN(max.getTime()) || max <= min) throw new Error('Invalid calendar date range.');
   if (max - min > 370 * 86400000) throw new Error('Calendar range is too large.');
   const out = [];
-  for (const calendarId of ids) {
-    const query = new URLSearchParams({ timeMin: min.toISOString(), timeMax: max.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
-    const data = await gfetch('/calendars/' + encodeURIComponent(calendarId) + '/events?' + query);
-    for (const event of data.items || []) {
-      if (event.status === 'cancelled') continue;
-      const start = event.start?.dateTime || event.start?.date;
-      if (!start) continue;
-      out.push({
-        id: event.id, calendarId, title: event.summary || 'Busy', start,
-        end: event.end?.dateTime || event.end?.date || start, allDay: Boolean(event.start?.date),
-        location: event.location || '', htmlLink: event.htmlLink || ''
-      });
+  const seen = new Set();
+  for (const account of accounts) {
+    for (const calendarId of account.selectedCalendarIds) {
+      const query = new URLSearchParams({ timeMin: min.toISOString(), timeMax: max.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
+      const data = await gfetch(account, '/calendars/' + encodeURIComponent(calendarId) + '/events?' + query);
+      for (const event of data.items || []) {
+        if (event.status === 'cancelled') continue;
+        const start = event.start?.dateTime || event.start?.date;
+        if (!start) continue;
+        const dedupeKey = calendarId + '|' + event.id + '|' + start;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        out.push({
+          id: event.id, calendarId, accountId: account.id, accountLabel: account.label,
+          title: event.summary || 'Busy', start,
+          end: event.end?.dateTime || event.end?.date || start, allDay: Boolean(event.start?.date),
+          location: event.location || '', htmlLink: event.htmlLink || ''
+        });
+      }
     }
   }
   out.sort((a, b) => new Date(a.start) - new Date(b.start));
@@ -378,7 +450,7 @@ function dueForDisplay(task) {
 }
 async function feed() {
   let ev = [], calendarError = null;
-  if (db.google.token && (db.google.selectedCalendarIds || []).length) {
+  if (googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
     try { ev = await events(); }
     catch (error) { calendarError = error.message; }
   }
@@ -568,7 +640,15 @@ function state() {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
-    google: { configured: googleConfigured(), connected: Boolean(decrypt(db.google.token)), selectedCalendarIds: db.google.selectedCalendarIds || [], countdownWindowDays: db.google.countdownWindowDays || 30 },
+    google: {
+      configured: googleConfigured(),
+      connected: googleAccounts().some(account => Boolean(decrypt(account.token))),
+      accounts: googleAccounts().map(account => ({
+        id: account.id, googleId: account.googleId, label: account.label,
+        selectedCalendarIds: account.selectedCalendarIds || [], connectedAt: account.connectedAt
+      })),
+      countdownWindowDays: db.google.countdownWindowDays || 30
+    },
     display: { ...db.display, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
   };
 }
@@ -658,7 +738,7 @@ const server = http.createServer(async (req, res) => {
       const oauthState = crypto.randomBytes(16).toString('hex');
       const query = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID, redirect_uri: base(req) + '/api/google/callback', response_type: 'code',
-        scope: SCOPES, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: oauthState
+        scope: SCOPES, access_type: 'offline', prompt: 'select_account consent', include_granted_scopes: 'true', state: oauthState
       });
       res.writeHead(302, { 'Set-Cookie': 'countdown_oauth_state=' + oauthState + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=600', Location: 'https://accounts.google.com/o/oauth2/v2/auth?' + query });
       return res.end();
@@ -669,14 +749,51 @@ const server = http.createServer(async (req, res) => {
       if (url.searchParams.get('error')) return text(res, 400, 'Google authorization was cancelled.');
       const token = await exchange(url.searchParams.get('code'), req);
       token.expires_at = Date.now() + num(token.expires_in, 3600) * 1000;
-      db.google.token = encrypt(token); save(db);
-      res.writeHead(302, { Location: '/?view=planner&calendar=connected', 'Set-Cookie': 'countdown_oauth_state=; Path=/; Max-Age=0' });
+      const identity = await identifyGoogleToken(token);
+      let account = identity.googleId ? googleAccounts().find(x => x.googleId === identity.googleId) : null;
+      if (account) {
+        const previous = decrypt(account.token) || {};
+        if (!token.refresh_token && previous.refresh_token) token.refresh_token = previous.refresh_token;
+        account.token = encrypt(token);
+        account.label = identity.label || account.label;
+        account.connectedAt = new Date().toISOString();
+      } else {
+        account = normalizeGoogleAccount({
+          id: id(), googleId: identity.googleId, label: identity.label,
+          token: encrypt(token), selectedCalendarIds: [], connectedAt: new Date().toISOString()
+        });
+        db.google.accounts.push(account);
+      }
+      save(db);
+      res.writeHead(302, { Location: '/?view=settings&calendar=connected', 'Set-Cookie': 'countdown_oauth_state=; Path=/; Max-Age=0' });
       return res.end();
     }
     if (p === '/api/google/disconnect' && req.method === 'POST') {
-      db.google.token = null; db.google.selectedCalendarIds = []; save(db); return json(res, 200, { ok: true });
+      db.google.accounts = []; save(db); return json(res, 200, { ok: true });
     }
-    if (p === '/api/google/calendars') return json(res, 200, { calendars: await calendars() });
+    if (p.startsWith('/api/google/accounts/') && p.endsWith('/disconnect') && req.method === 'POST') {
+      const parts = p.split('/');
+      const accountId = decodeURIComponent(parts[4] || '');
+      const before = db.google.accounts.length;
+      db.google.accounts = db.google.accounts.filter(account => account.id !== accountId);
+      if (before === db.google.accounts.length) return json(res, 404, { error: 'Google account was not found.' });
+      save(db); return json(res, 200, { ok: true });
+    }
+    if (p.startsWith('/api/google/accounts/') && p.endsWith('/calendars') && req.method === 'PUT') {
+      const parts = p.split('/');
+      const accountId = decodeURIComponent(parts[4] || '');
+      const account = googleAccount(accountId);
+      if (!account) return json(res, 404, { error: 'Google account was not found.' });
+      const incoming = await body(req);
+      if (!Array.isArray(incoming.calendarIds)) return json(res, 400, { error: 'calendarIds must be an array.' });
+      account.selectedCalendarIds = incoming.calendarIds.map(String).slice(0, 50);
+      save(db); return json(res, 200, { ok: true });
+    }
+    if (p === '/api/google/calendars') {
+      const accountId = url.searchParams.get('accountId');
+      if (!accountId) return json(res, 400, { error: 'accountId is required.' });
+      return json(res, 200, { calendars: await calendars(accountId) });
+    }
     if (p === '/api/google/events') {
       const from = url.searchParams.get('from');
       const to = url.searchParams.get('to');
@@ -685,7 +802,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/settings' && req.method === 'PUT') {
       const incoming = await body(req);
-      if (Array.isArray(incoming.selectedCalendarIds)) db.google.selectedCalendarIds = incoming.selectedCalendarIds.slice(0, 30);
+      if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
       if (incoming.countdownWindowDays !== undefined) db.google.countdownWindowDays = clamp(num(incoming.countdownWindowDays, 30), 1, 365);
       if (incoming.displayTitle !== undefined) db.display.title = cleanText(incoming.displayTitle || 'Today', 80);
       if (incoming.maxEvents !== undefined) db.display.maxEvents = clamp(num(incoming.maxEvents, 5), 1, 20);
