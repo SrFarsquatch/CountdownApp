@@ -60,7 +60,7 @@
 /* Google-style calendar time blocks */
 .calendar-stage{max-height:calc(100vh - 190px);overflow:auto;scrollbar-gutter:stable}
 .timeline-root{--hour-height:64px;min-width:0;background:var(--panel)}
-.timeline-day-all-day{display:grid;grid-template-columns:72px minmax(0,1fr);border-bottom:1px solid var(--line);min-height:42px}
+.timeline-day-all-day{display:grid;grid-template-columns:72px minmax(0,1fr);border-bottom:1px solid var(--line);min-height:42px}.day-time-grid{display:grid;grid-template-columns:72px minmax(0,1fr);min-width:0}
 .week-day-heads,.week-all-day,.week-time-grid{display:grid;grid-template-columns:72px repeat(7,minmax(120px,1fr));min-width:920px}
 .week-day-heads{position:sticky;top:0;z-index:12;background:var(--panel);border-bottom:1px solid var(--line)}
 .week-day-heads>div{padding:11px 7px;text-align:center;border-right:1px solid var(--line);font-size:12px;font-weight:800}
@@ -93,7 +93,7 @@
 @media(max-width:760px){
   .calendar-stage{max-height:calc(100vh - 235px)}
   .week-day-heads,.week-all-day,.week-time-grid{min-width:780px;grid-template-columns:58px repeat(7,minmax(103px,1fr))}
-  .timeline-day-all-day{grid-template-columns:58px minmax(0,1fr)}
+  .timeline-day-all-day,.day-time-grid{grid-template-columns:58px minmax(0,1fr)}
   .all-day-label{padding-left:4px;padding-right:6px}
   .cal-block-source{display:none}
 }
@@ -428,7 +428,7 @@ function renderDay(range){
  const items=calendarItemsForDay(day,next);
  let h='<div class="timeline-root">';
  if(allDay.length)h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell">'+allDay.map(allDayChip).join('')+'</div></div>';
- h+='<div class="week-time-grid" style="grid-template-columns:72px minmax(0,1fr);min-width:0">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
+ h+='<div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
  $('calendarStage').innerHTML=h;bindCalendarInteractions();scrollTimeline();
 }
 function renderWeek(range){
