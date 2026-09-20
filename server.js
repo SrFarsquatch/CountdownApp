@@ -28,8 +28,9 @@ const PALETTES = ['spectra6', 'mono'];
 const DATE_WIDGETS = ['flipper', 'plain'];
 const DISPLAY_MODES = ['dashboard', 'daily', 'weekly', 'monthly', 'countdowns'];
 const WEATHER_UNITS = ['metric', 'imperial'];
+const WEATHER_STYLES = ['compact', 'current', 'forecast'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
-const DISPLAY_SECTION_KEYS = ['agenda', 'tasks', 'goals', 'countdowns'];
+const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns'];
 const DISPLAY_GRID_COLS = 12;
 const DISPLAY_GRID_ROWS = 8;
 const TASK_STATUS = ['todo', 'progress', 'done'];
@@ -58,8 +59,9 @@ const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max)
 
 function defaultSectionLayout() {
   return {
-    agenda: { x: 0, y: 0, w: 6, h: 4 },
-    tasks: { x: 6, y: 0, w: 6, h: 4 },
+    agenda: { x: 0, y: 0, w: 7, h: 4 },
+    weather: { x: 7, y: 0, w: 5, h: 2 },
+    tasks: { x: 7, y: 2, w: 5, h: 2 },
     goals: { x: 0, y: 4, w: 6, h: 4 },
     countdowns: { x: 6, y: 4, w: 6, h: 4 }
   };
@@ -107,8 +109,8 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 2,
-      sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(),
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 3,
+      sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
     }
   };
@@ -227,7 +229,11 @@ function load() {
         const display = { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) };
         if (num(parsed.display?.plannerLayoutVersion, 0) < 2) {
           if (!parsed.display?.mode || parsed.display.mode === 'dashboard') display.mode = 'daily';
-          display.plannerLayoutVersion = 2;
+        }
+        if (num(parsed.display?.plannerLayoutVersion, 0) < 3) {
+          if (parsed.display?.sectionLayoutMode === 'custom' && !parsed.display?.sectionLayout?.weather) display.sectionLayout = defaultSectionLayout();
+          display.weatherStyle = en(parsed.display?.weatherStyle, WEATHER_STYLES, 'forecast');
+          display.plannerLayoutVersion = 3;
         }
         return display;
       })()
@@ -1113,7 +1119,7 @@ async function feed() {
       refreshMinutes: clamp(num(db.display.refreshMinutes, 15), 1, 1440),
       showAgenda: db.display.showAgenda !== false, showTasks: db.display.showTasks !== false,
       showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false,
-      showWeather: db.display.showWeather !== false
+      showWeather: db.display.showWeather !== false, weatherStyle: en(db.display.weatherStyle, WEATHER_STYLES, 'forecast')
     }
   };
 }
@@ -1249,16 +1255,12 @@ function renderPlannerSvg(data, w, h, mode) {
   }
   const viewLabel = mode === 'daily' ? 'DAY VIEW' : (mode === 'weekly' ? 'WEEK VIEW' : 'MONTH VIEW');
   svg += '<text x="' + (w-pad) + '" y="' + (15*scale) + '" text-anchor="end" font-size="' + (8*scale) + '" font-weight="800" letter-spacing="' + (1.1*scale) + '" class="muted">' + viewLabel + '</text>';
-  let weatherHeaderX = w - pad - 92*scale;
-  if (currentWeather && currentWeather.temperature !== null) {
-    svg += svgWeatherIcon(currentWeather.condition, weatherHeaderX, 10*scale, 29*scale, palette);
-    svg += '<text x="' + (weatherHeaderX + 35*scale) + '" y="' + (31*scale) + '" font-size="' + (14*scale) + '" font-weight="800">' + esc(currentWeather.temperature + unit) + '</text>';
-  }
   svg += '<text x="' + (w - pad) + '" y="' + (39*scale) + '" text-anchor="end" font-size="' + (17*scale) + '" font-weight="800">' + esc(timeText) + '</text>';
   svg += '<line x1="' + pad + '" y1="' + headerY + '" x2="' + (w-pad) + '" y2="' + headerY + '" class="rule"/>';
 
   if (mode === 'daily') {
-    const weatherH = currentWeather && landscape ? 58*scale : 0;
+    const weatherStyle = en(data.display.weatherStyle, WEATHER_STYLES, 'forecast');
+    const weatherH = currentWeather && landscape ? (weatherStyle === 'compact' ? 42*scale : 62*scale) : 0;
     const bottom = h - 24*scale - weatherH;
     const leftW = landscape ? (w - pad*2) * .55 : (w - pad*2);
     const rightX = pad + leftW + (landscape ? 18*scale : 0);
@@ -1314,14 +1316,29 @@ function renderPlannerSvg(data, w, h, mode) {
       }
     }
     if (currentWeather && landscape) {
-      const wy = h - 78*scale;
-      svg += '<rect x="' + pad + '" y="' + wy + '" width="' + (w-pad*2) + '" height="' + (54*scale) + '" rx="' + (6*scale) + '" fill="#f1f1ed"/>';
-      svg += svgWeatherIcon(currentWeather.condition,pad+10*scale,wy+9*scale,34*scale,palette);
-      svg += '<text x="' + (pad+55*scale) + '" y="' + (wy+22*scale) + '" font-size="' + (15*scale) + '" font-weight="800">' + esc((currentWeather.temperature ?? '—') + unit) + '</text>';
-      svg += '<text x="' + (pad+55*scale) + '" y="' + (wy+38*scale) + '" font-size="' + (10*scale) + '" class="muted">' + esc(currentWeather.description || '') + (location?' · '+esc(location):'') + '</text>';
-      if (todayWeather) {
-        svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+22*scale) + '" text-anchor="end" font-size="' + (12*scale) + '" font-weight="800">H ' + esc((todayWeather.high ?? '—')+unit) + '  L ' + esc((todayWeather.low ?? '—')+unit) + '</text>';
-        svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+39*scale) + '" text-anchor="end" font-size="' + (10*scale) + '" class="muted">' + Math.round(todayWeather.daytime?.precipitation||0) + '% precipitation</text>';
+      const wy = h - (weatherStyle === 'compact' ? 60*scale : 82*scale);
+      const wh = weatherStyle === 'compact' ? 36*scale : 58*scale;
+      svg += '<rect x="' + pad + '" y="' + wy + '" width="' + (w-pad*2) + '" height="' + wh + '" rx="' + (6*scale) + '" fill="#f1f1ed"/>';
+      if (weatherStyle === 'forecast') {
+        const days = (data.weather?.days || []).slice(0,5);
+        const left = pad + 10*scale;
+        svg += svgWeatherIcon(currentWeather.condition,left,wy+10*scale,30*scale,palette);
+        svg += '<text x="' + (left+39*scale) + '" y="' + (wy+24*scale) + '" font-size="' + (14*scale) + '" font-weight="800">' + esc((currentWeather.temperature ?? '—') + unit) + '</text>';
+        let fx = pad + 170*scale;
+        const fw = Math.max(60*scale,(w-pad-fx)/Math.max(1,days.length));
+        days.forEach((day,index)=>{
+          const dx=fx+index*fw;
+          svg += '<text x="' + dx + '" y="' + (wy+16*scale) + '" font-size="' + (8*scale) + '" font-weight="800" class="muted">' + esc(index===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
+          svg += svgWeatherIcon(day.daytime?.condition,dx,wy+22*scale,20*scale,palette);
+          svg += '<text x="' + (dx+25*scale) + '" y="' + (wy+37*scale) + '" font-size="' + (9*scale) + '" font-weight="800">' + esc((day.high??'—')+'°/'+(day.low??'—')+'°') + '</text>';
+        });
+      } else {
+        svg += svgWeatherIcon(currentWeather.condition,pad+10*scale,wy+(weatherStyle==='compact'?5:11)*scale,(weatherStyle==='compact'?26:34)*scale,palette);
+        svg += '<text x="' + (pad+48*scale) + '" y="' + (wy+(weatherStyle==='compact'?23:25)*scale) + '" font-size="' + (weatherStyle==='compact'?13:15)*scale + '" font-weight="800">' + esc((currentWeather.temperature ?? '—') + unit) + '</text>';
+        svg += '<text x="' + (pad+95*scale) + '" y="' + (wy+(weatherStyle==='compact'?23:25)*scale) + '" font-size="' + (10*scale) + '" class="muted">' + esc(currentWeather.description || '') + (location?' · '+esc(location):'') + '</text>';
+        if (weatherStyle === 'current' && todayWeather) {
+          svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+24*scale) + '" text-anchor="end" font-size="' + (11*scale) + '" font-weight="800">H ' + esc((todayWeather.high ?? '—')+unit) + '  L ' + esc((todayWeather.low ?? '—')+unit) + ' · ' + Math.round(todayWeather.daytime?.precipitation||0) + '%</text>';
+        }
       }
     }
     return plannerFooter(svg,data,w,h,pad,scale,'DAILY' + (data.weather ? ' · Weather: Open-Meteo' : '')) + '</svg>';
@@ -1383,12 +1400,6 @@ function renderPlannerSvg(data, w, h, mode) {
     const sx=gridX+gridW+14*scale,sw=w-pad-sx;
     svg += '<line x1="' + (sx-7*scale) + '" y1="' + gridTop + '" x2="' + (sx-7*scale) + '" y2="' + gridBottom + '" class="rule"/>';
     let sy=gridTop+13*scale;
-    if(currentWeather){
-      svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.2*scale) + '">TODAY</text>';sy+=9*scale;
-      svg += svgWeatherIcon(currentWeather.condition,sx,sy,32*scale,palette);
-      svg += '<text x="' + (sx+40*scale) + '" y="' + (sy+19*scale) + '" font-size="' + (18*scale) + '" font-weight="800">' + esc((currentWeather.temperature??'—')+unit) + '</text>';
-      svg += '<text x="' + (sx+40*scale) + '" y="' + (sy+34*scale) + '" font-size="' + (9*scale) + '" class="muted">' + esc(currentWeather.description||'') + '</text>';sy+=51*scale;
-    }
     const todays=plannerEventsForDay(data,now).slice(0,4);
     svg += '<line x1="' + sx + '" y1="' + sy + '" x2="' + (w-pad) + '" y2="' + sy + '" class="rule"/>';sy+=19*scale;
     svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.2*scale) + '">AGENDA</text>';sy+=19*scale;
@@ -1426,6 +1437,7 @@ function renderSvg(data, w, h) {
     availableKinds.push('countdowns');
   } else {
     if (data.display.showAgenda !== false) availableKinds.push('agenda');
+    if (data.display.showWeather !== false) availableKinds.push('weather');
     if (data.display.showTasks !== false) availableKinds.push('tasks');
     if (data.display.showGoals !== false) availableKinds.push('goals');
     if (data.display.showCountdowns !== false) availableKinds.push('countdowns');
@@ -1433,13 +1445,14 @@ function renderSvg(data, w, h) {
 
   const sectionData = {
     agenda: data.events || [],
+    weather: data.weather ? [data.weather] : [],
     tasks: data.tasks || [],
     goals: data.goals || [],
     countdowns: data.countdowns || []
   };
 
   function drawEmptySection(kind, x, y, width) {
-    const label = { agenda: 'AGENDA', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
     svg += sectionTitle(label, x, y + 11);
     svg += '<text x="' + x + '" y="' + (y + 37) + '" font-size="12" class="muted">Nothing to show.</text>';
   }
@@ -1448,7 +1461,7 @@ function renderSvg(data, w, h) {
     const clipId = options.clipId || '';
     if (clipId) svg += '<g clip-path="url(#' + clipId + ')">';
     let cursor = y;
-    const label = { agenda: 'AGENDA', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
     const items = sectionData[kind] || [];
     svg += sectionTitle(label, x, cursor + 11);
     cursor += 22;
@@ -1469,6 +1482,41 @@ function renderSvg(data, w, h) {
         svg += '<text x="' + x + '" y="' + (cursor + 20) + '" font-size="14" font-weight="700">' + esc(title) + '</text>';
         svg += '<text x="' + (x + width) + '" y="' + (cursor + 20) + '" text-anchor="end" font-size="12" class="muted">' + esc(when) + '</text>';
         cursor += 32;
+      }
+    }
+    if (kind === 'weather') {
+      const weather = data.weather;
+      const style = en(data.display.weatherStyle, WEATHER_STYLES, 'forecast');
+      if (weather?.current) {
+        const current = weather.current, today = (weather.days||[])[0], unitSymbol = weather.unitSymbol || '';
+        if (style === 'compact') {
+          svg += svgWeatherIcon(current.condition,x,cursor+2,28,palette);
+          svg += '<text x="' + (x+38) + '" y="' + (cursor+20) + '" font-size="17" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
+          svg += '<text x="' + (x+86) + '" y="' + (cursor+20) + '" font-size="11" class="muted">' + esc(truncateForWidth(current.description||'',width-90,11,76)) + '</text>';
+          if(today) svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" font-weight="700">H ' + esc((today.high??'—')+unitSymbol) + ' · L ' + esc((today.low??'—')+unitSymbol) + '</text>';
+          cursor += 34;
+        } else if (style === 'current') {
+          svg += svgWeatherIcon(current.condition,x,cursor+3,40,palette);
+          svg += '<text x="' + (x+52) + '" y="' + (cursor+24) + '" font-size="22" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
+          svg += '<text x="' + (x+52) + '" y="' + (cursor+41) + '" font-size="10" class="muted">' + esc(truncateForWidth(current.description||'',width-54,10)) + '</text>';
+          svg += '<text x="' + x + '" y="' + (cursor+61) + '" font-size="9.5" class="muted">Feels ' + esc((current.feelsLike??'—')+unitSymbol) + ' · ' + Math.round(current.humidity||0) + '% humidity · ' + Math.round(current.windSpeed||0) + (weather.units==='imperial'?' mph':' km/h') + '</text>';
+          cursor += 72;
+        } else {
+          svg += svgWeatherIcon(current.condition,x,cursor+1,30,palette);
+          svg += '<text x="' + (x+40) + '" y="' + (cursor+20) + '" font-size="17" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
+          const days=(weather.days||[]).slice(0,4);
+          const startY=cursor+36, cellW=Math.max(46,(width-2)/Math.max(1,days.length));
+          days.forEach((day,index)=>{
+            const dx=x+index*cellW;
+            svg += '<text x="' + dx + '" y="' + startY + '" font-size="8.5" font-weight="800" class="muted">' + esc(index===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
+            svg += svgWeatherIcon(day.daytime?.condition,dx,startY+5,20,palette);
+            svg += '<text x="' + (dx+24) + '" y="' + (startY+20) + '" font-size="9" font-weight="800">' + esc((day.high??'—')+'°/'+(day.low??'—')+'°') + '</text>';
+          });
+          cursor += 68;
+        }
+        if (weather.locationLabel && cursor + 12 <= y + maxHeight) {
+          svg += '<text x="' + x + '" y="' + Math.min(y+maxHeight-2,cursor+2) + '" font-size="8.5" class="muted">' + esc(truncateForWidth(weather.locationLabel,width,8.5)) + '</text>';
+        }
       }
     }
     if (kind === 'tasks') {
@@ -1513,7 +1561,7 @@ function renderSvg(data, w, h) {
 
   const top = pad + 50;
   const available = h - top - 24;
-  const custom = data.display.sectionLayoutMode === 'custom' && data.display.mode !== 'countdowns';
+  const custom = data.display.sectionLayoutMode === 'custom' && data.display.mode === 'dashboard';
 
   if (custom) {
     const contentWidth = w - pad * 2;
@@ -1906,6 +1954,7 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showGoals !== undefined) db.display.showGoals = Boolean(incoming.showGoals);
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
+      if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
       if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherUnits !== undefined) {
         db.weather = normalizeWeather({
           ...db.weather,
