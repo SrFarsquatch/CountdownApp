@@ -560,7 +560,7 @@ function applyGoogleTask(localTask, remote, account, list) {
     id: base.id || id(),
     title: cleanText(remote.title || base.title || 'Task', 160),
     description: cleanText(remote.notes || '', 2000),
-    status: done ? 'done' : 'todo',
+    status: done ? 'done' : (base.status === 'progress' ? 'progress' : 'todo'),
     due: remote.due ? googleDueToLocalIso(remote.due, base.due) : null,
     project: base.project || cleanText(list?.title, 80),
     created: base.created || iso(remote.updated) || new Date().toISOString(),
