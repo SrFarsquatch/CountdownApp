@@ -1,466 +1,78 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-const { URL } = require("url");
-
-const PORT = Number(process.env.PORT || 8080);
-const DATA_DIR = process.env.DATA_DIR || "/data";
-const DB_PATH = path.join(DATA_DIR, "countdown-data.json");
-const PUBLIC_DIR = path.join(__dirname, "public");
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
-const APP_SECRET = process.env.APP_SECRET || "";
-const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
-
-fs.mkdirSync(DATA_DIR, { recursive: true });
-
-function defaultDb() {
-  return {
-    countdowns: [],
-    google: {
-      token: null,
-      selectedCalendarIds: [],
-      showCalendarCountdowns: true,
-      countdownWindowDays: 30
-    },
-    display: {
-      token: crypto.randomBytes(24).toString("hex"),
-      title: "Upcoming",
-      maxEvents: 6,
-      maxCountdowns: 5
-    }
-  };
+const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
+const {URL}=require('url');
+const PORT=Number(process.env.PORT||8080),DATA_DIR=process.env.DATA_DIR||'/data',DB_PATH=path.join(DATA_DIR,'countdown-data.json'),PUBLIC_DIR=path.join(__dirname,'public');
+const GOOGLE_CLIENT_ID=process.env.GOOGLE_CLIENT_ID||'',GOOGLE_CLIENT_SECRET=process.env.GOOGLE_CLIENT_SECRET||'',APP_BASE_URL=(process.env.APP_BASE_URL||'').replace(/\/$/,''),APP_SECRET=process.env.APP_SECRET||'';
+const SCOPES='https://www.googleapis.com/auth/calendar.readonly';
+const COLORS=['black','red','blue','green','yellow'],PROGRESS_MODES=['time','manual','none'],PROGRESS_STYLES=['solid','segmented','thin'],DATE_STYLES=['short','medium','long','numeric'],TIME_STYLES=['days','compact','full','date'],LAYOUTS=['auto','landscape','portrait'],PALETTES=['spectra6','mono'],DATE_WIDGETS=['flipper','plain'];
+const HEX={black:'#111111',red:'#d62828',blue:'#1769aa',green:'#2f7d32',yellow:'#e0a800'};
+fs.mkdirSync(DATA_DIR,{recursive:true});
+const id=()=>Date.now().toString(36)+crypto.randomBytes(4).toString('hex');
+const iso=v=>{if(!v)return null;const d=new Date(v);return Number.isNaN(d.getTime())?null:d.toISOString()};
+const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
+const en=(v,a,f)=>a.includes(v)?v:f;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+function defaults(){return{countdowns:[],google:{token:null,selectedCalendarIds:[],showCalendarCountdowns:true,countdownWindowDays:30},display:{token:crypto.randomBytes(24).toString('hex'),title:'Upcoming',maxEvents:5,maxCountdowns:4,layout:'auto',palette:'spectra6',dateWidgetStyle:'flipper',refreshMinutes:15,showAgenda:true,showCountdowns:true}}}
+function normalizeCountdown(x={}){
+ const created=iso(x.created)||new Date().toISOString();
+ return{id:String(x.id||id()),name:String(x.name||'Countdown').slice(0,100),end:iso(x.end)||new Date(Date.now()+86400000).toISOString(),created,
+ accentColor:en(x.accentColor,COLORS,'black'),progressMode:en(x.progressMode,PROGRESS_MODES,'time'),progressStyle:en(x.progressStyle,PROGRESS_STYLES,'solid'),progressStart:iso(x.progressStart)||created,
+ progressCurrent:num(x.progressCurrent,0),progressTotal:Math.max(0,num(x.progressTotal,100)),dateDisplayStyle:en(x.dateDisplayStyle,DATE_STYLES,'medium'),timeDisplayStyle:en(x.timeDisplayStyle,TIME_STYLES,'days'),
+ showExactDate:x.showExactDate!==false,showProgressBar:x.showProgressBar!==false,displayEnabled:x.displayEnabled!==false,pinned:Boolean(x.pinned)};
 }
-
-function loadDb() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
-    return {
-      ...defaultDb(),
-      ...parsed,
-      google: { ...defaultDb().google, ...(parsed.google || {}) },
-      display: { ...defaultDb().display, ...(parsed.display || {}) }
-    };
-  } catch {
-    const db = defaultDb();
-    saveDb(db);
-    return db;
-  }
+function load(){try{const p=JSON.parse(fs.readFileSync(DB_PATH,'utf8')),b=defaults();return{...b,...p,countdowns:Array.isArray(p.countdowns)?p.countdowns.map(normalizeCountdown):[],google:{...b.google,...(p.google||{})},display:{...b.display,...(p.display||{})}}}catch{const d=defaults();save(d);return d}}
+function save(d){const t=DB_PATH+'.tmp';fs.writeFileSync(t,JSON.stringify(d,null,2));fs.renameSync(t,DB_PATH)}
+let db=load();
+function json(res,status,body,h={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...h});res.end(JSON.stringify(body))}
+function text(res,status,body,type='text/plain; charset=utf-8',h={}){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store',...h});res.end(body)}
+function body(req){return new Promise((ok,bad)=>{let s='';req.on('data',c=>{s+=c;if(s.length>1048576){bad(new Error('Request body is too large.'));req.destroy()}});req.on('end',()=>{try{ok(s?JSON.parse(s):{})}catch{bad(new Error('Invalid JSON request.'))}});req.on('error',bad)})}
+function key(){return APP_SECRET?crypto.createHash('sha256').update(APP_SECRET).digest():null}
+function encrypt(v){const k=key();if(!k)return null;const iv=crypto.randomBytes(12),c=crypto.createCipheriv('aes-256-gcm',k,iv),d=Buffer.concat([c.update(JSON.stringify(v),'utf8'),c.final()]);return[iv,c.getAuthTag(),d].map(x=>x.toString('base64url')).join('.')}
+function decrypt(v){const k=key();if(!v||!k)return null;try{const [i,t,d]=v.split('.'),c=crypto.createDecipheriv('aes-256-gcm',k,Buffer.from(i,'base64url'));c.setAuthTag(Buffer.from(t,'base64url'));return JSON.parse(Buffer.concat([c.update(Buffer.from(d,'base64url')),c.final()]).toString('utf8'))}catch{return null}}
+function base(req){if(APP_BASE_URL)return APP_BASE_URL;const proto=String(req.headers['x-forwarded-proto']||'http').split(',')[0].trim(),host=req.headers['x-forwarded-host']||req.headers.host;return proto+'://'+host}
+const googleConfigured=()=>Boolean(GOOGLE_CLIENT_ID&&GOOGLE_CLIENT_SECRET&&APP_SECRET);
+async function exchange(code,req){const b=new URLSearchParams({code,client_id:GOOGLE_CLIENT_ID,client_secret:GOOGLE_CLIENT_SECRET,redirect_uri:base(req)+'/api/google/callback',grant_type:'authorization_code'}),r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});if(!r.ok)throw new Error('Google token exchange failed.');return r.json()}
+async function accessToken(){const t=decrypt(db.google.token);if(!t)return null;if(t.access_token&&t.expires_at&&Date.now()<t.expires_at-60000)return t.access_token;if(!t.refresh_token)return null;const b=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:GOOGLE_CLIENT_SECRET,refresh_token:t.refresh_token,grant_type:'refresh_token'}),r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});if(!r.ok)return null;const n=await r.json(),m={...t,...n,refresh_token:t.refresh_token,expires_at:Date.now()+num(n.expires_in,3600)*1000};db.google.token=encrypt(m);save(db);return m.access_token}
+async function gfetch(ep){const a=await accessToken();if(!a)throw new Error('Google Calendar is not connected.');const r=await fetch('https://www.googleapis.com/calendar/v3'+ep,{headers:{Authorization:'Bearer '+a}});if(!r.ok)throw new Error('Google Calendar request failed: '+(await r.text()).slice(0,180));return r.json()}
+async function calendars(){let out=[],pt='';do{const q=new URLSearchParams({maxResults:'250'});if(pt)q.set('pageToken',pt);const d=await gfetch('/users/me/calendarList?'+q);out.push(...(d.items||[]));pt=d.nextPageToken||''}while(pt);return out.map(c=>({id:c.id,summary:c.summary,primary:Boolean(c.primary),backgroundColor:c.backgroundColor||''}))}
+async function events(){const ids=db.google.selectedCalendarIds||[];if(!ids.length)return[];const now=new Date(),max=new Date(now.getTime()+clamp(num(db.google.countdownWindowDays,30),1,365)*86400000),out=[];for(const cid of ids){const q=new URLSearchParams({timeMin:now.toISOString(),timeMax:max.toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'50'}),d=await gfetch('/calendars/'+encodeURIComponent(cid)+'/events?'+q);for(const e of d.items||[]){if(e.status==='cancelled')continue;const start=e.start?.dateTime||e.start?.date;if(!start)continue;out.push({id:e.id,calendarId:cid,title:e.summary||'Busy',start,end:e.end?.dateTime||e.end?.date||start,allDay:Boolean(e.start?.date),location:e.location||'',htmlLink:e.htmlLink||''})}}out.sort((a,b)=>new Date(a.start)-new Date(b.start));return out}
+function sorted(){return[...db.countdowns].sort((a,b)=>a.pinned!==b.pinned?(a.pinned?-1:1):new Date(a.end)-new Date(b.end))}
+function progress(c,now=Date.now()){if(!c.showProgressBar||c.progressMode==='none')return null;if(c.progressMode==='manual')return clamp(c.progressTotal>0?c.progressCurrent/c.progressTotal*100:0,0,100);const s=new Date(c.progressStart||c.created).getTime(),e=new Date(c.end).getTime();if(!Number.isFinite(s)||e<=s)return 0;return clamp((now-s)/(e-s)*100,0,100)}
+function countdownView(c,now=Date.now()){const ms=new Date(c.end).getTime()-now,s=Math.max(0,Math.floor(ms/1000)),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return{...c,expired:ms<=0,secondsRemaining:s,daysRemaining:Math.max(0,Math.ceil(ms/86400000)),remaining:{days:d,hours:h,minutes:m},progress:progress(c,now)}}
+async function feed(){let ev=[],calendarError=null;if(db.google.token&&(db.google.selectedCalendarIds||[]).length)try{ev=await events()}catch(e){calendarError=e.message}const now=Date.now(),cd=sorted().filter(c=>c.displayEnabled&&new Date(c.end).getTime()>now).slice(0,clamp(num(db.display.maxCountdowns,4),1,20)).map(c=>countdownView(c,now));return{generatedAt:new Date().toISOString(),title:db.display.title||'Upcoming',calendarError,nextEvent:ev[0]||null,events:db.display.showAgenda===false?[]:ev.slice(0,clamp(num(db.display.maxEvents,5),1,20)),countdowns:db.display.showCountdowns===false?[]:cd,display:{layout:en(db.display.layout,LAYOUTS,'auto'),palette:en(db.display.palette,PALETTES,'spectra6'),dateWidgetStyle:en(db.display.dateWidgetStyle,DATE_WIDGETS,'flipper'),refreshMinutes:clamp(num(db.display.refreshMinutes,15),1,1440),showAgenda:db.display.showAgenda!==false,showCountdowns:db.display.showCountdowns!==false}}}
+function color(name,palette){return palette==='mono'?'#111111':HEX[name]||HEX.black}
+function formatDateServer(v,style){const d=new Date(v);if(style==='numeric')return d.toLocaleDateString('en-CA');if(style==='short')return d.toLocaleDateString('en-CA',{month:'short',day:'numeric'});if(style==='long')return d.toLocaleDateString('en-CA',{weekday:'long',month:'long',day:'numeric',year:'numeric'});return d.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})}
+function timeLabel(c){const r=c.remaining;if(c.timeDisplayStyle==='date')return formatDateServer(c.end,c.dateDisplayStyle);if(c.timeDisplayStyle==='compact')return r.days+'d '+String(r.hours).padStart(2,'0')+'h';if(c.timeDisplayStyle==='full')return r.days+'d '+String(r.hours).padStart(2,'0')+'h '+String(r.minutes).padStart(2,'0')+'m';return c.daysRemaining+' '+(c.daysRemaining===1?'day':'days')}
+function svgBar(c,x,y,w,h,palette){if(c.progress==null)return'';const pct=clamp(c.progress,0,100),fill=color(c.accentColor,palette),bg='#deded8';if(c.progressStyle==='segmented'){let z='';for(let i=0;i<12;i++){const xx=x+i*(w/12),ww=w/12-3;z+='<rect x="'+xx.toFixed(1)+'" y="'+y+'" width="'+ww.toFixed(1)+'" height="'+h+'" rx="1" fill="'+(i<Math.round(pct/100*12)?fill:bg)+'"/>'}return z}const hh=c.progressStyle==='thin'?3:h,yy=y+(h-hh)/2;return'<rect x="'+x+'" y="'+yy+'" width="'+w+'" height="'+hh+'" rx="'+hh/2+'" fill="'+bg+'"/><rect x="'+x+'" y="'+yy+'" width="'+(w*pct/100).toFixed(1)+'" height="'+hh+'" rx="'+hh/2+'" fill="'+fill+'"/>'}
+function renderSvg(data,w,h){
+ const palette=data.display.palette,portrait=data.display.layout==='portrait'||(data.display.layout==='auto'&&h>w),pad=Math.max(18,Math.round(Math.min(w,h)*.045)),black='#111111',muted='#666660',rule='#c9c9c2',now=new Date(),month=now.toLocaleDateString('en-CA',{month:'short'}).toUpperCase(),day=String(now.getDate()).padStart(2,'0'),weekday=now.toLocaleDateString('en-CA',{weekday:'long'}).toUpperCase();
+ let s='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#ffffff"/><style>text{font-family:Arial,Helvetica,sans-serif;fill:'+black+'}.k{font-size:12px;font-weight:700;letter-spacing:1.4px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}</style>';
+ if(data.display.dateWidgetStyle==='flipper'){const fw=portrait?Math.min(180,w-pad*2):150,fh=70;s+='<g transform="translate('+pad+','+pad+')"><rect width="'+fw+'" height="'+fh+'" rx="5" fill="#fff" stroke="'+black+'" stroke-width="2"/><line x1="0" y1="27" x2="'+fw+'" y2="27" stroke="'+black+'"/><text x="'+fw/2+'" y="19" text-anchor="middle" class="k">'+weekday+'</text><text x="14" y="58" font-size="30" font-weight="800">'+month+'</text><text x="'+(fw-14)+'" y="58" text-anchor="end" font-size="30" font-weight="800">'+day+'</text></g>'}else{s+='<text x="'+pad+'" y="'+(pad+18)+'" font-size="18" font-weight="800">'+esc(now.toLocaleDateString('en-CA',{weekday:'long',month:'long',day:'numeric'}))+'</text>'}
+ s+='<text x="'+(w-pad)+'" y="'+(pad+24)+'" text-anchor="end" font-size="'+(portrait?26:34)+'" font-weight="800">'+esc(data.title)+'</text>';
+ const top=pad+90;
+ if(portrait){let y=top;if(data.countdowns.length){s+='<text x="'+pad+'" y="'+y+'" class="k">COUNTDOWNS</text>';y+=20;for(const [i,c] of data.countdowns.entries()){const accent=color(c.accentColor,palette),hero=i===0;s+='<line x1="'+pad+'" y1="'+(y-8)+'" x2="'+(w-pad)+'" y2="'+(y-8)+'" class="line"/><rect x="'+pad+'" y="'+y+'" width="5" height="'+(hero?58:38)+'" fill="'+accent+'"/><text x="'+(pad+15)+'" y="'+(y+16)+'" font-size="'+(hero?22:17)+'" font-weight="800">'+esc(c.name)+'</text><text x="'+(w-pad)+'" y="'+(y+16)+'" text-anchor="end" font-size="'+(hero?22:17)+'" font-weight="800" fill="'+accent+'">'+esc(timeLabel(c))+'</text>';if(c.showExactDate)s+='<text x="'+(pad+15)+'" y="'+(y+34)+'" font-size="12" class="muted">'+esc(formatDateServer(c.end,c.dateDisplayStyle))+'</text>';s+=svgBar(c,pad+15,y+(hero?44:29),w-pad*2-15,8,palette);y+=hero?75:55}}if(data.events.length&&y<h-50){y+=4;s+='<text x="'+pad+'" y="'+y+'" class="k">AGENDA</text>';y+=15;for(const e of data.events){if(y>h-28)break;s+='<line x1="'+pad+'" y1="'+y+'" x2="'+(w-pad)+'" y2="'+y+'" class="line"/><text x="'+pad+'" y="'+(y+20)+'" font-size="14" font-weight="700">'+esc(e.title)+'</text><text x="'+(w-pad)+'" y="'+(y+20)+'" text-anchor="end" font-size="13" class="muted">'+esc(formatDateServer(e.start,'short'))+'</text>';y+=30}}}
+ else{const gap=28,leftW=Math.round((w-pad*2-gap)*.56),rightX=pad+leftW+gap,rightW=w-pad-rightX;let y=top;s+='<text x="'+pad+'" y="'+y+'" class="k">COUNTDOWNS</text>';y+=17;if(data.countdowns.length){const c=data.countdowns[0],accent=color(c.accentColor,palette);s+='<rect x="'+pad+'" y="'+y+'" width="6" height="92" fill="'+accent+'"/><text x="'+(pad+18)+'" y="'+(y+28)+'" font-size="28" font-weight="800">'+esc(c.name)+'</text><text x="'+(pad+18)+'" y="'+(y+61)+'" font-size="32" font-weight="800" fill="'+accent+'">'+esc(timeLabel(c))+'</text>';if(c.showExactDate)s+='<text x="'+(pad+18)+'" y="'+(y+82)+'" font-size="13" class="muted">'+esc(formatDateServer(c.end,c.dateDisplayStyle))+'</text>';s+=svgBar(c,pad+18,y+91,leftW-18,9,palette);y+=120;for(const c2 of data.countdowns.slice(1)){if(y>h-35)break;s+='<line x1="'+pad+'" y1="'+y+'" x2="'+(pad+leftW)+'" y2="'+y+'" class="line"/><rect x="'+pad+'" y="'+(y+9)+'" width="4" height="24" fill="'+color(c2.accentColor,palette)+'"/><text x="'+(pad+12)+'" y="'+(y+26)+'" font-size="15" font-weight="700">'+esc(c2.name)+'</text><text x="'+(pad+leftW)+'" y="'+(y+26)+'" text-anchor="end" font-size="15" font-weight="800">'+esc(timeLabel(c2))+'</text>';y+=39}}else{s+='<text x="'+pad+'" y="'+(y+30)+'" font-size="18" class="muted">No active countdowns</text>'}let ry=top;s+='<text x="'+rightX+'" y="'+ry+'" class="k">AGENDA</text>';ry+=17;if(data.events.length){for(const e of data.events){if(ry>h-35)break;s+='<line x1="'+rightX+'" y1="'+ry+'" x2="'+(rightX+rightW)+'" y2="'+ry+'" class="line"/><text x="'+rightX+'" y="'+(ry+20)+'" font-size="14" font-weight="700">'+esc(e.title)+'</text><text x="'+(rightX+rightW)+'" y="'+(ry+20)+'" text-anchor="end" font-size="12" class="muted">'+esc(formatDateServer(e.start,'short'))+'</text>';ry+=34}}else{s+='<text x="'+rightX+'" y="'+(ry+30)+'" font-size="16" class="muted">Nothing scheduled</text>'}}
+ s+='<text x="'+pad+'" y="'+(h-10)+'" font-size="10" class="muted">Updated '+esc(new Date(data.generatedAt).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text></svg>';return s
 }
-
-function saveDb(db) {
-  const temp = DB_PATH + ".tmp";
-  fs.writeFileSync(temp, JSON.stringify(db, null, 2));
-  fs.renameSync(temp, DB_PATH);
-}
-
-let db = loadDb();
-
-function json(res, status, body, extraHeaders = {}) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    ...extraHeaders
-  });
-  res.end(JSON.stringify(body));
-}
-
-function text(res, status, body, type = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" });
-  res.end(body);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-    req.on("data", chunk => {
-      body += chunk;
-      if (body.length > 1024 * 1024) req.destroy();
-    });
-    req.on("end", () => {
-      try { resolve(body ? JSON.parse(body) : {}); }
-      catch (e) { reject(e); }
-    });
-    req.on("error", reject);
-  });
-}
-
-function safeId() {
-  return Date.now().toString(36) + crypto.randomBytes(4).toString("hex");
-}
-
-function encryptionKey() {
-  if (!APP_SECRET) return null;
-  return crypto.createHash("sha256").update(APP_SECRET).digest();
-}
-
-function encrypt(value) {
-  const key = encryptionKey();
-  if (!key) return null;
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return [iv, tag, encrypted].map(x => x.toString("base64url")).join(".");
-}
-
-function decrypt(value) {
-  if (!value) return null;
-  const key = encryptionKey();
-  if (!key) return null;
-  try {
-    const [ivB64, tagB64, dataB64] = value.split(".");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivB64, "base64url"));
-    decipher.setAuthTag(Buffer.from(tagB64, "base64url"));
-    const out = Buffer.concat([
-      decipher.update(Buffer.from(dataB64, "base64url")),
-      decipher.final()
-    ]);
-    return JSON.parse(out.toString("utf8"));
-  } catch {
-    return null;
-  }
-}
-
-function publicBase(req) {
-  if (APP_BASE_URL) return APP_BASE_URL;
-  const proto = (req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  return `${proto}://${host}`;
-}
-
-function googleConfigured() {
-  return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && APP_SECRET);
-}
-
-async function exchangeCode(code, req) {
-  const redirectUri = publicBase(req) + "/api/google/callback";
-  const body = new URLSearchParams({
-    code,
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
-    redirect_uri: redirectUri,
-    grant_type: "authorization_code"
-  });
-  const r = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body
-  });
-  if (!r.ok) throw new Error("Google token exchange failed");
-  return r.json();
-}
-
-async function getAccessToken() {
-  const token = decrypt(db.google.token);
-  if (!token) return null;
-
-  if (token.access_token && token.expires_at && Date.now() < token.expires_at - 60000) {
-    return token.access_token;
-  }
-
-  if (!token.refresh_token) return null;
-
-  const body = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
-    refresh_token: token.refresh_token,
-    grant_type: "refresh_token"
-  });
-  const r = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body
-  });
-  if (!r.ok) return null;
-  const refreshed = await r.json();
-  const merged = {
-    ...token,
-    ...refreshed,
-    refresh_token: token.refresh_token,
-    expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
-  };
-  db.google.token = encrypt(merged);
-  saveDb(db);
-  return merged.access_token;
-}
-
-async function googleFetch(endpoint) {
-  const access = await getAccessToken();
-  if (!access) throw new Error("Google Calendar is not connected");
-  const r = await fetch("https://www.googleapis.com/calendar/v3" + endpoint, {
-    headers: { Authorization: "Bearer " + access }
-  });
-  if (!r.ok) {
-    const details = await r.text();
-    throw new Error("Google Calendar request failed: " + details.slice(0, 200));
-  }
-  return r.json();
-}
-
-async function calendarList() {
-  const out = [];
-  let pageToken = "";
-  do {
-    const q = new URLSearchParams({ maxResults: "250" });
-    if (pageToken) q.set("pageToken", pageToken);
-    const data = await googleFetch("/users/me/calendarList?" + q.toString());
-    out.push(...(data.items || []));
-    pageToken = data.nextPageToken || "";
-  } while (pageToken);
-  return out.map(c => ({
-    id: c.id,
-    summary: c.summary,
-    primary: Boolean(c.primary),
-    backgroundColor: c.backgroundColor
-  }));
-}
-
-async function upcomingEvents() {
-  const ids = db.google.selectedCalendarIds || [];
-  if (!ids.length) return [];
-  const now = new Date();
-  const days = Math.max(1, Math.min(365, Number(db.google.countdownWindowDays || 30)));
-  const timeMax = new Date(now.getTime() + days * 86400000);
-  const merged = [];
-
-  for (const id of ids) {
-    const q = new URLSearchParams({
-      timeMin: now.toISOString(),
-      timeMax: timeMax.toISOString(),
-      singleEvents: "true",
-      orderBy: "startTime",
-      maxResults: "50"
-    });
-    const data = await googleFetch("/calendars/" + encodeURIComponent(id) + "/events?" + q.toString());
-    for (const e of data.items || []) {
-      if (e.status === "cancelled") continue;
-      merged.push({
-        id: e.id,
-        calendarId: id,
-        title: e.summary || "Busy",
-        start: e.start?.dateTime || e.start?.date,
-        end: e.end?.dateTime || e.end?.date,
-        allDay: Boolean(e.start?.date),
-        location: e.location || "",
-        htmlLink: e.htmlLink || ""
-      });
-    }
-  }
-  merged.sort((a, b) => new Date(a.start) - new Date(b.start));
-  return merged;
-}
-
-function manualCountdowns() {
-  return [...db.countdowns].sort((a, b) => new Date(a.end) - new Date(b.end));
-}
-
-function isAuthorizedDisplay(url) {
-  return url.searchParams.get("token") && url.searchParams.get("token") === db.display.token;
-}
-
-async function buildFeed() {
-  let events = [];
-  let calendarError = null;
-  if (db.google.token && (db.google.selectedCalendarIds || []).length) {
-    try { events = await upcomingEvents(); }
-    catch (e) { calendarError = e.message; }
-  }
-  const now = Date.now();
-  const countdowns = manualCountdowns()
-    .filter(c => new Date(c.end).getTime() > now)
-    .slice(0, Number(db.display.maxCountdowns || 5))
-    .map(c => ({
-      id: c.id,
-      title: c.name,
-      end: c.end,
-      secondsRemaining: Math.max(0, Math.floor((new Date(c.end).getTime() - now) / 1000)),
-      daysRemaining: Math.max(0, Math.ceil((new Date(c.end).getTime() - now) / 86400000))
-    }));
-
-  return {
-    generatedAt: new Date().toISOString(),
-    title: db.display.title || "Upcoming",
-    calendarError,
-    nextEvent: events[0] || null,
-    events: events.slice(0, Number(db.display.maxEvents || 6)),
-    countdowns
-  };
-}
-
-function serveStatic(req, res, pathname) {
-  let file = pathname === "/" ? "/index.html" : pathname;
-  file = path.normalize(file).replace(/^(\.\.(\/|\\|$))+/, "");
-  const full = path.join(PUBLIC_DIR, file);
-  if (!full.startsWith(PUBLIC_DIR)) return text(res, 403, "Forbidden");
-  fs.readFile(full, (err, data) => {
-    if (err) return text(res, 404, "Not found");
-    const ext = path.extname(full).toLowerCase();
-    const types = {
-      ".html": "text/html; charset=utf-8",
-      ".js": "application/javascript; charset=utf-8",
-      ".css": "text/css; charset=utf-8",
-      ".svg": "image/svg+xml",
-      ".json": "application/json; charset=utf-8"
-    };
-    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
-    res.end(data);
-  });
-}
-
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, "http://local");
-  const p = url.pathname;
-
-  try {
-    if (p === "/healthz") return text(res, 200, "ok");
-
-    if (p === "/api/state" && req.method === "GET") {
-      const connected = Boolean(decrypt(db.google.token));
-      return json(res, 200, {
-        countdowns: manualCountdowns(),
-        google: {
-          configured: googleConfigured(),
-          connected,
-          selectedCalendarIds: db.google.selectedCalendarIds || [],
-          showCalendarCountdowns: db.google.showCalendarCountdowns !== false,
-          countdownWindowDays: db.google.countdownWindowDays || 30
-        },
-        display: {
-          title: db.display.title,
-          maxEvents: db.display.maxEvents,
-          maxCountdowns: db.display.maxCountdowns,
-          feedPath: "/api/frameos/feed?token=" + db.display.token,
-          viewPath: "/frame?token=" + db.display.token
-        }
-      });
-    }
-
-    if (p === "/api/countdowns" && req.method === "POST") {
-      const body = await readBody(req);
-      const name = String(body.name || "").trim().slice(0, 100);
-      const date = new Date(body.end);
-      if (!name || Number.isNaN(date.getTime())) return json(res, 400, { error: "Name and a valid end date are required." });
-      const item = { id: safeId(), name, end: date.toISOString(), created: new Date().toISOString() };
-      db.countdowns.push(item);
-      saveDb(db);
-      return json(res, 201, item);
-    }
-
-    if (p.startsWith("/api/countdowns/") && req.method === "PUT") {
-      const id = decodeURIComponent(p.split("/").pop());
-      const item = db.countdowns.find(x => x.id === id);
-      if (!item) return json(res, 404, { error: "Not found" });
-      const body = await readBody(req);
-      const name = String(body.name || "").trim().slice(0, 100);
-      const date = new Date(body.end);
-      if (!name || Number.isNaN(date.getTime())) return json(res, 400, { error: "Name and a valid end date are required." });
-      item.name = name;
-      item.end = date.toISOString();
-      saveDb(db);
-      return json(res, 200, item);
-    }
-
-    if (p.startsWith("/api/countdowns/") && req.method === "DELETE") {
-      const id = decodeURIComponent(p.split("/").pop());
-      const before = db.countdowns.length;
-      db.countdowns = db.countdowns.filter(x => x.id !== id);
-      if (db.countdowns.length === before) return json(res, 404, { error: "Not found" });
-      saveDb(db);
-      return json(res, 200, { ok: true });
-    }
-
-    if (p === "/api/google/auth" && req.method === "GET") {
-      if (!googleConfigured()) return json(res, 400, { error: "Google OAuth is not configured on the server." });
-      const state = crypto.randomBytes(16).toString("hex");
-      const redirectUri = publicBase(req) + "/api/google/callback";
-      const q = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: redirectUri,
-        response_type: "code",
-        scope: SCOPES,
-        access_type: "offline",
-        prompt: "consent",
-        include_granted_scopes: "true",
-        state
-      });
-      res.writeHead(302, {
-        "Set-Cookie": `countdown_oauth_state=${state}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600`,
-        Location: "https://accounts.google.com/o/oauth2/v2/auth?" + q.toString()
-      });
-      return res.end();
-    }
-
-    if (p === "/api/google/callback" && req.method === "GET") {
-      const cookie = req.headers.cookie || "";
-      const match = cookie.match(/(?:^|;\s*)countdown_oauth_state=([^;]+)/);
-      if (!match || !url.searchParams.get("state") || match[1] !== url.searchParams.get("state")) {
-        return text(res, 400, "Invalid OAuth state.");
-      }
-      if (url.searchParams.get("error")) return text(res, 400, "Google authorization was cancelled.");
-      const token = await exchangeCode(url.searchParams.get("code"), req);
-      token.expires_at = Date.now() + Number(token.expires_in || 3600) * 1000;
-      db.google.token = encrypt(token);
-      saveDb(db);
-      res.writeHead(302, { Location: "/?calendar=connected", "Set-Cookie": "countdown_oauth_state=; Path=/; Max-Age=0" });
-      return res.end();
-    }
-
-    if (p === "/api/google/disconnect" && req.method === "POST") {
-      db.google.token = null;
-      db.google.selectedCalendarIds = [];
-      saveDb(db);
-      return json(res, 200, { ok: true });
-    }
-
-    if (p === "/api/google/calendars" && req.method === "GET") {
-      return json(res, 200, { calendars: await calendarList() });
-    }
-
-    if (p === "/api/google/events" && req.method === "GET") {
-      return json(res, 200, { events: await upcomingEvents() });
-    }
-
-    if (p === "/api/settings" && req.method === "PUT") {
-      const body = await readBody(req);
-      if (Array.isArray(body.selectedCalendarIds)) db.google.selectedCalendarIds = body.selectedCalendarIds.slice(0, 30);
-      if (body.showCalendarCountdowns !== undefined) db.google.showCalendarCountdowns = Boolean(body.showCalendarCountdowns);
-      if (body.countdownWindowDays !== undefined) db.google.countdownWindowDays = Math.max(1, Math.min(365, Number(body.countdownWindowDays) || 30));
-      if (body.displayTitle !== undefined) db.display.title = String(body.displayTitle || "Upcoming").slice(0, 80);
-      if (body.maxEvents !== undefined) db.display.maxEvents = Math.max(1, Math.min(20, Number(body.maxEvents) || 6));
-      if (body.maxCountdowns !== undefined) db.display.maxCountdowns = Math.max(1, Math.min(20, Number(body.maxCountdowns) || 5));
-      saveDb(db);
-      return json(res, 200, { ok: true });
-    }
-
-    if (p === "/api/display/rotate-token" && req.method === "POST") {
-      db.display.token = crypto.randomBytes(24).toString("hex");
-      saveDb(db);
-      return json(res, 200, {
-        feedPath: "/api/frameos/feed?token=" + db.display.token,
-        viewPath: "/frame?token=" + db.display.token
-      });
-    }
-
-    if (p === "/api/frameos/feed" && req.method === "GET") {
-      if (!isAuthorizedDisplay(url)) return json(res, 401, { error: "Invalid display token" });
-      return json(res, 200, await buildFeed());
-    }
-
-    if (p === "/frame" && req.method === "GET") {
-      if (!isAuthorizedDisplay(url)) return text(res, 401, "Invalid display token");
-      return serveStatic(req, res, "/frame.html");
-    }
-
-    return serveStatic(req, res, p);
-  } catch (e) {
-    console.error(e);
-    return json(res, 500, { error: e.message || "Unexpected error" });
-  }
-});
-
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`CountdownApp listening on :${PORT}`);
-});
+function serve(res,p){let f=p==='/'?'/index.html':p;f=path.normalize(f).replace(/^(\.\.(\/|\\|$))+/,'');const full=path.join(PUBLIC_DIR,f);if(!full.startsWith(PUBLIC_DIR))return text(res,403,'Forbidden');fs.readFile(full,(e,d)=>{if(e)return text(res,404,'Not found');const t={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'}[path.extname(full).toLowerCase()]||'application/octet-stream';res.writeHead(200,{'Content-Type':t});res.end(d)})}
+const authorized=u=>Boolean(u.searchParams.get('token')&&u.searchParams.get('token')===db.display.token);
+function state(){return{countdowns:sorted(),options:{colors:COLORS,progressModes:PROGRESS_MODES,progressStyles:PROGRESS_STYLES,dateStyles:DATE_STYLES,timeStyles:TIME_STYLES},google:{configured:googleConfigured(),connected:Boolean(decrypt(db.google.token)),selectedCalendarIds:db.google.selectedCalendarIds||[],countdownWindowDays:db.google.countdownWindowDays||30},display:{...db.display,feedPath:'/api/frameos/feed?token='+db.display.token,svgPath:'/api/frameos/svg?token='+db.display.token,viewPath:'/frame?token='+db.display.token}}}
+const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://local'),p=u.pathname;try{
+ if(p==='/healthz')return text(res,200,'ok');
+ if(p==='/api/state'&&req.method==='GET')return json(res,200,state());
+ if(p==='/api/countdowns'&&req.method==='POST'){const b=await body(req),c=normalizeCountdown({...b,id:id(),created:new Date().toISOString()});if(!String(b.name||'').trim()||!iso(b.end))return json(res,400,{error:'Name and a valid end date are required.'});db.countdowns.push(c);save(db);return json(res,201,c)}
+ if(p.startsWith('/api/countdowns/')&&req.method==='PUT'){const cid=decodeURIComponent(p.split('/').pop()),i=db.countdowns.findIndex(x=>x.id===cid);if(i<0)return json(res,404,{error:'Not found'});const b=await body(req);if(!String(b.name||'').trim()||!iso(b.end))return json(res,400,{error:'Name and a valid end date are required.'});db.countdowns[i]=normalizeCountdown({...db.countdowns[i],...b,id:cid,created:db.countdowns[i].created});save(db);return json(res,200,db.countdowns[i])}
+ if(p.startsWith('/api/countdowns/')&&req.method==='DELETE'){const cid=decodeURIComponent(p.split('/').pop()),n=db.countdowns.length;db.countdowns=db.countdowns.filter(x=>x.id!==cid);if(n===db.countdowns.length)return json(res,404,{error:'Not found'});save(db);return json(res,200,{ok:true})}
+ if(p==='/api/google/auth'){if(!googleConfigured())return json(res,400,{error:'Google OAuth is not configured on the server.'});const st=crypto.randomBytes(16).toString('hex'),q=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,redirect_uri:base(req)+'/api/google/callback',response_type:'code',scope:SCOPES,access_type:'offline',prompt:'consent',include_granted_scopes:'true',state:st});res.writeHead(302,{'Set-Cookie':'countdown_oauth_state='+st+'; HttpOnly; SameSite=Lax; Path=/; Max-Age=600',Location:'https://accounts.google.com/o/oauth2/v2/auth?'+q});return res.end()}
+ if(p==='/api/google/callback'){const m=String(req.headers.cookie||'').match(/(?:^|;\s*)countdown_oauth_state=([^;]+)/);if(!m||m[1]!==u.searchParams.get('state'))return text(res,400,'Invalid OAuth state.');if(u.searchParams.get('error'))return text(res,400,'Google authorization was cancelled.');const t=await exchange(u.searchParams.get('code'),req);t.expires_at=Date.now()+num(t.expires_in,3600)*1000;db.google.token=encrypt(t);save(db);res.writeHead(302,{Location:'/?calendar=connected','Set-Cookie':'countdown_oauth_state=; Path=/; Max-Age=0'});return res.end()}
+ if(p==='/api/google/disconnect'&&req.method==='POST'){db.google.token=null;db.google.selectedCalendarIds=[];save(db);return json(res,200,{ok:true})}
+ if(p==='/api/google/calendars')return json(res,200,{calendars:await calendars()});
+ if(p==='/api/google/events')return json(res,200,{events:await events()});
+ if(p==='/api/settings'&&req.method==='PUT'){const b=await body(req);if(Array.isArray(b.selectedCalendarIds))db.google.selectedCalendarIds=b.selectedCalendarIds.slice(0,30);if(b.countdownWindowDays!==undefined)db.google.countdownWindowDays=clamp(num(b.countdownWindowDays,30),1,365);if(b.displayTitle!==undefined)db.display.title=String(b.displayTitle||'Upcoming').slice(0,80);if(b.maxEvents!==undefined)db.display.maxEvents=clamp(num(b.maxEvents,5),1,20);if(b.maxCountdowns!==undefined)db.display.maxCountdowns=clamp(num(b.maxCountdowns,4),1,20);if(b.layout!==undefined)db.display.layout=en(b.layout,LAYOUTS,'auto');if(b.palette!==undefined)db.display.palette=en(b.palette,PALETTES,'spectra6');if(b.dateWidgetStyle!==undefined)db.display.dateWidgetStyle=en(b.dateWidgetStyle,DATE_WIDGETS,'flipper');if(b.refreshMinutes!==undefined)db.display.refreshMinutes=clamp(num(b.refreshMinutes,15),1,1440);if(b.showAgenda!==undefined)db.display.showAgenda=Boolean(b.showAgenda);if(b.showCountdowns!==undefined)db.display.showCountdowns=Boolean(b.showCountdowns);save(db);return json(res,200,{ok:true})}
+ if(p==='/api/display/rotate-token'&&req.method==='POST'){db.display.token=crypto.randomBytes(24).toString('hex');save(db);return json(res,200,{feedPath:'/api/frameos/feed?token='+db.display.token,svgPath:'/api/frameos/svg?token='+db.display.token,viewPath:'/frame?token='+db.display.token})}
+ if(p==='/api/frameos/feed'){if(!authorized(u))return json(res,401,{error:'Invalid display token'});return json(res,200,await feed())}
+ if(p==='/api/frameos/svg'){if(!authorized(u))return text(res,401,'Invalid display token');const w=clamp(num(u.searchParams.get('w'),800),300,2000),h=clamp(num(u.searchParams.get('h'),480),300,2000),d=await feed();return text(res,200,renderSvg(d,w,h),'image/svg+xml; charset=utf-8',{'X-FrameOS-Refresh-Minutes':String(d.display.refreshMinutes)})}
+ if(p==='/frame'){if(!authorized(u))return text(res,401,'Invalid display token');return serve(res,'/frame.html')}
+ return serve(res,p)
+ }catch(e){console.error(e);return json(res,500,{error:e.message||'Unexpected error'})}});
+server.listen(PORT,'0.0.0.0',()=>console.log('CountdownApp listening on :'+PORT));
