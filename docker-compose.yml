@@ -17,7 +17,9 @@ services:
       APP_BASE_URL: "${APP_BASE_URL:-}"
       APP_SECRET: "${APP_SECRET:-}"
     volumes:
-      - countdown-data:/data
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
@@ -37,13 +39,14 @@ services:
         max-size: "5m"
         max-file: "2"
     x-casaos:
+      volumes:
+        - container: /data
+          description:
+            en_US: Persistent CountdownApp data
       ports:
         - container: "8080"
           description:
             en_US: Countdown web interface and FrameOS API
-
-volumes:
-  countdown-data:
 
 x-casaos:
   id: countdownapp
