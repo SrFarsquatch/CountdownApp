@@ -902,17 +902,17 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && !eventId) {
         const incoming = await body(req);
         const payload = googleEventPayload(incoming, true);
-        const created = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events?sendUpdates=none', 'POST', payload);
+        const created = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events?sendUpdates=all', 'POST', payload);
         return json(res, 201, { ok: true, event: created });
       }
       if ((req.method === 'PATCH' || req.method === 'PUT') && eventId) {
         const incoming = await body(req);
         const payload = googleEventPayload(incoming, false);
-        const updated = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=none', 'PATCH', payload);
+        const updated = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=all', 'PATCH', payload);
         return json(res, 200, { ok: true, event: updated });
       }
       if (req.method === 'DELETE' && eventId) {
-        await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=none', 'DELETE');
+        await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=all', 'DELETE');
         return json(res, 200, { ok: true });
       }
       return json(res, 405, { error: 'Unsupported event operation.' });
