@@ -16,10 +16,16 @@ services:
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
       APP_BASE_URL: "${APP_BASE_URL:-}"
       APP_SECRET: "${APP_SECRET:-}"
+      DOCKER_SOCKET: "/var/run/docker.sock"
+      TARGET_CONTAINER: "countdownapp"
+      TARGET_IMAGE: "ghcr.io/srfarsquatch/countdownapp:edge"
     volumes:
       - type: bind
         source: /DATA/AppData/countdownapp/data
         target: /data
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
@@ -43,6 +49,9 @@ services:
         - container: /data
           description:
             en_US: Persistent CountdownApp data
+        - container: /var/run/docker.sock
+          description:
+            en_US: Docker access used only when Update now is selected
       ports:
         - container: "8080"
           description:
