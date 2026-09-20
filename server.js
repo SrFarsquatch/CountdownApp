@@ -13,6 +13,8 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
 const APP_SECRET = process.env.APP_SECRET || "";
 const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+const UPDATER_URL = process.env.UPDATER_URL || "";
+const UPDATE_TOKEN = process.env.UPDATE_TOKEN || "";
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -135,6 +137,20 @@ function publicBase(req) {
 
 function googleConfigured() {
   return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && APP_SECRET);
+}
+
+async function updaterFetch(endpoint, options = {}) {
+  if (!UPDATER_URL || !UPDATE_TOKEN) throw new Error("Updater is not configured");
+  const r = await fetch(UPDATER_URL + endpoint, {
+    ...options,
+    headers: {
+      "X-Update-Token": UPDATE_TOKEN,
+      ...(options.headers || {})
+    }
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "Updater request failed");
+  return data;
 }
 
 async function exchangeCode(code, req) {
@@ -335,6 +351,9 @@ const server = http.createServer(async (req, res) => {
           showCalendarCountdowns: db.google.showCalendarCountdowns !== false,
           countdownWindowDays: db.google.countdownWindowDays || 30
         },
+        updater: {
+          configured: Boolean(UPDATER_URL && UPDATE_TOKEN)
+        },
         display: {
           title: db.display.title,
           maxEvents: db.display.maxEvents,
@@ -444,6 +463,22 @@ const server = http.createServer(async (req, res) => {
       if (body.colorTheme !== undefined && ["mono", "red", "blue", "green", "yellow", "spectrum"].includes(body.colorTheme)) db.display.colorTheme = body.colorTheme;
       saveDb(db);
       return json(res, 200, { ok: true });
+    }
+
+    if (p === "/api/update/status" && req.method === "GET") {
+      if (!UPDATER_URL || !UPDATE_TOKEN) return json(res, 200, { configured: false, phase: "disabled", message: "Updater is not configured" });
+      try {
+        const status = await updaterFetch("/status");
+        return json(res, 200, { configured: true, ...status });
+      } catch (error) {
+        return json(res, 200, { configured: true, phase: "error", message: "Updater unavailable", error: error.message });
+      }
+    }
+
+    if (p === "/api/update/start" && req.method === "POST") {
+      if (!UPDATER_URL || !UPDATE_TOKEN) return json(res, 503, { error: "Updater is not configured" });
+      const result = await updaterFetch("/update", { method: "POST" });
+      return json(res, 202, result);
     }
 
     if (p === "/api/display/rotate-token" && req.method === "POST") {
