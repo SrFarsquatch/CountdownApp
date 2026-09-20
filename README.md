@@ -96,11 +96,25 @@ For FrameOS, use the rendered SVG endpoint for the built-in CountdownApp layout,
 
 Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
 
-## Updating
+## One-click updates
 
-The CasaOS install now uses a single application container. This avoids the installer race that could produce a Docker "No such container" error during initial setup.
+The CasaOS install still runs as a single long-lived application container. There is no permanent updater sidecar and no `depends_on` install dependency.
 
-To update the app, pull/recreate the `ghcr.io/srfarsquatch/countdownapp:edge` container from CasaOS after a successful GitHub Actions build. The persistent data folder is:
+The app mounts `/var/run/docker.sock` so **Display → Application updates → Update now** can launch a short-lived helper container only when requested. That helper:
+
+- pulls the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
+- recreates only the `countdownapp` container,
+- preserves the current environment, port, network, labels, health check and mounts,
+- waits for the replacement to become healthy,
+- restores the previous container if the replacement fails,
+- writes update progress to `/DATA/AppData/countdownapp/data/update-status.json`,
+- removes itself automatically when finished.
+
+Because Docker socket access is effectively host-level Docker control, only expose CountdownApp to people you trust.
+
+Existing installations created from the single-container compose must be re-imported once after this change so the Docker socket mount is added. After that, future updates can be installed directly from the app page.
+
+Persistent application data remains at:
 
 `/DATA/AppData/countdownapp/data`
 

@@ -1,10 +1,14 @@
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
 const PORT = Number(process.env.PORT || 8090);
 const SOCKET = process.env.DOCKER_SOCKET || "/var/run/docker.sock";
 const TARGET_CONTAINER = process.env.TARGET_CONTAINER || "countdownapp";
 const TARGET_IMAGE = process.env.TARGET_IMAGE || "ghcr.io/srfarsquatch/countdownapp:edge";
 const UPDATE_TOKEN = process.env.UPDATE_TOKEN || "countdown-internal-updater";
+const DATA_DIR = process.env.DATA_DIR || "/data";
+const STATUS_PATH = path.join(DATA_DIR, "update-status.json");
 
 let apiVersion = "";
 let state = {
@@ -14,6 +18,18 @@ let state = {
   finishedAt: null,
   error: null
 };
+
+function persistState(next) {
+  state = { ...state, ...next };
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const temp = STATUS_PATH + ".tmp";
+    fs.writeFileSync(temp, JSON.stringify(state, null, 2));
+    fs.renameSync(temp, STATUS_PATH);
+  } catch (error) {
+    console.error("Could not persist update status:", error.message);
+  }
+}
 
 function respond(res, status, body) {
   res.writeHead(status, {
@@ -43,7 +59,7 @@ function dockerRaw(method, endpoint, body) {
       res.on("data", chunk => chunks.push(chunk));
       res.on("end", () => {
         const raw = Buffer.concat(chunks).toString("utf8");
-        if (res.statusCode >= 200 && res.statusCode < 300 || res.statusCode === 304) {
+        if ((res.statusCode >= 200 && res.statusCode < 300) || res.statusCode === 304) {
           return resolve({ status: res.statusCode, raw });
         }
         reject(new Error(`Docker API ${method} ${endpoint} failed (${res.statusCode}): ${raw.slice(0, 500)}`));
@@ -103,8 +119,7 @@ function runtimeEnvironment(env) {
     "GOOGLE_CLIENT_SECRET",
     "APP_BASE_URL",
     "APP_SECRET",
-    "UPDATER_URL",
-    "UPDATE_TOKEN"
+    "DOCKER_SOCKET"
   ]);
   return (env || []).filter(entry => keep.has(String(entry).split("=")[0]));
 }
@@ -131,11 +146,13 @@ function createConfig(inspect) {
     Env: runtimeEnvironment(inspect.Config?.Env),
     Labels: inspect.Config?.Labels || {},
     Healthcheck: inspect.Config?.Healthcheck,
+    ExposedPorts: inspect.Config?.ExposedPorts || undefined,
     HostConfig: inspect.HostConfig || {}
   };
   const network = networkingConfig(inspect);
   if (network) config.NetworkingConfig = network;
   if (!config.Healthcheck) delete config.Healthcheck;
+  if (!config.ExposedPorts) delete config.ExposedPorts;
   return config;
 }
 
@@ -166,13 +183,13 @@ async function rollback(backupName, replacementName) {
 }
 
 async function runUpdate() {
-  state = {
+  persistState({
     phase: "pulling",
     message: "Pulling latest image",
     startedAt: new Date().toISOString(),
     finishedAt: null,
     error: null
-  };
+  });
 
   let backupName = null;
   let replacementName = null;
@@ -183,17 +200,15 @@ async function runUpdate() {
     const latestImage = await inspectImage(TARGET_IMAGE);
 
     if (current.Image === latestImage.Id) {
-      state = {
-        ...state,
+      persistState({
         phase: "complete",
         message: "Already running the latest container image",
         finishedAt: new Date().toISOString()
-      };
-      return;
+      });
+      return true;
     }
 
-    state.phase = "preparing";
-    state.message = "Preparing replacement container";
+    persistState({ phase: "preparing", message: "Preparing replacement container" });
 
     const stamp = Date.now().toString(36);
     replacementName = TARGET_CONTAINER + "-next-" + stamp;
@@ -205,8 +220,7 @@ async function runUpdate() {
       createConfig(current)
     );
 
-    state.phase = "restarting";
-    state.message = "Restarting CountdownApp";
+    persistState({ phase: "restarting", message: "Restarting CountdownApp" });
 
     try { await docker("POST", "/containers/" + encodeURIComponent(TARGET_CONTAINER) + "/stop?t=10"); } catch {}
     await docker("POST", "/containers/" + encodeURIComponent(TARGET_CONTAINER) + "/rename?name=" + encodeURIComponent(backupName));
@@ -221,12 +235,12 @@ async function runUpdate() {
 
     try { await docker("DELETE", "/containers/" + encodeURIComponent(backupName) + "?force=true"); } catch {}
 
-    state = {
-      ...state,
+    persistState({
       phase: "complete",
       message: "Update installed successfully",
       finishedAt: new Date().toISOString()
-    };
+    });
+    return true;
   } catch (error) {
     if (backupName) {
       try {
@@ -236,35 +250,39 @@ async function runUpdate() {
         try { await rollback(backupName, TARGET_CONTAINER); } catch {}
       }
     }
-    state = {
-      ...state,
+    persistState({
       phase: "error",
       message: "Update failed",
       error: error.message,
       finishedAt: new Date().toISOString()
-    };
+    });
     console.error(error);
+    return false;
   }
 }
 
-const server = http.createServer((req, res) => {
-  if (!authorized(req)) return respond(res, 401, { error: "Unauthorized" });
+if (process.argv.includes("--once") || process.env.RUN_ONCE === "1") {
+  runUpdate().then(ok => process.exit(ok ? 0 : 1));
+} else {
+  const server = http.createServer((req, res) => {
+    if (!authorized(req)) return respond(res, 401, { error: "Unauthorized" });
 
-  if (req.method === "GET" && req.url === "/status") {
-    return respond(res, 200, state);
-  }
-
-  if (req.method === "POST" && req.url === "/update") {
-    if (["pulling", "preparing", "restarting"].includes(state.phase)) {
-      return respond(res, 409, { error: "An update is already running", state });
+    if (req.method === "GET" && req.url === "/status") {
+      return respond(res, 200, state);
     }
-    setTimeout(() => runUpdate(), 250);
-    return respond(res, 202, { ok: true, message: "Update started" });
-  }
 
-  return respond(res, 404, { error: "Not found" });
-});
+    if (req.method === "POST" && req.url === "/update") {
+      if (["pulling", "preparing", "restarting"].includes(state.phase)) {
+        return respond(res, 409, { error: "An update is already running", state });
+      }
+      setTimeout(() => runUpdate(), 250);
+      return respond(res, 202, { ok: true, message: "Update started" });
+    }
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`CountdownApp updater listening on :${PORT}`);
-});
+    return respond(res, 404, { error: "Not found" });
+  });
+
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`CountdownApp updater listening on :${PORT}`);
+  });
+}
