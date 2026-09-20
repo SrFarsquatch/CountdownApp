@@ -1178,7 +1178,17 @@ const server = http.createServer(async (req, res) => {
       if (!account) return json(res, 404, { error: 'Google account was not found.' });
       const incoming = await body(req);
       if (!Array.isArray(incoming.taskListIds)) return json(res, 400, { error: 'taskListIds must be an array.' });
+      const previousTaskLists = new Set(account.selectedTaskListIds || []);
       account.selectedTaskListIds = incoming.taskListIds.map(String).slice(0, 50);
+      const selectedTaskLists = new Set(account.selectedTaskListIds);
+      const removedTaskLists = [...previousTaskLists].filter(taskListId => !selectedTaskLists.has(taskListId));
+      if (removedTaskLists.length) {
+        db.tasks = db.tasks.map(task => task.googleAccountId === accountId && removedTaskLists.includes(task.googleTaskListId) ? normalizeTask({
+          ...task,
+          googleAccountId: '', googleTaskListId: '', googleTaskListTitle: '',
+          googleTaskId: '', googleParentId: '', googleUpdated: null, googleEtag: ''
+        }) : task);
+      }
       const requestedDefault = incoming.defaultTaskListId ? String(incoming.defaultTaskListId) : '';
       account.defaultTaskListId = account.selectedTaskListIds.includes(requestedDefault) ? requestedDefault : (account.selectedTaskListIds[0] || '');
       save(db);
