@@ -27,6 +27,10 @@ const LAYOUTS = ['auto', 'landscape', 'portrait'];
 const PALETTES = ['spectra6', 'mono'];
 const DATE_WIDGETS = ['flipper', 'plain'];
 const DISPLAY_MODES = ['dashboard', 'daily', 'countdowns'];
+const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
+const DISPLAY_SECTION_KEYS = ['agenda', 'tasks', 'goals', 'countdowns'];
+const DISPLAY_GRID_COLS = 12;
+const DISPLAY_GRID_ROWS = 8;
 const TASK_STATUS = ['todo', 'progress', 'done'];
 const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 const GOAL_TYPES = ['number', 'checklist', 'deadline'];
@@ -51,6 +55,47 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 }[char]));
 const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max);
 
+function defaultSectionLayout() {
+  return {
+    agenda: { x: 0, y: 0, w: 6, h: 4 },
+    tasks: { x: 6, y: 0, w: 6, h: 4 },
+    goals: { x: 0, y: 4, w: 6, h: 4 },
+    countdowns: { x: 6, y: 4, w: 6, h: 4 }
+  };
+}
+function normalizeSectionLayout(input) {
+  const base = defaultSectionLayout();
+  const source = input && typeof input === 'object' ? input : {};
+  const out = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = source[key] && typeof source[key] === 'object' ? source[key] : base[key];
+    const w = clamp(Math.round(num(raw.w, base[key].w)), 2, DISPLAY_GRID_COLS);
+    const h = clamp(Math.round(num(raw.h, base[key].h)), 1, DISPLAY_GRID_ROWS);
+    const x = clamp(Math.round(num(raw.x, base[key].x)), 0, DISPLAY_GRID_COLS - w);
+    const y = clamp(Math.round(num(raw.y, base[key].y)), 0, DISPLAY_GRID_ROWS - h);
+    out[key] = { x, y, w, h };
+  }
+  return out;
+}
+function normalizeSectionOrder(input) {
+  const source = Array.isArray(input) ? input.map(String) : [];
+  const seen = new Set();
+  const out = [];
+  for (const key of source) {
+    if (DISPLAY_SECTION_KEYS.includes(key) && !seen.has(key)) {
+      seen.add(key); out.push(key);
+    }
+  }
+  for (const key of DISPLAY_SECTION_KEYS) if (!seen.has(key)) out.push(key);
+  return out;
+}
+function truncateForWidth(value, width, fontSize = 13, reserve = 0) {
+  const text = String(value || '');
+  const usable = Math.max(20, width - reserve);
+  const max = Math.max(4, Math.floor(usable / Math.max(5, fontSize * 0.55)));
+  return text.length <= max ? text : text.slice(0, Math.max(1, max - 1)).trimEnd() + '…';
+}
+
 function defaults() {
   return {
     countdowns: [],
@@ -61,6 +106,7 @@ function defaults() {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
       layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'dashboard',
+      sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true
     }
   };
@@ -163,7 +209,7 @@ function load() {
         accounts,
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
-      display: { ...base.display, ...(parsed.display || {}) }
+      display: { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) }
     };
   } catch {
     const data = defaults();
@@ -807,6 +853,9 @@ async function feed() {
     display: {
       layout: en(db.display.layout, LAYOUTS, 'auto'), palette: en(db.display.palette, PALETTES, 'spectra6'),
       dateWidgetStyle: en(db.display.dateWidgetStyle, DATE_WIDGETS, 'plain'), mode: en(db.display.mode, DISPLAY_MODES, 'dashboard'),
+      sectionLayoutMode: en(db.display.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto'),
+      sectionLayout: normalizeSectionLayout(db.display.sectionLayout), sectionOrder: normalizeSectionOrder(db.display.sectionOrder),
+      gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS,
       refreshMinutes: clamp(num(db.display.refreshMinutes, 15), 1, 1440),
       showAgenda: db.display.showAgenda !== false, showTasks: db.display.showTasks !== false,
       showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false
@@ -849,106 +898,171 @@ function renderSvg(data, w, h) {
   const black = '#111111', muted = '#666660', rule = '#c9c9c2';
   const now = new Date();
   const dateText = now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#ffffff"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}</style>';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#ffffff"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
 
   svg += '<text x="' + pad + '" y="' + (pad + 18) + '" font-size="18" font-weight="800">' + esc(dateText) + '</text>';
   svg += '<text x="' + (w - pad) + '" y="' + (pad + 18) + '" text-anchor="end" font-size="' + (portrait ? 22 : 26) + '" font-weight="800">' + esc(data.title) + '</text>';
   svg += '<line x1="' + pad + '" y1="' + (pad + 34) + '" x2="' + (w - pad) + '" y2="' + (pad + 34) + '" class="line"/>';
 
-  const sections = [];
+  const availableKinds = [];
   if (data.display.mode === 'countdowns') {
-    sections.push('countdowns');
+    availableKinds.push('countdowns');
   } else {
-    if (data.events.length) sections.push('agenda');
-    if (data.tasks.length) sections.push('tasks');
-    if (data.goals.length) sections.push('goals');
-    if (data.countdowns.length) sections.push('countdowns');
+    if (data.display.showAgenda !== false) availableKinds.push('agenda');
+    if (data.display.showTasks !== false) availableKinds.push('tasks');
+    if (data.display.showGoals !== false) availableKinds.push('goals');
+    if (data.display.showCountdowns !== false) availableKinds.push('countdowns');
   }
-  if (!sections.length) sections.push('empty');
 
-  function drawSection(kind, x, y, width, maxHeight) {
-    let cursor = y;
-    if (kind === 'empty') {
-      svg += '<text x="' + x + '" y="' + (cursor + 28) + '" font-size="18" class="muted">Nothing scheduled.</text>';
-      return maxHeight;
-    }
+  const sectionData = {
+    agenda: data.events || [],
+    tasks: data.tasks || [],
+    goals: data.goals || [],
+    countdowns: data.countdowns || []
+  };
+
+  function drawEmptySection(kind, x, y, width) {
     const label = { agenda: 'AGENDA', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    svg += sectionTitle(label, x, y + 11);
+    svg += '<text x="' + x + '" y="' + (y + 37) + '" font-size="12" class="muted">Nothing to show.</text>';
+  }
+
+  function drawSection(kind, x, y, width, maxHeight, options = {}) {
+    const clipId = options.clipId || '';
+    if (clipId) svg += '<g clip-path="url(#' + clipId + ')">';
+    let cursor = y;
+    const label = { agenda: 'AGENDA', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    const items = sectionData[kind] || [];
     svg += sectionTitle(label, x, cursor + 11);
     cursor += 22;
+
+    if (!items.length) {
+      svg += '<text x="' + x + '" y="' + (cursor + 15) + '" font-size="12" class="muted">Nothing to show.</text>';
+      if (clipId) svg += '</g>';
+      return Math.min(maxHeight, cursor - y + 18);
+    }
+
     if (kind === 'agenda') {
-      for (const event of data.events) {
+      for (const event of items) {
         if (cursor + 34 > y + maxHeight) break;
         const d = new Date(event.start);
         const when = event.allDay ? d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+        const title = truncateForWidth(event.title, width, 14, Math.min(92, width * 0.28));
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
-        svg += '<text x="' + x + '" y="' + (cursor + 20) + '" font-size="14" font-weight="700">' + esc(event.title) + '</text>';
+        svg += '<text x="' + x + '" y="' + (cursor + 20) + '" font-size="14" font-weight="700">' + esc(title) + '</text>';
         svg += '<text x="' + (x + width) + '" y="' + (cursor + 20) + '" text-anchor="end" font-size="12" class="muted">' + esc(when) + '</text>';
         cursor += 32;
       }
     }
     if (kind === 'tasks') {
-      for (const task of data.tasks) {
+      for (const task of items) {
         if (cursor + 29 > y + maxHeight) break;
         const due = task.due ? new Date(task.due).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
+        const title = truncateForWidth(task.title, width - 18, 13, due ? Math.min(74, width * 0.24) : 0);
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
         svg += '<rect x="' + x + '" y="' + (cursor + 9) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
-        svg += '<text x="' + (x + 18) + '" y="' + (cursor + 19) + '" font-size="13" font-weight="700">' + esc(task.title) + '</text>';
+        svg += '<text x="' + (x + 18) + '" y="' + (cursor + 19) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
         if (due) svg += '<text x="' + (x + width) + '" y="' + (cursor + 19) + '" text-anchor="end" font-size="11" class="muted">' + esc(due) + '</text>';
         cursor += 28;
       }
     }
     if (kind === 'goals') {
-      for (const goal of data.goals) {
+      for (const goal of items) {
         if (cursor + 47 > y + maxHeight) break;
         const accent = color(goal.accentColor, palette);
-        svg += '<text x="' + x + '" y="' + (cursor + 15) + '" font-size="13" font-weight="700">' + esc(goal.title) + '</text>';
+        const title = truncateForWidth(goal.title, width, 13, 48);
+        svg += '<text x="' + x + '" y="' + (cursor + 15) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
         svg += '<text x="' + (x + width) + '" y="' + (cursor + 15) + '" text-anchor="end" font-size="12" font-weight="700">' + Math.round(goal.progress) + '%</text>';
         svg += svgBar(goal.progress, x, cursor + 24, width, 7, accent);
         cursor += 44;
       }
     }
     if (kind === 'countdowns') {
-      for (const countdown of data.countdowns) {
+      for (const countdown of items) {
         if (cursor + 39 > y + maxHeight) break;
         const accent = color(countdown.accentColor, palette);
+        const labelText = timeLabel(countdown);
+        const title = truncateForWidth(countdown.name, width - 12, 13, Math.min(100, width * 0.34));
         svg += '<rect x="' + x + '" y="' + (cursor + 4) + '" width="4" height="26" rx="2" fill="' + accent + '"/>';
-        svg += '<text x="' + (x + 12) + '" y="' + (cursor + 16) + '" font-size="13" font-weight="700">' + esc(countdown.name) + '</text>';
-        svg += '<text x="' + (x + width) + '" y="' + (cursor + 16) + '" text-anchor="end" font-size="14" font-weight="800" fill="' + accent + '">' + esc(timeLabel(countdown)) + '</text>';
+        svg += '<text x="' + (x + 12) + '" y="' + (cursor + 16) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
+        svg += '<text x="' + (x + width) + '" y="' + (cursor + 16) + '" text-anchor="end" font-size="14" font-weight="800" fill="' + accent + '">' + esc(labelText) + '</text>';
         if (countdown.showExactDate) svg += '<text x="' + (x + 12) + '" y="' + (cursor + 31) + '" font-size="10" class="muted">' + esc(formatDateServer(countdown.end, countdown.dateDisplayStyle)) + '</text>';
         cursor += 38;
       }
     }
+    if (clipId) svg += '</g>';
     return cursor - y;
   }
 
   const top = pad + 50;
   const available = h - top - 24;
-  if (portrait) {
-    let y = top;
-    const per = Math.max(80, Math.floor(available / sections.length));
-    for (const kind of sections) {
-      drawSection(kind, pad, y, w - pad * 2, per - 8);
-      y += per;
-      if (y > h - 28) break;
+  const custom = data.display.sectionLayoutMode === 'custom' && data.display.mode !== 'countdowns';
+
+  if (custom) {
+    const contentWidth = w - pad * 2;
+    const layout = normalizeSectionLayout(data.display.sectionLayout);
+    const order = normalizeSectionOrder(data.display.sectionOrder);
+    let defs = '';
+    const drawQueue = [];
+    for (const kind of order) {
+      if (!availableKinds.includes(kind)) continue;
+      const r = layout[kind];
+      const x = pad + contentWidth * r.x / DISPLAY_GRID_COLS;
+      const y = top + available * r.y / DISPLAY_GRID_ROWS;
+      const width = contentWidth * r.w / DISPLAY_GRID_COLS;
+      const height = available * r.h / DISPLAY_GRID_ROWS;
+      const inset = Math.max(5, Math.min(9, Math.round(Math.min(width, height) * 0.035)));
+      const clipId = 'clip-' + kind;
+      defs += '<clipPath id="' + clipId + '"><rect x="' + (x + inset) + '" y="' + (y + inset) + '" width="' + Math.max(1, width - inset * 2) + '" height="' + Math.max(1, height - inset * 2) + '" rx="4"/></clipPath>';
+      drawQueue.push({ kind, x, y, width, height, inset, clipId });
+    }
+    if (defs) svg += '<defs>' + defs + '</defs>';
+    for (const item of drawQueue) {
+      svg += '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.width + '" height="' + item.height + '" rx="7" class="section-box"/>';
+      drawSection(
+        item.kind,
+        item.x + item.inset,
+        item.y + item.inset,
+        Math.max(20, item.width - item.inset * 2),
+        Math.max(20, item.height - item.inset * 2),
+        { clipId: item.clipId }
+      );
     }
   } else {
-    const gap = 28;
-    const columnWidth = (w - pad * 2 - gap) / 2;
-    const left = sections.filter((_, i) => i % 2 === 0);
-    const right = sections.filter((_, i) => i % 2 === 1);
-    let y = top;
-    for (const kind of left) {
-      const slot = Math.max(90, available / Math.max(1, left.length));
-      drawSection(kind, pad, y, columnWidth, slot - 8);
-      y += slot;
+    const sections = [];
+    for (const kind of availableKinds) {
+      if ((sectionData[kind] || []).length) sections.push(kind);
     }
-    y = top;
-    for (const kind of right) {
-      const slot = Math.max(90, available / Math.max(1, right.length));
-      drawSection(kind, pad + columnWidth + gap, y, columnWidth, slot - 8);
-      y += slot;
+    if (!sections.length) {
+      svg += '<text x="' + pad + '" y="' + (top + 28) + '" font-size="18" class="muted">Nothing scheduled.</text>';
+    } else if (portrait) {
+      let y = top;
+      const per = Math.max(80, Math.floor(available / sections.length));
+      for (const kind of sections) {
+        drawSection(kind, pad, y, w - pad * 2, per - 8);
+        y += per;
+        if (y > h - 28) break;
+      }
+    } else {
+      const gap = 28;
+      const columnWidth = (w - pad * 2 - gap) / 2;
+      const left = sections.filter((_, i) => i % 2 === 0);
+      const right = sections.filter((_, i) => i % 2 === 1);
+      let y = top;
+      for (const kind of left) {
+        const slot = Math.max(90, available / Math.max(1, left.length));
+        drawSection(kind, pad, y, columnWidth, slot - 8);
+        y += slot;
+      }
+      y = top;
+      for (const kind of right) {
+        const slot = Math.max(90, available / Math.max(1, right.length));
+        drawSection(kind, pad + columnWidth + gap, y, columnWidth, slot - 8);
+        y += slot;
+      }
     }
   }
+
   svg += '<text x="' + pad + '" y="' + (h - 9) + '" font-size="9" class="muted">Updated ' + esc(new Date(data.generatedAt).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })) + '</text></svg>';
   return svg;
 }
@@ -989,7 +1103,7 @@ function state() {
       })),
       countdownWindowDays: db.google.countdownWindowDays || 30
     },
-    display: { ...db.display, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
+    display: { ...db.display, sectionLayout: normalizeSectionLayout(db.display.sectionLayout), sectionOrder: normalizeSectionOrder(db.display.sectionOrder), sectionLayoutMode: en(db.display.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto'), gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
   };
 }
 
@@ -1252,6 +1366,9 @@ const server = http.createServer(async (req, res) => {
       if (incoming.palette !== undefined) db.display.palette = en(incoming.palette, PALETTES, 'spectra6');
       if (incoming.dateWidgetStyle !== undefined) db.display.dateWidgetStyle = en(incoming.dateWidgetStyle, DATE_WIDGETS, 'plain');
       if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'dashboard');
+      if (incoming.sectionLayoutMode !== undefined) db.display.sectionLayoutMode = en(incoming.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto');
+      if (incoming.sectionLayout !== undefined) db.display.sectionLayout = normalizeSectionLayout(incoming.sectionLayout);
+      if (incoming.sectionOrder !== undefined) db.display.sectionOrder = normalizeSectionOrder(incoming.sectionOrder);
       if (incoming.refreshMinutes !== undefined) db.display.refreshMinutes = clamp(num(incoming.refreshMinutes, 15), 1, 1440);
       if (incoming.showAgenda !== undefined) db.display.showAgenda = Boolean(incoming.showAgenda);
       if (incoming.showTasks !== undefined) db.display.showTasks = Boolean(incoming.showTasks);
