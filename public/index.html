@@ -145,8 +145,12 @@
 .layout-block:active{cursor:grabbing}
 .layout-block.off{opacity:.35;border-style:dashed}
 .layout-block.overlap{border-color:#c62828;box-shadow:0 0 0 3px rgba(198,40,40,.12)}
-.layout-block strong{display:block;font-size:12px;line-height:1.1}
+.layout-block strong{display:block;font-size:12px;line-height:1.1;padding-right:24px}
 .layout-block small{display:block;margin-top:3px;color:var(--muted);font-size:9px}
+.layout-config{position:absolute;right:4px;top:4px;width:24px;height:24px;border:1px solid rgba(0,0,0,.18);border-radius:7px;background:#fff;color:#111;display:grid;place-items:center;font-size:13px;cursor:pointer;z-index:3}
+.widget-settings{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:12px}
+.widget-settings[hidden]{display:none}.widget-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:9px}.widget-settings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.widget-settings-head h4{margin:0;font-size:14px}
+@media(max-width:760px){.widget-settings-grid{grid-template-columns:1fr}.layout-config{width:22px;height:22px}}
 .layout-resize{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize}
 .layout-resize:after{content:"";position:absolute;right:4px;bottom:4px;width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor}
 .layout-limit-grid{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:9px;margin-top:12px}
@@ -259,11 +263,8 @@
     <div class="card setting-card"><div class="eyebrow">Layout</div><h3>Display content</h3>
       <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="weekly">Weekly planner</option><option value="monthly">Monthly planner</option><option value="countdowns">Countdowns only</option></select></div>
       <div class="setting-row"><span>Orientation</span><select id="displayLayout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
-      <div class="setting-row"><span>Section layout</span><select id="displaySectionLayoutMode"><option value="auto">Automatic</option><option value="custom">Custom — drag & resize</option></select></div>
       <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Colour e-ink</option><option value="mono">Black & white</option></select></div>
       <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
-      <div class="setting-row"><span>Sections</span><div><label><input type="checkbox" id="showAgenda"> Agenda</label><br><label><input type="checkbox" id="showTasks"> Tasks</label><br><label><input type="checkbox" id="showGoals"> Goals</label><br><label><input type="checkbox" id="showCountdowns"> Countdowns</label><br><label><input type="checkbox" id="showWeather"> Weather</label></div></div>
-      <div class="setting-row"><span>Weather style</span><select id="weatherStyle"><option value="compact">Compact</option><option value="current">Current conditions</option><option value="forecast">Forecast strip</option></select></div>
       <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather location and units are managed in Settings.</div>
       <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
     </div>
@@ -276,8 +277,8 @@
 
   <div class="card eink-layout-card" id="einkLayoutCard">
     <div class="eyebrow">Section editor</div>
-    <h3 style="margin:4px 0">Arrange the e-ink dashboard</h3>
-    <p class="meta layout-help">Drag a section to move it. Drag its bottom-right corner to resize it. Positions snap to a 12 × 8 grid so the same layout scales cleanly to different e-ink resolutions. The date/title header and update footer remain fixed.</p>
+    <h3 style="margin:4px 0">Arrange this display mode</h3>
+    <p class="meta layout-help">Every mode has its own layout. Drag widgets to move them, resize from the bottom-right corner, or tap the ⚙ button inside a widget to change what it shows.</p>
     <div class="eink-layout-toolbar">
       <div class="meta" id="layoutEditorStatus">Custom layout is off.</div>
       <div class="row-actions"><button class="btn tiny" id="autoArrangeSections">Arrange for resolution</button><button class="btn tiny" id="resetSectionLayout">Reset layout</button></div>
@@ -287,12 +288,7 @@
       <div class="section-layout-editor" id="sectionLayoutEditor"></div>
       <div class="eink-layout-footer">Updated 12:30 p.m.</div>
     </div>
-    <div class="layout-limit-grid">
-      <div class="layout-limit"><label for="maxEvents">Agenda items</label><input id="maxEvents" type="number" min="1" max="20" value="5"></div>
-      <div class="layout-limit"><label for="maxTasks">Task items</label><input id="maxTasks" type="number" min="1" max="20" value="6"></div>
-      <div class="layout-limit"><label for="maxGoals">Goal items</label><input id="maxGoals" type="number" min="1" max="20" value="3"></div>
-      <div class="layout-limit"><label for="maxCountdowns">Countdown items</label><input id="maxCountdowns" type="number" min="1" max="20" value="3"></div>
-    </div>
+    <div class="widget-settings" id="widgetSettings" hidden></div>
   </div>
 
   <div class="card connection-box">
@@ -345,7 +341,7 @@
 </div></div>
 
 <script>
-let state=null,calEvents=[],weatherData=null,weatherError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false;
+let state=null,calEvents=[],weatherData=null,weatherError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const fmtDate=(v,o={})=>new Date(v).toLocaleDateString([],{month:'short',day:'numeric',...o});
@@ -821,15 +817,39 @@ $('plannerPrev').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='
 $('plannerNext').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()+1);else if(plannerView==='week')x.setDate(x.getDate()+7);else x.setMonth(x.getMonth()+1);plannerAnchor=x;renderPlanner()};
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns'};
-const DISPLAY_SECTION_CHECKS={agenda:'showAgenda',weather:'showWeather',tasks:'showTasks',goals:'showGoals',countdowns:'showCountdowns'};
+const DISPLAY_SECTION_STYLES={
+ agenda:[['list','List'],['timeline','Timeline'],['week','Week rows'],['calendar','Calendar grid']],
+ weather:[['compact','Compact'],['current','Current conditions'],['forecast','Forecast strip']],
+ tasks:[['checklist','Checklist'],['compact','Compact list']],
+ goals:[['bars','Progress bars'],['compact','Compact']],
+ countdowns:[['detailed','Detailed'],['compact','Compact']]
+};
+const DISPLAY_MODES=['dashboard','daily','weekly','monthly','countdowns'];
 function cloneDisplayLayout(layout){
  const fallback={agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
 }
+function cloneModeLayouts(source={}){
+ const out={};DISPLAY_MODES.forEach(mode=>out[mode]=cloneDisplayLayout(source[mode]));return out;
+}
+function cloneModeSections(source={}){
+ const defaults={
+  agenda:{enabled:true,style:'list',limit:6},weather:{enabled:true,style:'forecast',limit:5},
+  tasks:{enabled:true,style:'checklist',limit:4},goals:{enabled:true,style:'bars',limit:2},countdowns:{enabled:true,style:'detailed',limit:3}
+ };
+ const out={};
+ DISPLAY_MODES.forEach(mode=>{
+  out[mode]={};
+  Object.keys(defaults).forEach(kind=>{const raw=source?.[mode]?.[kind]||{};out[mode][kind]={...defaults[kind],...raw,enabled:raw.enabled===undefined?defaults[kind].enabled:Boolean(raw.enabled),limit:Math.max(1,Math.min(20,Number(raw.limit)||defaults[kind].limit))}});
+ });
+ return out;
+}
 function displayGrid(){return{cols:Number(state?.display?.gridCols)||12,rows:Number(state?.display?.gridRows)||8}}
-function sectionEnabled(kind){const el=$(DISPLAY_SECTION_CHECKS[kind]);return !el||el.checked}
+function currentDisplayMode(){return $('displayMode').value||'daily'}
+function activeSectionDraft(){return displaySectionsDraft?.[currentDisplayMode()]||{}}
+function sectionEnabled(kind){return activeSectionDraft()?.[kind]?.enabled!==false}
 function layoutCollision(kind,candidate){
  return Object.entries(displayLayoutDraft||{}).some(([other,r])=>{
    if(other===kind||!sectionEnabled(other))return false;
@@ -838,74 +858,78 @@ function layoutCollision(kind,candidate){
 }
 function applyLayoutBlock(block,rect){
  const g=displayGrid();
- block.style.left=(rect.x/g.cols*100)+'%';
- block.style.top=(rect.y/g.rows*100)+'%';
- block.style.width=(rect.w/g.cols*100)+'%';
- block.style.height=(rect.h/g.rows*100)+'%';
- const small=block.querySelector('small');if(small)small.textContent=rect.w+' × '+rect.h+(sectionEnabled(block.dataset.kind)?'':' · hidden');
- block.classList.toggle('off',!sectionEnabled(block.dataset.kind));
+ block.style.left=(rect.x/g.cols*100)+'%';block.style.top=(rect.y/g.rows*100)+'%';block.style.width=(rect.w/g.cols*100)+'%';block.style.height=(rect.h/g.rows*100)+'%';
+ const settings=activeSectionDraft()[block.dataset.kind]||{};
+ const small=block.querySelector('small');if(small)small.textContent=rect.w+' × '+rect.h+' · '+(settings.enabled===false?'hidden':settings.style||'default');
+ block.classList.toggle('off',settings.enabled===false);
 }
-function defaultDisplayLayoutForResolution(){
- const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
- if(h>w)return{agenda:{x:0,y:0,w:12,h:2},weather:{x:0,y:2,w:12,h:1},tasks:{x:0,y:3,w:12,h:1},goals:{x:0,y:4,w:12,h:2},countdowns:{x:0,y:6,w:12,h:2}};
- return{agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
+function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
+ const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480),portrait=h>w;
+ if(mode==='daily'||mode==='weekly') return portrait
+   ?{agenda:{x:0,y:0,w:12,h:5},weather:{x:0,y:5,w:12,h:1},tasks:{x:0,y:6,w:4,h:2},goals:{x:4,y:6,w:4,h:2},countdowns:{x:8,y:6,w:4,h:2}}
+   :{agenda:{x:0,y:0,w:8,h:8},weather:{x:8,y:0,w:4,h:2},tasks:{x:8,y:2,w:4,h:2},goals:{x:8,y:4,w:4,h:2},countdowns:{x:8,y:6,w:4,h:2}};
+ if(mode==='monthly') return portrait
+   ?{agenda:{x:0,y:0,w:12,h:6},weather:{x:0,y:6,w:12,h:1},tasks:{x:0,y:7,w:4,h:1},goals:{x:4,y:7,w:4,h:1},countdowns:{x:8,y:7,w:4,h:1}}
+   :{agenda:{x:0,y:0,w:9,h:8},weather:{x:9,y:0,w:3,h:2},tasks:{x:9,y:2,w:3,h:2},goals:{x:9,y:4,w:3,h:2},countdowns:{x:9,y:6,w:3,h:2}};
+ if(mode==='countdowns') return{agenda:{x:0,y:0,w:6,h:3},weather:{x:6,y:0,w:6,h:2},tasks:{x:6,y:2,w:6,h:2},goals:{x:0,y:3,w:6,h:3},countdowns:{x:0,y:0,w:12,h:8}};
+ return portrait
+   ?{agenda:{x:0,y:0,w:12,h:3},weather:{x:0,y:3,w:12,h:1},tasks:{x:0,y:4,w:12,h:1},goals:{x:0,y:5,w:12,h:1},countdowns:{x:0,y:6,w:12,h:2}}
+   :{agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
 }
-function setLayoutStatus(message,error=false){
- const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':'';
+function setLayoutStatus(message,error=false){const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':''}
+function renderWidgetSettings(kind=selectedDisplayWidget){
+ selectedDisplayWidget=kind;
+ const root=$('widgetSettings'),settings=activeSectionDraft()[kind];if(!root||!settings){if(root)root.hidden=true;return}
+ const styles=DISPLAY_SECTION_STYLES[kind]||[];
+ root.hidden=false;
+ root.innerHTML='<div class="widget-settings-head"><h4>'+DISPLAY_SECTION_LABELS[kind]+' settings</h4><button class="btn tiny ghost" id="closeWidgetSettings">Close</button></div>'+
+ '<div class="widget-settings-grid">'+
+ '<div class="field"><label>Show widget</label><select id="widgetEnabled"><option value="true">Shown</option><option value="false">Hidden</option></select></div>'+
+ '<div class="field"><label>Display style</label><select id="widgetStyle">'+styles.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div>'+
+ '<div class="field"><label>Items / forecast days</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"></div></div>'+
+ '<div class="meta" style="margin-top:8px">These settings apply only to <strong>'+currentDisplayMode()+'</strong> mode.</div>';
+ $('widgetEnabled').value=String(settings.enabled!==false);$('widgetStyle').value=settings.style;$('widgetLimit').value=settings.limit;
+ const update=()=>{settings.enabled=$('widgetEnabled').value==='true';settings.style=$('widgetStyle').value;settings.limit=Math.max(1,Math.min(20,Number($('widgetLimit').value)||1));renderSectionLayoutEditor(false);setLayoutStatus('Unsaved '+DISPLAY_SECTION_LABELS[kind]+' settings.');};
+ $('widgetEnabled').onchange=update;$('widgetStyle').onchange=update;$('widgetLimit').onchange=update;$('closeWidgetSettings').onclick=()=>{root.hidden=true};
 }
-function renderSectionLayoutEditor(){
+function renderSectionLayoutEditor(renderSettings=true){
  if(!state)return;
- if(!displayLayoutDraft)displayLayoutDraft=cloneDisplayLayout(state.display.sectionLayout);
- const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor'),mode=$('displaySectionLayoutMode').value,displayMode=$('displayMode').value,countdownsOnly=displayMode==='countdowns',customizable=displayMode==='dashboard';
- const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
- shell.style.aspectRatio=w+'/'+h;
- $('einkLayoutCard').classList.toggle('disabled',mode!=='custom'||!customizable||countdownsOnly);
+ const mode=currentDisplayMode();
+ if(!displayLayoutsDraft)displayLayoutsDraft=cloneModeLayouts(state.display.modeLayouts);
+ if(!displaySectionsDraft)displaySectionsDraft=cloneModeSections(state.display.modeSections);
+ displayLayoutDraft=displayLayoutsDraft[mode]||cloneDisplayLayout();
+ const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor');
+ const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);shell.style.aspectRatio=w+'/'+h;
+ $('einkLayoutCard').classList.remove('disabled');
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];
-   return'<div class="layout-block" data-kind="'+kind+'"><strong>'+DISPLAY_SECTION_LABELS[kind]+'</strong><small></small><span class="layout-resize" data-resize="1" aria-label="Resize '+DISPLAY_SECTION_LABELS[kind]+'"></span></div>';
+   return'<div class="layout-block" data-kind="'+kind+'"><button type="button" class="layout-config" data-config="'+kind+'" aria-label="Configure '+DISPLAY_SECTION_LABELS[kind]+'">⚙</button><strong>'+DISPLAY_SECTION_LABELS[kind]+'</strong><small></small><span class="layout-resize" data-resize="1" aria-label="Resize '+DISPLAY_SECTION_LABELS[kind]+'"></span></div>';
  }).join('');
+ editor.querySelectorAll('[data-config]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();renderWidgetSettings(btn.dataset.config)});
  editor.querySelectorAll('.layout-block').forEach(block=>{
    const kind=block.dataset.kind;applyLayoutBlock(block,displayLayoutDraft[kind]);
    block.onpointerdown=e=>{
-     if(mode!=='custom'||!customizable||countdownsOnly)return;
-     e.preventDefault();
-     const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),g=displayGrid();
-     const startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
+     if(e.target.closest('[data-config]'))return;
+     e.preventDefault();const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),g=displayGrid(),startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
      block.setPointerCapture?.(e.pointerId);
      const move=ev=>{
-       const dx=Math.round((ev.clientX-startX)/bounds.width*g.cols),dy=Math.round((ev.clientY-startY)/bounds.height*g.rows);
-       let next;
-       if(resize){
-         next={...start,w:Math.max(2,Math.min(g.cols-start.x,start.w+dx)),h:Math.max(1,Math.min(g.rows-start.y,start.h+dy))};
-       }else{
-         next={...start,x:Math.max(0,Math.min(g.cols-start.w,start.x+dx)),y:Math.max(0,Math.min(g.rows-start.h,start.y+dy))};
-       }
-       displayLayoutDraft[kind]=next;applyLayoutBlock(block,next);
-       const overlaps=layoutCollision(kind,next);block.classList.toggle('overlap',overlaps);
-       setLayoutStatus(overlaps?'Sections cannot overlap.':'Unsaved layout changes.',overlaps);
+       const dx=Math.round((ev.clientX-startX)/bounds.width*g.cols),dy=Math.round((ev.clientY-startY)/bounds.height*g.rows);let next;
+       if(resize)next={...start,w:Math.max(2,Math.min(g.cols-start.x,start.w+dx)),h:Math.max(1,Math.min(g.rows-start.y,start.h+dy))};
+       else next={...start,x:Math.max(0,Math.min(g.cols-start.w,start.x+dx)),y:Math.max(0,Math.min(g.rows-start.h,start.y+dy))};
+       displayLayoutDraft[kind]=next;applyLayoutBlock(block,next);const overlaps=layoutCollision(kind,next);block.classList.toggle('overlap',overlaps);setLayoutStatus(overlaps?'Sections cannot overlap.':'Unsaved '+mode+' layout.',overlaps);
      };
-     const up=ev=>{
-       block.removeEventListener('pointermove',move);block.removeEventListener('pointerup',up);block.removeEventListener('pointercancel',up);
-       const current=displayLayoutDraft[kind];
-       if(layoutCollision(kind,current)){displayLayoutDraft[kind]=start;applyLayoutBlock(block,start);block.classList.remove('overlap');setLayoutStatus('Move cancelled because it overlapped another visible section.',true)}
-       else setLayoutStatus('Unsaved layout changes.');
-       try{block.releasePointerCapture?.(ev.pointerId)}catch{}
-     };
+     const up=ev=>{block.removeEventListener('pointermove',move);block.removeEventListener('pointerup',up);block.removeEventListener('pointercancel',up);const current=displayLayoutDraft[kind];if(layoutCollision(kind,current)){displayLayoutDraft[kind]=start;applyLayoutBlock(block,start);block.classList.remove('overlap');setLayoutStatus('Move cancelled because it overlapped another visible widget.',true)}else displayLayoutsDraft[mode]=displayLayoutDraft;try{block.releasePointerCapture?.(ev.pointerId)}catch{}};
      block.addEventListener('pointermove',move);block.addEventListener('pointerup',up);block.addEventListener('pointercancel',up);
    };
  });
- if(countdownsOnly)setLayoutStatus('Countdowns-only mode uses the dedicated countdown layout.');
- else if(mode==='custom')setLayoutStatus('Drag sections to move them; use the corner handle to resize.');
- else setLayoutStatus('Automatic layout is active. Switch Section layout to Custom to edit.');
+ setLayoutStatus('Editing '+mode+' mode · drag, resize, or tap ⚙ for widget settings.');
+ if(renderSettings&&!$('widgetSettings').hidden)renderWidgetSettings(selectedDisplayWidget);
 }
 function renderDisplay(){
  const d=state.display,wc=state.weather||{};
- $('displayMode').value=d.mode||'dashboard';$('displayLayout').value=d.layout||'auto';$('displaySectionLayoutMode').value=d.sectionLayoutMode||'auto';$('displayPalette').value=d.palette||'spectra6';$('displayRefresh').value=String(d.refreshMinutes||15);
- $('showAgenda').checked=d.showAgenda!==false;$('showTasks').checked=d.showTasks!==false;$('showGoals').checked=d.showGoals!==false;$('showCountdowns').checked=d.showCountdowns!==false;$('showWeather').checked=d.showWeather!==false;
- $('weatherStyle').value=d.weatherStyle||'forecast';
+ $('displayMode').value=d.mode||'daily';$('displayLayout').value=d.layout||'auto';$('displayPalette').value=d.palette||'spectra6';$('displayRefresh').value=String(d.refreshMinutes||15);
  if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.locationLabel?'Weather: '+wc.locationLabel+' · location managed in Settings.':'Choose a weather location in Settings.';
- $('maxEvents').value=String(d.maxEvents||5);$('maxTasks').value=String(d.maxTasks||6);$('maxGoals').value=String(d.maxGoals||3);$('maxCountdowns').value=String(d.maxCountdowns||3);
- displayLayoutDraft=cloneDisplayLayout(d.sectionLayout);
+ displayLayoutsDraft=cloneModeLayouts(d.modeLayouts);displaySectionsDraft=cloneModeSections(d.modeSections);displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];
  const root=location.origin;
  $('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);
  renderSectionLayoutEditor();previewDisplay();
@@ -919,24 +943,20 @@ function previewDisplay(){
  if($('viewUrl'))$('viewUrl').textContent=location.origin+state.display.viewPath+'&w='+w+'&h='+h;
  if($('einkLayoutShell'))renderSectionLayoutEditor();
 }
-$('previewW').onchange=$('previewH').onchange=previewDisplay;
-$('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;previewDisplay()};
-$('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;previewDisplay()};
+$('previewW').onchange=$('previewH').onchange=()=>{renderSectionLayoutEditor(false);previewDisplay()};
+$('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;renderSectionLayoutEditor(false);previewDisplay()};
+$('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;renderSectionLayoutEditor(false);previewDisplay()};
 $('openFrame').onclick=()=>window.open(state.display.viewPath+'&w='+$('previewW').value+'&h='+$('previewH').value,'_blank');
-$('displaySectionLayoutMode').onchange=renderSectionLayoutEditor;
-$('displayMode').onchange=renderSectionLayoutEditor;
-Object.values(DISPLAY_SECTION_CHECKS).forEach(id=>{$(id).onchange=()=>{renderSectionLayoutEditor();setLayoutStatus('Unsaved display changes.')}});if($('showWeather'))$('showWeather').onchange=()=>setLayoutStatus('Unsaved display changes.');
-$('autoArrangeSections').onclick=()=>{displayLayoutDraft=defaultDisplayLayoutForResolution();renderSectionLayoutEditor();setLayoutStatus('Layout arranged for the current preview orientation. Save to apply.')};
-$('resetSectionLayout').onclick=()=>{displayLayoutDraft={agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};renderSectionLayoutEditor();setLayoutStatus('Layout reset. Save to apply.')};
+$('displayMode').onchange=()=>{displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];$('widgetSettings').hidden=true;renderSectionLayoutEditor();setLayoutStatus('Editing '+currentDisplayMode()+' mode. Save display to apply.')};
+$('autoArrangeSections').onclick=()=>{const mode=currentDisplayMode();displayLayoutsDraft[mode]=defaultDisplayLayoutForResolution(mode);displayLayoutDraft=displayLayoutsDraft[mode];renderSectionLayoutEditor(false);setLayoutStatus('Arranged '+mode+' mode for this resolution. Save to apply.')};
+$('resetSectionLayout').onclick=()=>{const mode=currentDisplayMode();displayLayoutsDraft[mode]=defaultDisplayLayoutForResolution(mode);displayLayoutDraft=displayLayoutsDraft[mode];displaySectionsDraft=cloneModeSections(state.display.modeSections);renderSectionLayoutEditor(false);$('widgetSettings').hidden=true;setLayoutStatus('Reset '+mode+' mode. Save to apply.')};
 $('saveDisplay').onclick=async()=>{
+ const mode=currentDisplayMode();displayLayoutsDraft[mode]=displayLayoutDraft;
  await api('/api/settings',{method:'PUT',body:JSON.stringify({
-   mode:$('displayMode').value,layout:$('displayLayout').value,sectionLayoutMode:$('displaySectionLayoutMode').value,sectionLayout:displayLayoutDraft,
-   palette:$('displayPalette').value,refreshMinutes:Number($('displayRefresh').value),
-   maxEvents:Number($('maxEvents').value),maxTasks:Number($('maxTasks').value),maxGoals:Number($('maxGoals').value),maxCountdowns:Number($('maxCountdowns').value),
-   showAgenda:$('showAgenda').checked,showTasks:$('showTasks').checked,showGoals:$('showGoals').checked,showCountdowns:$('showCountdowns').checked,showWeather:$('showWeather').checked,
-   weatherStyle:$('weatherStyle').value
+   mode,layout:$('displayLayout').value,palette:$('displayPalette').value,refreshMinutes:Number($('displayRefresh').value),
+   sectionLayoutMode:'custom',modeLayouts:displayLayoutsDraft,modeSections:displaySectionsDraft
  })});
- state=await api('/api/state');displayLayoutDraft=null;renderDisplay();renderToday();setLayoutStatus('Saved. FrameOS will use this layout on its next refresh.');
+ state=await api('/api/state');displayLayoutsDraft=null;displaySectionsDraft=null;displayLayoutDraft=null;renderDisplay();renderToday();setLayoutStatus('Saved '+mode+' layout and widget settings. FrameOS will use them on its next refresh.');
 };
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const el=$(b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent);const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200)}catch{prompt('Copy this URL:',el.textContent)}});
 $('rotateDisplayToken').onclick=async()=>{if(!confirm('Rotate the private display token? Existing FrameOS URLs will stop working.'))return;await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');renderDisplay()};
