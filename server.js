@@ -10,6 +10,7 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_WEATHER_API_KEY = process.env.GOOGLE_WEATHER_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
@@ -26,7 +27,8 @@ const TIME_STYLES = ['days', 'compact', 'full', 'precise', 'weeks', 'date'];
 const LAYOUTS = ['auto', 'landscape', 'portrait'];
 const PALETTES = ['spectra6', 'mono'];
 const DATE_WIDGETS = ['flipper', 'plain'];
-const DISPLAY_MODES = ['dashboard', 'daily', 'countdowns'];
+const DISPLAY_MODES = ['dashboard', 'daily', 'weekly', 'monthly', 'countdowns'];
+const WEATHER_UNITS = ['metric', 'imperial'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
 const DISPLAY_SECTION_KEYS = ['agenda', 'tasks', 'goals', 'countdowns'];
 const DISPLAY_GRID_COLS = 12;
@@ -102,12 +104,13 @@ function defaults() {
     tasks: [],
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
+    weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
       layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'dashboard',
       sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(),
-      refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true
+      refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
     }
   };
 }
@@ -185,6 +188,17 @@ function normalizeGoogleAccount(x = {}) {
   };
 }
 
+function normalizeWeather(x = {}) {
+  const rawLat = x.latitude === '' || x.latitude === null || x.latitude === undefined ? null : Number(x.latitude);
+  const rawLon = x.longitude === '' || x.longitude === null || x.longitude === undefined ? null : Number(x.longitude);
+  return {
+    latitude: Number.isFinite(rawLat) && rawLat >= -90 && rawLat <= 90 ? rawLat : null,
+    longitude: Number.isFinite(rawLon) && rawLon >= -180 && rawLon <= 180 ? rawLon : null,
+    locationLabel: cleanText(x.locationLabel, 100),
+    units: en(x.units, WEATHER_UNITS, 'metric')
+  };
+}
+
 function load() {
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -209,6 +223,7 @@ function load() {
         accounts,
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
+      weather: normalizeWeather(parsed.weather || base.weather),
       display: { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) }
     };
   } catch {
@@ -940,11 +955,95 @@ function dueForDisplay(task) {
   if (!task.due) return true;
   return new Date(task.due).getTime() < Date.now() + 14 * 86400000;
 }
+let weatherCache = { key: '', expiresAt: 0, data: null };
+function weatherConfigured() { return Boolean(GOOGLE_WEATHER_API_KEY); }
+function weatherLocationReady() {
+  return Number.isFinite(db.weather?.latitude) && Number.isFinite(db.weather?.longitude);
+}
+function weatherDateKey(d) {
+  const x = new Date(d);
+  return [x.getFullYear(), String(x.getMonth() + 1).padStart(2, '0'), String(x.getDate()).padStart(2, '0')].join('-');
+}
+function weatherDisplayDateKey(value) {
+  if (!value || !Number.isFinite(Number(value.year)) || !Number.isFinite(Number(value.month)) || !Number.isFinite(Number(value.day))) return '';
+  return String(value.year).padStart(4, '0') + '-' + String(value.month).padStart(2, '0') + '-' + String(value.day).padStart(2, '0');
+}
+function weatherTemperature(value) {
+  const n = Number(value?.degrees);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+function weatherPart(part = {}) {
+  return {
+    condition: cleanText(part.weatherCondition?.type || '', 80),
+    description: cleanText(part.weatherCondition?.description?.text || '', 120),
+    precipitation: clamp(num(part.precipitation?.probability?.percent, 0), 0, 100)
+  };
+}
+async function weatherData() {
+  if (!weatherConfigured()) throw new Error('Google Weather API key is not configured.');
+  if (!weatherLocationReady()) throw new Error('Set a weather latitude and longitude in Display settings.');
+  const units = en(db.weather.units, WEATHER_UNITS, 'metric');
+  const key = [db.weather.latitude, db.weather.longitude, units].join('|');
+  if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
+  const common = new URLSearchParams({
+    key: GOOGLE_WEATHER_API_KEY,
+    'location.latitude': String(db.weather.latitude),
+    'location.longitude': String(db.weather.longitude),
+    unitsSystem: units === 'imperial' ? 'IMPERIAL' : 'METRIC',
+    languageCode: 'en'
+  });
+  const dailyParams = new URLSearchParams(common);
+  dailyParams.set('days', '10');
+  dailyParams.set('pageSize', '10');
+  const [currentResponse, dailyResponse] = await Promise.all([
+    fetch('https://weather.googleapis.com/v1/currentConditions:lookup?' + common),
+    fetch('https://weather.googleapis.com/v1/forecast/days:lookup?' + dailyParams)
+  ]);
+  if (!currentResponse.ok || !dailyResponse.ok) {
+    const status = !currentResponse.ok ? currentResponse.status : dailyResponse.status;
+    throw new Error('Google Weather request failed (' + status + ').');
+  }
+  const [currentRaw, dailyRaw] = await Promise.all([currentResponse.json(), dailyResponse.json()]);
+  const currentPart = weatherPart({
+    weatherCondition: currentRaw.weatherCondition,
+    precipitation: currentRaw.precipitation
+  });
+  const data = {
+    locationLabel: db.weather.locationLabel || '',
+    units,
+    unitSymbol: units === 'imperial' ? '°F' : '°C',
+    timeZone: dailyRaw.timeZone?.id || currentRaw.timeZone?.id || '',
+    current: {
+      temperature: weatherTemperature(currentRaw.temperature),
+      feelsLike: weatherTemperature(currentRaw.feelsLikeTemperature),
+      humidity: clamp(num(currentRaw.relativeHumidity, 0), 0, 100),
+      isDaytime: currentRaw.isDaytime !== false,
+      ...currentPart
+    },
+    days: (dailyRaw.forecastDays || []).map(day => ({
+      date: weatherDisplayDateKey(day.displayDate),
+      high: weatherTemperature(day.maxTemperature),
+      low: weatherTemperature(day.minTemperature),
+      daytime: weatherPart(day.daytimeForecast),
+      nighttime: weatherPart(day.nighttimeForecast)
+    })).filter(day => day.date)
+  };
+  weatherCache = { key, expiresAt: Date.now() + 15 * 60 * 1000, data };
+  return data;
+}
+
 async function feed() {
-  let ev = [], calendarError = null;
+  let ev = [], calendarError = null, weather = null, weatherError = null;
   if (googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
     try { ev = await events(); }
     catch (error) { calendarError = error.message; }
+  }
+  if (db.display.showWeather !== false) {
+    if (weatherConfigured() && weatherLocationReady()) {
+      try { weather = await weatherData(); }
+      catch (error) { weatherError = error.message; }
+    } else if (!weatherConfigured()) weatherError = 'Google Weather API key is not configured.';
+    else weatherError = 'Set a weather latitude and longitude in Display settings.';
   }
   const now = Date.now();
   const countdowns = sortedCountdowns()
@@ -955,10 +1054,12 @@ async function feed() {
     .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
     .slice(0, clamp(num(db.display.maxGoals, 3), 1, 20)).map(g => ({ ...g, progress: goalProgress(g) }));
   return {
-    generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError,
+    generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather,
     nextEvent: ev[0] || null,
     events: db.display.showAgenda === false ? [] : ev.slice(0, clamp(num(db.display.maxEvents, 5), 1, 20)),
+    calendarEvents: db.display.showAgenda === false ? [] : ev.slice(0, 250),
     tasks: db.display.showTasks === false ? [] : tasks,
+    plannerTasks: db.display.showTasks === false ? [] : sortedTasks().filter(dueForDisplay).slice(0, 100),
     goals: db.display.showGoals === false ? [] : goals,
     countdowns: db.display.showCountdowns === false ? [] : countdowns,
     display: {
@@ -969,7 +1070,8 @@ async function feed() {
       gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS,
       refreshMinutes: clamp(num(db.display.refreshMinutes, 15), 1, 1440),
       showAgenda: db.display.showAgenda !== false, showTasks: db.display.showTasks !== false,
-      showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false
+      showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false,
+      showWeather: db.display.showWeather !== false
     }
   };
 }
@@ -1002,7 +1104,258 @@ function svgBar(percent, x, y, width, height, fill) {
 function sectionTitle(label, x, y) {
   return '<text x="' + x + '" y="' + y + '" class="k">' + esc(label) + '</text>';
 }
+function plannerDateKey(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+}
+function plannerStartOfDay(value) {
+  const d = new Date(value); d.setHours(0, 0, 0, 0); return d;
+}
+function plannerEventsForDay(data, day) {
+  const start = plannerStartOfDay(day), end = new Date(start); end.setDate(end.getDate() + 1);
+  return (data.calendarEvents || data.events || []).filter(event => {
+    const a = new Date(event.start), b = new Date(event.end || event.start);
+    return a < end && b > start;
+  });
+}
+function plannerTasksForDay(data, day) {
+  const key = plannerDateKey(day);
+  return (data.plannerTasks || data.tasks || []).filter(task => task.due && plannerDateKey(task.due) === key && task.status !== 'done');
+}
+function plannerWeatherForDay(data, day) {
+  const key = plannerDateKey(day);
+  return data.weather?.days?.find(item => item.date === key) || null;
+}
+function parseHex(value) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(value || ''));
+  if (!match) return null;
+  const n = parseInt(match[1], 16);
+  return { r: n >> 16, g: (n >> 8) & 255, b: n & 255 };
+}
+function einkAccent(value, palette, fallback = 'blue') {
+  if (palette === 'mono') return HEX.black;
+  if (HEX[value]) return HEX[value];
+  const rgb = parseHex(value);
+  if (!rgb) return HEX[fallback] || HEX.blue;
+  let best = HEX[fallback] || HEX.blue, bestDistance = Infinity;
+  for (const candidate of Object.values(HEX)) {
+    const c = parseHex(candidate);
+    const distance = Math.pow(rgb.r - c.r, 2) + Math.pow(rgb.g - c.g, 2) + Math.pow(rgb.b - c.b, 2);
+    if (distance < bestDistance) { bestDistance = distance; best = candidate; }
+  }
+  return best;
+}
+function plannerEventAccent(event, palette) {
+  return einkAccent(event.eventColor || event.calendarColor, palette, 'blue');
+}
+function plannerWeatherAccent(type, palette) {
+  if (palette === 'mono') return HEX.black;
+  const t = String(type || '').toUpperCase();
+  if (/THUNDER|STORM/.test(t)) return HEX.purple;
+  if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return HEX.blue;
+  if (/SNOW|ICE|SLEET/.test(t)) return HEX.blue;
+  if (/CLEAR|SUN/.test(t)) return HEX.yellow;
+  if (/CLOUD|FOG|HAZE/.test(t)) return HEX.black;
+  return HEX.green;
+}
+function svgWeatherIcon(type, x, y, size, palette) {
+  const t = String(type || '').toUpperCase();
+  const accent = plannerWeatherAccent(t, palette), black = '#111111';
+  const sun = '<circle cx="' + (x + size * .42) + '" cy="' + (y + size * .42) + '" r="' + (size * .18) + '" fill="' + accent + '"/>' +
+    '<path d="M' + (x + size * .42) + ' ' + y + 'v' + (size * .14) + 'M' + (x + size * .42) + ' ' + (y + size * .70) + 'v' + (size * .14) +
+    'M' + x + ' ' + (y + size * .42) + 'h' + (size * .14) + 'M' + (x + size * .70) + ' ' + (y + size * .42) + 'h' + (size * .14) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5, size * .055) + '" stroke-linecap="round"/>';
+  const cloud = '<path d="M' + (x + size * .18) + ' ' + (y + size * .57) + 'c0-' + (size * .12) + ' ' + (size * .10) + '-' + (size * .22) + ' ' + (size * .23) + '-' + (size * .22) +
+    ' ' + (size * .05) + '-' + (size * .13) + ' ' + (size * .17) + '-' + (size * .21) + ' ' + (size * .31) + '-' + (size * .21) + ' ' + (size * .20) +
+    ' 0 ' + (size * .36) + ' ' + (size * .16) + ' ' + (size * .36) + ' ' + (size * .35) + ' 0 ' + (size * .13) + '-' + (size * .10) + ' ' + (size * .24) +
+    '-' + (size * .23) + ' ' + (size * .24) + 'H' + (x + size * .38) + 'c-' + (size * .11) + ' 0-' + (size * .20) + '-' + (size * .09) + '-' + (size * .20) + '-' + (size * .20) + 'z" fill="' + (palette === 'mono' ? black : '#777777') + '"/>';
+  if (/CLEAR|SUN/.test(t) && !/CLOUD/.test(t)) return sun;
+  if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return cloud + '<path d="M' + (x + size*.34) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.54) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.74) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5,size*.055) + '" stroke-linecap="round"/>';
+  if (/SNOW|ICE|SLEET/.test(t)) return cloud + '<g fill="' + accent + '"><circle cx="' + (x+size*.34) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.55) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.76) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/></g>';
+  if (/THUNDER|STORM/.test(t)) return cloud + '<path d="M' + (x+size*.52) + ' ' + (y+size*.73) + 'h' + (size*.13) + 'l-' + (size*.12) + ' ' + (size*.20) + 'h' + (size*.12) + 'l-' + (size*.22) + ' ' + (size*.25) + ' ' + (size*.07) + '-' + (size*.22) + 'h-' + (size*.12) + 'z" fill="' + accent + '"/>';
+  if (/PARTLY/.test(t)) return sun + cloud;
+  return cloud;
+}
+function plannerFooter(svg, data, w, h, pad, scale, label) {
+  const muted = '#666660';
+  svg += '<text x="' + pad + '" y="' + (h - 10 * scale) + '" font-size="' + (9 * scale) + '" fill="' + muted + '">' + esc(label) + '</text>';
+  svg += '<text x="' + (w - pad) + '" y="' + (h - 10 * scale) + '" text-anchor="end" font-size="' + (9 * scale) + '" fill="' + muted + '">Updated ' + esc(new Date(data.generatedAt).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })) + '</text>';
+  return svg;
+}
+function renderPlannerSvg(data, w, h, mode) {
+  const palette = data.display.palette, landscape = w >= h;
+  const scale = Math.max(.62, Math.min(1.45, Math.min(w / 800, h / 480)));
+  const pad = Math.max(12, Math.round(22 * scale)), black = '#111111', muted = '#666660', rule = '#d1d1ca', paper = '#ffffff';
+  const now = new Date();
+  const currentWeather = data.display.showWeather !== false ? data.weather?.current : null;
+  const todayWeather = data.display.showWeather !== false ? plannerWeatherForDay(data, now) : null;
+  const unit = data.weather?.unitSymbol || '';
+  const location = data.weather?.locationLabel || '';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="' + paper + '"/><style>text{font-family:Arial,Helvetica,sans-serif}.muted{fill:' + muted + '}.rule{stroke:' + rule + ';stroke-width:1}</style>';
+  const headerY = 54 * scale;
+  const timeText = now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+  if (mode === 'daily') {
+    svg += '<text x="' + pad + '" y="' + (18*scale) + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.4*scale) + '">' + esc(now.toLocaleDateString('en-CA', { weekday:'long', year:'numeric' }).toUpperCase()) + '</text>';
+    svg += '<text x="' + pad + '" y="' + (43*scale) + '" font-size="' + (26*scale) + '" font-weight="800">' + esc(now.toLocaleDateString('en-CA', { month:'long', day:'numeric' })) + '</text>';
+  } else if (mode === 'weekly') {
+    const monday = plannerStartOfDay(now); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
+    svg += '<text x="' + pad + '" y="' + (18*scale) + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.4*scale) + '">WEEK · ' + esc(String(now.getFullYear())) + '</text>';
+    svg += '<text x="' + pad + '" y="' + (43*scale) + '" font-size="' + (25*scale) + '" font-weight="800">' + esc(monday.toLocaleDateString('en-CA',{month:'short',day:'numeric'}) + ' — ' + sunday.toLocaleDateString('en-CA',{month:'short',day:'numeric'})) + '</text>';
+  } else {
+    svg += '<text x="' + pad + '" y="' + (18*scale) + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.4*scale) + '">' + now.getFullYear() + '</text>';
+    svg += '<text x="' + pad + '" y="' + (43*scale) + '" font-size="' + (26*scale) + '" font-weight="800">' + esc(now.toLocaleDateString('en-CA',{month:'long'})) + '</text>';
+  }
+  let weatherHeaderX = w - pad - 92*scale;
+  if (currentWeather && currentWeather.temperature !== null) {
+    svg += svgWeatherIcon(currentWeather.condition, weatherHeaderX, 10*scale, 29*scale, palette);
+    svg += '<text x="' + (weatherHeaderX + 35*scale) + '" y="' + (31*scale) + '" font-size="' + (14*scale) + '" font-weight="800">' + esc(currentWeather.temperature + unit) + '</text>';
+  }
+  svg += '<text x="' + (w - pad) + '" y="' + (39*scale) + '" text-anchor="end" font-size="' + (17*scale) + '" font-weight="800">' + esc(timeText) + '</text>';
+  svg += '<line x1="' + pad + '" y1="' + headerY + '" x2="' + (w-pad) + '" y2="' + headerY + '" class="rule"/>';
+
+  if (mode === 'daily') {
+    const weatherH = currentWeather && landscape ? 58*scale : 0;
+    const bottom = h - 24*scale - weatherH;
+    const leftW = landscape ? (w - pad*2) * .55 : (w - pad*2);
+    const rightX = pad + leftW + (landscape ? 18*scale : 0);
+    const rightW = landscape ? w - pad - rightX : leftW;
+    const dayStart = plannerStartOfDay(now), events = plannerEventsForDay(data, dayStart).slice(0, 7);
+    svg += '<text x="' + pad + '" y="' + (headerY+22*scale) + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">TODAY</text>';
+    let y = headerY + 42*scale, rowH = Math.max(38*scale, (bottom-y)/Math.max(4, events.length || 1));
+    if (!events.length) svg += '<text x="' + pad + '" y="' + (y+18*scale) + '" font-size="' + (13*scale) + '" class="muted">Nothing scheduled.</text>';
+    for (const event of events) {
+      if (y + rowH > bottom) break;
+      const d = new Date(event.start), when = event.allDay ? 'All day' : d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});
+      const accent = plannerEventAccent(event, palette);
+      svg += '<line x1="' + pad + '" y1="' + y + '" x2="' + (pad+leftW-12*scale) + '" y2="' + y + '" class="rule"/>';
+      svg += '<text x="' + pad + '" y="' + (y+22*scale) + '" font-size="' + (11*scale) + '" class="muted">' + esc(when) + '</text>';
+      svg += '<circle cx="' + (pad+78*scale) + '" cy="' + (y+18*scale) + '" r="' + (4.5*scale) + '" fill="' + accent + '"/>';
+      svg += '<text x="' + (pad+91*scale) + '" y="' + (y+20*scale) + '" font-size="' + (13.5*scale) + '" font-weight="700">' + esc(truncateForWidth(event.title, leftW-95*scale, 13.5*scale)) + '</text>';
+      if (event.calendarName) svg += '<text x="' + (pad+91*scale) + '" y="' + (y+34*scale) + '" font-size="' + (9.5*scale) + '" class="muted">' + esc(truncateForWidth(event.calendarName, leftW-95*scale, 9.5*scale)) + '</text>';
+      y += rowH;
+    }
+    if (landscape) {
+      let ry = headerY + 22*scale;
+      if (data.display.showTasks !== false) {
+        svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">TASKS</text>'; ry += 18*scale;
+        for (const task of (data.tasks||[]).slice(0,3)) {
+          svg += '<rect x="' + rightX + '" y="' + (ry-9*scale) + '" width="' + (10*scale) + '" height="' + (10*scale) + '" rx="' + (1.5*scale) + '" fill="#fff" stroke="' + black + '"/>';
+          svg += '<text x="' + (rightX+18*scale) + '" y="' + ry + '" font-size="' + (11.5*scale) + '">' + esc(truncateForWidth(task.title,rightW-20*scale,11.5*scale)) + '</text>'; ry += 24*scale;
+        }
+      }
+      if (data.display.showGoals !== false && (data.goals||[]).length) {
+        ry += 7*scale; svg += '<line x1="' + rightX + '" y1="' + ry + '" x2="' + (w-pad) + '" y2="' + ry + '" class="rule"/>'; ry += 22*scale;
+        svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">GOALS</text>'; ry += 17*scale;
+        for (const goal of (data.goals||[]).slice(0,2)) {
+          svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (11.5*scale) + '" font-weight="700">' + esc(truncateForWidth(goal.title,rightW,11.5*scale,38*scale)) + '</text>';
+          svg += '<text x="' + (w-pad) + '" y="' + ry + '" text-anchor="end" font-size="' + (10*scale) + '" font-weight="700">' + Math.round(goal.progress) + '%</text>';
+          svg += svgBar(goal.progress,rightX,ry+7*scale,rightW,6*scale,color(goal.accentColor,palette)); ry += 31*scale;
+        }
+      }
+      if (data.display.showCountdowns !== false && (data.countdowns||[]).length) {
+        ry += 3*scale; svg += '<line x1="' + rightX + '" y1="' + ry + '" x2="' + (w-pad) + '" y2="' + ry + '" class="rule"/>'; ry += 22*scale;
+        svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">COUNTDOWNS</text>'; ry += 18*scale;
+        for (const c of (data.countdowns||[]).slice(0,2)) {
+          svg += '<circle cx="' + (rightX+4*scale) + '" cy="' + (ry-4*scale) + '" r="' + (4*scale) + '" fill="' + color(c.accentColor,palette) + '"/>';
+          svg += '<text x="' + (rightX+15*scale) + '" y="' + ry + '" font-size="' + (11*scale) + '" font-weight="700">' + esc(truncateForWidth(c.name,rightW*.6,11*scale)) + '</text>';
+          svg += '<text x="' + (w-pad) + '" y="' + ry + '" text-anchor="end" font-size="' + (11*scale) + '" font-weight="800" fill="' + color(c.accentColor,palette) + '">' + esc(timeLabel(c)) + '</text>'; ry += 24*scale;
+        }
+      }
+    }
+    if (currentWeather && landscape) {
+      const wy = h - 78*scale;
+      svg += '<rect x="' + pad + '" y="' + wy + '" width="' + (w-pad*2) + '" height="' + (54*scale) + '" rx="' + (6*scale) + '" fill="#f1f1ed"/>';
+      svg += svgWeatherIcon(currentWeather.condition,pad+10*scale,wy+9*scale,34*scale,palette);
+      svg += '<text x="' + (pad+55*scale) + '" y="' + (wy+22*scale) + '" font-size="' + (15*scale) + '" font-weight="800">' + esc((currentWeather.temperature ?? '—') + unit) + '</text>';
+      svg += '<text x="' + (pad+55*scale) + '" y="' + (wy+38*scale) + '" font-size="' + (10*scale) + '" class="muted">' + esc(currentWeather.description || '') + (location?' · '+esc(location):'') + '</text>';
+      if (todayWeather) {
+        svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+22*scale) + '" text-anchor="end" font-size="' + (12*scale) + '" font-weight="800">H ' + esc((todayWeather.high ?? '—')+unit) + '  L ' + esc((todayWeather.low ?? '—')+unit) + '</text>';
+        svg += '<text x="' + (w-pad-8*scale) + '" y="' + (wy+39*scale) + '" text-anchor="end" font-size="' + (10*scale) + '" class="muted">' + Math.round(todayWeather.daytime?.precipitation||0) + '% precipitation</text>';
+      }
+    }
+    return plannerFooter(svg,data,w,h,pad,scale,'DAILY') + '</svg>';
+  }
+
+  if (mode === 'weekly') {
+    const monday = plannerStartOfDay(now); monday.setDate(monday.getDate() - ((monday.getDay()+6)%7));
+    const top = headerY + 8*scale, bottom = h - 28*scale, rowH = (bottom-top)/7;
+    for (let i=0;i<7;i++) {
+      const day = new Date(monday); day.setDate(day.getDate()+i);
+      const isToday = plannerDateKey(day) === plannerDateKey(now);
+      const y = top + i*rowH, weather = data.display.showWeather !== false ? plannerWeatherForDay(data,day) : null;
+      if (isToday) svg += '<rect x="' + pad + '" y="' + y + '" width="' + (w-pad*2) + '" height="' + rowH + '" rx="' + (5*scale) + '" fill="#f0f0ec"/>';
+      svg += '<line x1="' + pad + '" y1="' + (y+rowH) + '" x2="' + (w-pad) + '" y2="' + (y+rowH) + '" class="rule"/>';
+      svg += '<text x="' + (pad+4*scale) + '" y="' + (y+17*scale) + '" font-size="' + (8.5*scale) + '" font-weight="800">' + esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
+      svg += '<text x="' + (pad+4*scale) + '" y="' + (y+38*scale) + '" font-size="' + (18*scale) + '" font-weight="800">' + day.getDate() + '</text>';
+      let eventX = pad + 162*scale;
+      if (weather) {
+        svg += svgWeatherIcon(weather.daytime?.condition,eventX-82*scale,y+8*scale,28*scale,palette);
+        svg += '<text x="' + (eventX-48*scale) + '" y="' + (y+24*scale) + '" font-size="' + (10.5*scale) + '" font-weight="800">' + esc((weather.high??'—') + '°/' + (weather.low??'—') + '°') + '</text>';
+      }
+      const events = plannerEventsForDay(data,day).slice(0,2), tasks = plannerTasksForDay(data,day).slice(0,1);
+      let ey = y + 19*scale;
+      for (const event of events) {
+        svg += '<circle cx="' + eventX + '" cy="' + (ey-4*scale) + '" r="' + (4*scale) + '" fill="' + plannerEventAccent(event,palette) + '"/>';
+        svg += '<text x="' + (eventX+12*scale) + '" y="' + ey + '" font-size="' + (11.5*scale) + '" font-weight="700">' + esc(truncateForWidth(event.title,w-eventX-pad-80*scale,11.5*scale)) + '</text>';
+        if (!event.allDay) svg += '<text x="' + (w-pad) + '" y="' + ey + '" text-anchor="end" font-size="' + (10*scale) + '" class="muted">' + esc(new Date(event.start).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'})) + '</text>';
+        ey += 20*scale;
+      }
+      for (const task of tasks) {
+        svg += '<rect x="' + eventX + '" y="' + (ey-11*scale) + '" width="' + (8*scale) + '" height="' + (8*scale) + '" fill="#fff" stroke="' + black + '"/>';
+        svg += '<text x="' + (eventX+12*scale) + '" y="' + (ey-3*scale) + '" font-size="' + (10.5*scale) + '" class="muted">' + esc(truncateForWidth(task.title,w-eventX-pad,10.5*scale)) + '</text>';
+      }
+    }
+    return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'WEEKLY') + '</svg>';
+  }
+
+  const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
+  const firstOffset = (monthStart.getDay()+6)%7;
+  const gridStart = new Date(monthStart); gridStart.setDate(gridStart.getDate()-firstOffset);
+  const sideW = landscape ? Math.max(185*scale,(w-pad*2)*.28) : 0;
+  const gridW = landscape ? w-pad*2-sideW-14*scale : w-pad*2;
+  const gridX = pad, gridTop = headerY + 24*scale, dayHeadH = 19*scale, gridBottom = h-30*scale, cellH=(gridBottom-gridTop-dayHeadH)/6, cellW=gridW/7;
+  ['MON','TUE','WED','THU','FRI','SAT','SUN'].forEach((label,i)=>svg += '<text x="' + (gridX+i*cellW+cellW/2) + '" y="' + (gridTop+12*scale) + '" text-anchor="middle" font-size="' + (7.5*scale) + '" font-weight="800">' + label + '</text>');
+  for(let i=0;i<42;i++){
+    const day=new Date(gridStart);day.setDate(day.getDate()+i);
+    const row=Math.floor(i/7),col=i%7,x=gridX+col*cellW,y=gridTop+dayHeadH+row*cellH,isMonth=day.getMonth()===now.getMonth(),isToday=plannerDateKey(day)===plannerDateKey(now);
+    svg += '<rect x="' + x + '" y="' + y + '" width="' + cellW + '" height="' + cellH + '" fill="#fff" stroke="' + rule + '" stroke-width="1"/>';
+    if(isToday)svg += '<rect x="' + (x+1.5*scale) + '" y="' + (y+1.5*scale) + '" width="' + (cellW-3*scale) + '" height="' + (cellH-3*scale) + '" fill="none" stroke="' + black + '" stroke-width="' + (2.4*scale) + '"/>';
+    svg += '<text x="' + (x+6*scale) + '" y="' + (y+14*scale) + '" font-size="' + (9.5*scale) + '" font-weight="' + (isToday?'800':'600') + '" fill="' + (isMonth?black:'#999999') + '">' + day.getDate() + '</text>';
+    const weather=data.display.showWeather!==false?plannerWeatherForDay(data,day):null;
+    if(weather&&isMonth)svg += svgWeatherIcon(weather.daytime?.condition,x+cellW-24*scale,y+4*scale,18*scale,palette);
+    const dots=plannerEventsForDay(data,day).slice(0,3);
+    dots.forEach((event,j)=>svg += '<circle cx="' + (x+9*scale+j*10*scale) + '" cy="' + (y+cellH-8*scale) + '" r="' + (3*scale) + '" fill="' + plannerEventAccent(event,palette) + '"/>');
+  }
+  if(landscape){
+    const sx=gridX+gridW+14*scale,sw=w-pad-sx;
+    svg += '<line x1="' + (sx-7*scale) + '" y1="' + gridTop + '" x2="' + (sx-7*scale) + '" y2="' + gridBottom + '" class="rule"/>';
+    let sy=gridTop+13*scale;
+    if(currentWeather){
+      svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.2*scale) + '">TODAY</text>';sy+=9*scale;
+      svg += svgWeatherIcon(currentWeather.condition,sx,sy,32*scale,palette);
+      svg += '<text x="' + (sx+40*scale) + '" y="' + (sy+19*scale) + '" font-size="' + (18*scale) + '" font-weight="800">' + esc((currentWeather.temperature??'—')+unit) + '</text>';
+      svg += '<text x="' + (sx+40*scale) + '" y="' + (sy+34*scale) + '" font-size="' + (9*scale) + '" class="muted">' + esc(currentWeather.description||'') + '</text>';sy+=51*scale;
+    }
+    const todays=plannerEventsForDay(data,now).slice(0,4);
+    svg += '<line x1="' + sx + '" y1="' + sy + '" x2="' + (w-pad) + '" y2="' + sy + '" class="rule"/>';sy+=19*scale;
+    svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.2*scale) + '">AGENDA</text>';sy+=19*scale;
+    for(const event of todays){
+      svg += '<circle cx="' + (sx+3*scale) + '" cy="' + (sy-4*scale) + '" r="' + (3.5*scale) + '" fill="' + plannerEventAccent(event,palette) + '"/>';
+      svg += '<text x="' + (sx+12*scale) + '" y="' + sy + '" font-size="' + (10.5*scale) + '" font-weight="700">' + esc(truncateForWidth(event.title,sw-12*scale,10.5*scale,50*scale)) + '</text>';
+      svg += '<text x="' + (w-pad) + '" y="' + sy + '" text-anchor="end" font-size="' + (8.5*scale) + '" class="muted">' + esc(event.allDay?'All day':new Date(event.start).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'})) + '</text>';sy+=22*scale;
+    }
+    const next=(data.countdowns||[])[0];
+    if(next&&sy<gridBottom-45*scale){
+      sy+=5*scale;svg += '<line x1="' + sx + '" y1="' + sy + '" x2="' + (w-pad) + '" y2="' + sy + '" class="rule"/>';sy+=20*scale;
+      svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (9*scale) + '" font-weight="800" letter-spacing="' + (1.2*scale) + '">COMING UP</text>';sy+=22*scale;
+      svg += '<text x="' + sx + '" y="' + sy + '" font-size="' + (11*scale) + '" font-weight="700">' + esc(truncateForWidth(next.name,sw,11*scale,70*scale)) + '</text><text x="' + (w-pad) + '" y="' + sy + '" text-anchor="end" font-size="' + (11*scale) + '" font-weight="800" fill="' + color(next.accentColor,palette) + '">' + esc(timeLabel(next)) + '</text>';
+    }
+  }
+  return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'MONTHLY · forecast shown for next 10 days') + '</svg>';
+}
+
 function renderSvg(data, w, h) {
+  if (['daily', 'weekly', 'monthly'].includes(data.display.mode)) return renderPlannerSvg(data, w, h, data.display.mode);
   const palette = data.display.palette;
   const portrait = data.display.layout === 'portrait' || (data.display.layout === 'auto' && h > w);
   const pad = Math.max(18, Math.round(Math.min(w, h) * 0.045));
@@ -1199,6 +1552,7 @@ function state() {
   return {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
+    weather: { ...normalizeWeather(db.weather), configured: weatherConfigured() },
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
@@ -1485,6 +1839,17 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showTasks !== undefined) db.display.showTasks = Boolean(incoming.showTasks);
       if (incoming.showGoals !== undefined) db.display.showGoals = Boolean(incoming.showGoals);
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
+      if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
+      if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherUnits !== undefined) {
+        db.weather = normalizeWeather({
+          ...db.weather,
+          latitude: incoming.weatherLatitude !== undefined ? incoming.weatherLatitude : db.weather.latitude,
+          longitude: incoming.weatherLongitude !== undefined ? incoming.weatherLongitude : db.weather.longitude,
+          locationLabel: incoming.weatherLocationLabel !== undefined ? incoming.weatherLocationLabel : db.weather.locationLabel,
+          units: incoming.weatherUnits !== undefined ? incoming.weatherUnits : db.weather.units
+        });
+        weatherCache = { key: '', expiresAt: 0, data: null };
+      }
       save(db); return json(res, 200, { ok: true });
     }
 
