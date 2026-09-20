@@ -31,9 +31,9 @@ The compose file uses `pull_policy: always`. Recreate/update the app after a suc
 
 ## Persistent data
 
-The app stores its JSON database in the named Docker volume `countdown-data`, mounted at `/data`.
+The app stores its JSON database at `/DATA/AppData/$AppID/data` on the CasaOS host, bind-mounted to `/data` in the container.
 
-Do not delete this volume if you want to retain countdowns, Google Calendar credentials, selected calendars and the FrameOS display token.
+Do not delete that AppData folder if you want to retain countdowns, Google Calendar credentials, selected calendars and the FrameOS display token.
 
 ## Google Calendar setup
 
