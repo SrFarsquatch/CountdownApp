@@ -1,0 +1,10 @@
+{
+  "name": "Planner",
+  "short_name": "Planner",
+  "description": "Self-hosted calendar, tasks, goals, countdowns and e-ink dashboard",
+  "start_url": "/?view=today",
+  "display": "standalone",
+  "background_color": "#f3f2ef",
+  "theme_color": "#f5f4f1",
+  "icons": []
+}
