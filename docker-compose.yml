@@ -1,5 +1,5 @@
 # CasaOS custom-install file.
-# The image is built and published by GitHub Actions from the main branch.
+# GitHub Actions builds and publishes the image from main.
 
 name: countdownapp
 
@@ -9,17 +9,25 @@ services:
     pull_policy: always
     container_name: countdownapp
     ports:
-      - "8088:80"
+      - "8088:8080"
+    environment:
+      TZ: "America/Vancouver"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      APP_BASE_URL: "${APP_BASE_URL:-}"
+      APP_SECRET: "${APP_SECRET:-}"
+    volumes:
+      - countdown-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       start_period: 10s
       retries: 3
-    mem_limit: 128m
-    mem_reservation: 16m
-    cpus: "0.25"
+    mem_limit: 192m
+    mem_reservation: 32m
+    cpus: "0.35"
     pids_limit: 64
     security_opt:
       - no-new-privileges:true
@@ -30,9 +38,12 @@ services:
         max-file: "2"
     x-casaos:
       ports:
-        - container: "80"
+        - container: "8080"
           description:
-            en_US: Countdown web interface
+            en_US: Countdown web interface and FrameOS API
+
+volumes:
+  countdown-data:
 
 x-casaos:
   id: countdownapp
@@ -45,9 +56,9 @@ x-casaos:
   developer: SrFarsquatch
   author: SrFarsquatch
   tagline:
-    en_US: Lightweight self-hosted countdown clock
+    en_US: Self-hosted countdown, calendar and e-ink dashboard
   description:
-    en_US: A simple self-hosted countdown clock with a selectable end date and browser-saved settings.
+    en_US: Manage countdowns, read Google Calendar events, and publish a private FrameOS-friendly e-ink feed.
   scheme: http
   port_map: "8088"
   index: /
