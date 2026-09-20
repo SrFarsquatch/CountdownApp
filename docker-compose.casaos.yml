@@ -68,9 +68,9 @@ x-casaos:
   developer: SrFarsquatch
   author: SrFarsquatch
   tagline:
-    en_US: Self-hosted countdown, calendar and e-ink dashboard
+    en_US: Self-hosted calendar, tasks, goals, countdowns and e-ink planner
   description:
-    en_US: Manage countdowns, Google Calendar, and e-ink displays from a single reliable CasaOS container.
+    en_US: Plan your day with Google Calendar, tasks, goals, countdowns and flexible e-ink displays from a single CasaOS container.
   scheme: http
   port_map: "8088"
   index: /
