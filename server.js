@@ -307,15 +307,34 @@ function updaterConfigured() {
   try { fs.accessSync(DOCKER_SOCKET, fs.constants.R_OK | fs.constants.W_OK); return true; }
   catch { return false; }
 }
-function updateStatus() {
-  try { return { configured: updaterConfigured(), ...JSON.parse(fs.readFileSync(UPDATE_STATUS_PATH, 'utf8')) }; }
-  catch {
-    return {
-      configured: updaterConfigured(), phase: 'idle',
-      message: updaterConfigured() ? 'Ready to update' : 'Updater unavailable: Docker socket is not mounted',
-      startedAt: null, finishedAt: null, error: null
-    };
+function defaultUpdateState() {
+  return {
+    phase: 'idle', step: 'idle', progress: 0,
+    message: updaterConfigured() ? 'Ready to check for updates' : 'Updater unavailable: Docker socket is not mounted',
+    startedAt: null, finishedAt: null, error: null,
+    checking: false, available: null, lastCheckedAt: null, checkError: null,
+    currentImageId: '', latestImageId: '', currentRevision: '', latestRevision: '',
+    currentVersion: '', latestVersion: '', latestCreatedAt: ''
+  };
+}
+function readUpdateState() {
+  try { return { ...defaultUpdateState(), ...JSON.parse(fs.readFileSync(UPDATE_STATUS_PATH, 'utf8')) }; }
+  catch { return defaultUpdateState(); }
+}
+function writeUpdateState(patch) {
+  const next = { ...readUpdateState(), ...patch };
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const temp = UPDATE_STATUS_PATH + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify(next, null, 2));
+    fs.renameSync(temp, UPDATE_STATUS_PATH);
+  } catch (error) {
+    console.warn('Could not persist update status:', error.message);
   }
+  return next;
+}
+function updateStatus() {
+  return { configured: updaterConfigured(), ...readUpdateState() };
 }
 function dockerRaw(method, endpoint, payload) {
   return new Promise((resolve, reject) => {
@@ -342,18 +361,110 @@ async function dockerApiVersion() {
   const data = JSON.parse(response.raw);
   return data.ApiVersion ? '/v' + data.ApiVersion : '';
 }
+async function dockerJson(version, method, endpoint, payload) {
+  const response = await dockerRaw(method, version + endpoint, payload);
+  return response.raw ? JSON.parse(response.raw) : {};
+}
+function splitImageReference(ref) {
+  const slash = ref.lastIndexOf('/');
+  const colon = ref.lastIndexOf(':');
+  if (colon > slash) return { image: ref.slice(0, colon), tag: ref.slice(colon + 1) };
+  return { image: ref, tag: 'latest' };
+}
+function compactImageId(value) {
+  const text = String(value || '').replace(/^sha256:/, '');
+  return text ? text.slice(0, 12) : '';
+}
+function dockerImageMetadata(info) {
+  const labels = info?.Config?.Labels || {};
+  const revision = String(labels['org.opencontainers.image.revision'] || '');
+  const version = String(labels['org.opencontainers.image.version'] || '');
+  return {
+    imageId: info?.Id || '',
+    revision,
+    version,
+    createdAt: info?.Created || '',
+    display: revision ? revision.slice(0, 8) : (version || compactImageId(info?.Id))
+  };
+}
+async function pullTargetImage(version) {
+  const ref = splitImageReference(TARGET_IMAGE);
+  const response = await dockerRaw('POST', version + '/images/create?fromImage=' + encodeURIComponent(ref.image) + '&tag=' + encodeURIComponent(ref.tag));
+  for (const line of response.raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line);
+      if (event.errorDetail?.message) throw new Error(event.errorDetail.message);
+      if (event.error) throw new Error(event.error);
+    } catch (error) {
+      if (error instanceof SyntaxError) continue;
+      throw error;
+    }
+  }
+}
+let updateCheckPromise = null;
+async function checkForUpdate() {
+  if (!updaterConfigured()) throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
+  const currentStatus = readUpdateState();
+  if (['queued', 'pulling', 'preparing', 'restarting', 'verifying'].includes(currentStatus.phase)) {
+    throw new Error('An update is already running.');
+  }
+  if (updateCheckPromise) return updateCheckPromise;
+  updateCheckPromise = (async () => {
+    writeUpdateState({ checking: true, checkError: null, message: 'Checking for updates…' });
+    try {
+      const version = await dockerApiVersion();
+      const container = await dockerJson(version, 'GET', '/containers/' + encodeURIComponent(TARGET_CONTAINER) + '/json');
+      const currentImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(container.Image) + '/json');
+      await pullTargetImage(version);
+      const latestImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(TARGET_IMAGE) + '/json');
+      const currentMeta = dockerImageMetadata(currentImage);
+      const latestMeta = dockerImageMetadata(latestImage);
+      const available = container.Image !== latestImage.Id;
+      return writeUpdateState({
+        phase: 'idle', step: 'idle', progress: 0, checking: false, available,
+        lastCheckedAt: new Date().toISOString(), checkError: null,
+        message: available ? 'Update available' : 'Planner is up to date',
+        currentImageId: currentMeta.imageId, latestImageId: latestMeta.imageId,
+        currentRevision: currentMeta.revision, latestRevision: latestMeta.revision,
+        currentVersion: currentMeta.version, latestVersion: latestMeta.version,
+        latestCreatedAt: latestMeta.createdAt
+      });
+    } catch (error) {
+      writeUpdateState({
+        checking: false, checkError: error.message,
+        lastCheckedAt: new Date().toISOString(),
+        message: 'Could not check for updates'
+      });
+      throw error;
+    } finally {
+      updateCheckPromise = null;
+    }
+  })();
+  return updateCheckPromise;
+}
 async function launchUpdater() {
   if (!updaterConfigured()) throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
   const version = await dockerApiVersion();
   const name = 'countdownapp-update-' + Date.now().toString(36);
+  writeUpdateState({
+    phase: 'queued', step: 'starting', progress: 2,
+    message: 'Starting update…', startedAt: new Date().toISOString(),
+    finishedAt: null, error: null, checking: false
+  });
   const config = {
     Image: TARGET_IMAGE, Cmd: ['node', '/app/updater.js', '--once'],
     Env: ['RUN_ONCE=1', 'TARGET_CONTAINER=' + TARGET_CONTAINER, 'TARGET_IMAGE=' + TARGET_IMAGE, 'DATA_DIR=/data', 'DOCKER_SOCKET=/var/run/docker.sock'],
     HostConfig: { AutoRemove: true, Binds: ['/var/run/docker.sock:/var/run/docker.sock', '/DATA/AppData/countdownapp/data:/data'] }
   };
-  await dockerRaw('POST', version + '/containers/create?name=' + encodeURIComponent(name), config);
-  await dockerRaw('POST', version + '/containers/' + encodeURIComponent(name) + '/start');
-  return { name };
+  try {
+    await dockerRaw('POST', version + '/containers/create?name=' + encodeURIComponent(name), config);
+    await dockerRaw('POST', version + '/containers/' + encodeURIComponent(name) + '/start');
+    return { name };
+  } catch (error) {
+    writeUpdateState({ phase: 'error', step: 'error', progress: 0, message: 'Could not start update', error: error.message, finishedAt: new Date().toISOString() });
+    throw error;
+  }
 }
 
 async function exchange(code, req) {
@@ -1378,10 +1489,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/update/status' && req.method === 'GET') return json(res, 200, updateStatus());
+    if (p === '/api/update/check' && req.method === 'POST') {
+      if (req.headers['x-countdown-action'] !== 'update-check') return json(res, 403, { error: 'Invalid update check request' });
+      const checked = await checkForUpdate();
+      return json(res, 200, { ok: true, ...checked, configured: updaterConfigured() });
+    }
     if (p === '/api/update/start' && req.method === 'POST') {
       if (req.headers['x-countdown-action'] !== 'update') return json(res, 403, { error: 'Invalid update request' });
       const status = updateStatus();
-      if (['pulling', 'preparing', 'restarting'].includes(status.phase)) return json(res, 409, { error: 'An update is already running' });
+      if (['queued', 'pulling', 'preparing', 'restarting', 'verifying'].includes(status.phase)) return json(res, 409, { error: 'An update is already running' });
       const launched = await launchUpdater();
       return json(res, 202, { ok: true, message: 'Update started', helper: launched.name });
     }
