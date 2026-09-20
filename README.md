@@ -3,7 +3,8 @@
 A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
 ## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
-- Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.\n- Install the web app as a standalone PWA.\n
+- Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.
+- Build custom e-ink layouts with a drag-and-resize section editor: move Agenda, Tasks, Goals and Countdowns on a resolution-independent 12 × 8 grid, resize each section, and control per-section item limits.\n- Install the web app as a standalone PWA.\n
 
 - Create and edit multiple countdowns with per-countdown accent colors.
 - Choose days-only, days + hours, days + hours + minutes, live seconds, weeks + days, or target-date countdown displays.
@@ -102,6 +103,8 @@ Treat the display token like a password. Use **Rotate display token** if a URL i
 For FrameOS, use the rendered SVG endpoint for the built-in CountdownApp layout, or point a custom app at the JSON feed if you want to build your own scene.
 
 Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
+
+The **Displays → Section editor** can switch between automatic layout and a custom grid. In custom mode, drag sections to reposition them and use the bottom-right handle to resize them. **Arrange for resolution** creates a two-column landscape layout or a stacked portrait layout based on the preview dimensions. Long agenda/task labels are clipped and shortened inside their section so they do not bleed into neighboring content.
 
 ## One-click updates
 
