@@ -4,13 +4,19 @@ A lightweight self-hosted countdown, Google Calendar and e-ink dashboard designe
 
 ## What it does
 
-- Create and edit multiple countdowns.
+- Create and edit multiple countdowns with per-countdown accent colors.
+- Choose days, compact, full, or target-date time displays.
+- Choose short, medium, long, or numeric date formats.
+- Add solid, segmented, or thin progress bars using time elapsed or manual goals.
+- Pin important countdowns and independently hide them from e-ink.
 - Store countdowns persistently on the server instead of only in one browser.
 - Connect Google Calendar using read-only OAuth access.
 - Select which Google calendars are included.
 - Show an upcoming agenda from those calendars.
 - Publish a private JSON feed for FrameOS or another e-ink client.
-- Provide a dedicated monochrome `/frame` view for browser-capable displays.
+- Publish a rendered SVG endpoint so FrameOS can show the exact dashboard design.
+- Provide a dedicated `/frame` preview that uses that same SVG renderer.
+- Render landscape or portrait layouts with split-flap/plain date headers and six-color or monochrome palettes.
 - Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
 
 ## CasaOS deployment
@@ -68,10 +74,13 @@ After the environment variables are configured and the container is restarted:
 
 ## FrameOS
 
-Open **Displays** in CountdownApp. It shows two tokenized URLs:
+Open **Display** in CountdownApp. It shows private tokenized display URLs:
 
+- **Rendered SVG**: `/api/frameos/svg?token=...&w=800&h=480`
 - **JSON feed**: `/api/frameos/feed?token=...`
-- **Monochrome view**: `/frame?token=...`
+- **Browser preview**: `/frame?token=...&w=800&h=480`
+
+Use the rendered SVG when you want FrameOS to match CountdownApp exactly. Set `w` and `h` to the panel's native resolution. The renderer automatically supports portrait and landscape sizing and deliberately limits itself to e-ink-safe colors.
 
 The JSON feed contains:
 
@@ -83,7 +92,9 @@ The JSON feed contains:
 
 Treat the display token like a password. Use **Rotate display token** if a URL is exposed.
 
-For FrameOS, point an HTTP/JSON source or custom app at the full JSON feed URL. A browser-capable frame can instead use the monochrome view URL directly.
+For FrameOS, use the rendered SVG endpoint for the built-in CountdownApp layout, or point a custom app at the JSON feed if you want to build your own scene.
+
+Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
 
 ## One-click updates
 
