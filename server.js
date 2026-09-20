@@ -354,8 +354,17 @@ async function calendars(accountId) {
   const out = await calendarListForAccount(account);
   return out.map(c => ({
     id: c.id, summary: c.summary, primary: Boolean(c.primary),
-    backgroundColor: c.backgroundColor || '', accessRole: c.accessRole || 'reader'
+    backgroundColor: c.backgroundColor || '', foregroundColor: c.foregroundColor || '',
+    accessRole: c.accessRole || 'reader'
   }));
+}
+async function eventColors(account) {
+  try {
+    const data = await gfetch(account, '/colors');
+    return data.event || {};
+  } catch {
+    return {};
+  }
 }
 async function identifyGoogleToken(token) {
   if (!token?.access_token) return { googleId: '', label: 'Google account' };
@@ -373,7 +382,13 @@ async function eventsBetween(from, to) {
   const out = [];
   const seen = new Set();
   for (const account of accounts) {
+    const [calendarItems, colors] = await Promise.all([
+      calendarListForAccount(account),
+      eventColors(account)
+    ]);
+    const calendarMap = new Map(calendarItems.map(calendar => [calendar.id, calendar]));
     for (const calendarId of account.selectedCalendarIds) {
+      const calendar = calendarMap.get(calendarId) || {};
       const query = new URLSearchParams({ timeMin: min.toISOString(), timeMax: max.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
       const data = await gfetch(account, '/calendars/' + encodeURIComponent(calendarId) + '/events?' + query);
       for (const event of data.items || []) {
@@ -383,8 +398,15 @@ async function eventsBetween(from, to) {
         const dedupeKey = calendarId + '|' + event.id + '|' + start;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
+        const specificColor = event.colorId ? colors[event.colorId] : null;
         out.push({
           id: event.id, calendarId, accountId: account.id, accountLabel: account.label,
+          calendarName: calendar.summary || 'Calendar',
+          calendarColor: calendar.backgroundColor || '#6c5ce7',
+          calendarForeground: calendar.foregroundColor || '#ffffff',
+          eventColor: specificColor?.background || '',
+          eventForeground: specificColor?.foreground || '',
+          colorId: event.colorId || '',
           title: event.summary || 'Busy', start,
           end: event.end?.dateTime || event.end?.date || start, allDay: Boolean(event.start?.date),
           location: event.location || '', htmlLink: event.htmlLink || ''
