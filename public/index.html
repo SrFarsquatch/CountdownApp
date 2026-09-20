@@ -138,9 +138,9 @@
 .eink-layout-card.disabled .section-layout-editor{opacity:.45;pointer-events:none}
 .eink-layout-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0}
 .eink-layout-shell{position:relative;width:100%;max-width:920px;margin:0 auto;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.02)}
-.eink-layout-header{position:absolute;left:4%;right:4%;top:4%;height:9%;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #c9c9c2;color:#111;font-size:clamp(9px,1.5vw,14px);font-weight:800}
-.eink-layout-footer{position:absolute;left:4%;bottom:1.5%;font-size:clamp(6px,1vw,9px);color:#777}
-.section-layout-editor{position:absolute;left:4%;right:4%;top:15%;bottom:5%;touch-action:none;background-image:linear-gradient(to right,rgba(20,20,20,.07) 1px,transparent 1px),linear-gradient(to bottom,rgba(20,20,20,.07) 1px,transparent 1px);background-size:calc(100% / 12) calc(100% / 8);border-right:1px solid rgba(20,20,20,.07);border-bottom:1px solid rgba(20,20,20,.07)}
+.eink-layout-header{position:absolute;left:2%;right:2%;top:1.5%;height:7%;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #d8d8d2;color:#111;font-size:clamp(8px,1.25vw,12px);font-weight:800;letter-spacing:.04em}
+.eink-layout-footer{position:absolute;left:2%;bottom:.8%;font-size:clamp(6px,.9vw,8px);color:#777}
+.section-layout-editor{position:absolute;left:2%;right:2%;top:10%;bottom:3.5%;touch-action:none;background-image:linear-gradient(to right,rgba(20,20,20,.055) 1px,transparent 1px),linear-gradient(to bottom,rgba(20,20,20,.055) 1px,transparent 1px);background-size:calc(100% / 24) calc(100% / 16);border-right:1px solid rgba(20,20,20,.055);border-bottom:1px solid rgba(20,20,20,.055)}
 .layout-block{position:absolute;min-width:0;min-height:0;border:2px solid var(--text);border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);padding:7px 9px;cursor:grab;user-select:none;touch-action:none;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .layout-block:active{cursor:grabbing}
 .layout-block.off{opacity:.35;border-style:dashed}
@@ -278,15 +278,15 @@
   <div class="card eink-layout-card" id="einkLayoutCard">
     <div class="eyebrow">Section editor</div>
     <h3 style="margin:4px 0">Arrange this display mode</h3>
-    <p class="meta layout-help">Every mode has its own layout. Drag widgets to move them, resize from the bottom-right corner, or tap the ⚙ button inside a widget to change what it shows.</p>
+    <p class="meta layout-help">Every mode has its own 24 × 16 layout. Drag widgets to move them, resize from the bottom-right corner for finer control, or tap the ⚙ button inside a widget to change what it shows.</p>
     <div class="eink-layout-toolbar">
       <div class="meta" id="layoutEditorStatus">Custom layout is off.</div>
       <div class="row-actions"><button class="btn tiny" id="autoArrangeSections">Arrange for resolution</button><button class="btn tiny" id="resetSectionLayout">Reset layout</button></div>
     </div>
     <div class="eink-layout-shell" id="einkLayoutShell">
-      <div class="eink-layout-header"><span>Sunday, September 20</span><strong>Upcoming</strong></div>
+      <div class="eink-layout-header"><span id="layoutEditorDate">SEP 20, 2026</span><strong id="layoutEditorMode">DAY · 2:49 PM</strong></div>
       <div class="section-layout-editor" id="sectionLayoutEditor"></div>
-      <div class="eink-layout-footer">Updated 12:30 p.m.</div>
+      <div class="eink-layout-footer" id="layoutEditorFooter">24 × 16 grid</div>
     </div>
     <div class="widget-settings" id="widgetSettings" hidden></div>
   </div>
@@ -826,7 +826,7 @@ const DISPLAY_SECTION_STYLES={
 };
 const DISPLAY_MODES=['dashboard','daily','weekly','monthly','countdowns'];
 function cloneDisplayLayout(layout){
- const fallback={agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
+ const fallback={agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:12,y:8,w:12,h:8}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
@@ -846,7 +846,7 @@ function cloneModeSections(source={}){
  });
  return out;
 }
-function displayGrid(){return{cols:Number(state?.display?.gridCols)||12,rows:Number(state?.display?.gridRows)||8}}
+function displayGrid(){return{cols:Number(state?.display?.gridCols)||24,rows:Number(state?.display?.gridRows)||16}}
 function currentDisplayMode(){return $('displayMode').value||'daily'}
 function activeSectionDraft(){return displaySectionsDraft?.[currentDisplayMode()]||{}}
 function sectionEnabled(kind){return activeSectionDraft()?.[kind]?.enabled!==false}
@@ -860,21 +860,21 @@ function applyLayoutBlock(block,rect){
  const g=displayGrid();
  block.style.left=(rect.x/g.cols*100)+'%';block.style.top=(rect.y/g.rows*100)+'%';block.style.width=(rect.w/g.cols*100)+'%';block.style.height=(rect.h/g.rows*100)+'%';
  const settings=activeSectionDraft()[block.dataset.kind]||{};
- const small=block.querySelector('small');if(small)small.textContent=rect.w+' × '+rect.h+' · '+(settings.enabled===false?'hidden':settings.style||'default');
+ const small=block.querySelector('small');if(small)small.textContent=rect.w+' × '+rect.h+' cells · '+(settings.enabled===false?'hidden':settings.style||'default');
  block.classList.toggle('off',settings.enabled===false);
 }
 function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480),portrait=h>w;
  if(mode==='daily'||mode==='weekly') return portrait
-   ?{agenda:{x:0,y:0,w:12,h:5},weather:{x:0,y:5,w:12,h:1},tasks:{x:0,y:6,w:4,h:2},goals:{x:4,y:6,w:4,h:2},countdowns:{x:8,y:6,w:4,h:2}}
-   :{agenda:{x:0,y:0,w:8,h:8},weather:{x:8,y:0,w:4,h:2},tasks:{x:8,y:2,w:4,h:2},goals:{x:8,y:4,w:4,h:2},countdowns:{x:8,y:6,w:4,h:2}};
+   ?{agenda:{x:0,y:0,w:24,h:10},weather:{x:0,y:10,w:24,h:2},tasks:{x:0,y:12,w:8,h:4},goals:{x:8,y:12,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4}}
+   :{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4}};
  if(mode==='monthly') return portrait
-   ?{agenda:{x:0,y:0,w:12,h:6},weather:{x:0,y:6,w:12,h:1},tasks:{x:0,y:7,w:4,h:1},goals:{x:4,y:7,w:4,h:1},countdowns:{x:8,y:7,w:4,h:1}}
-   :{agenda:{x:0,y:0,w:9,h:8},weather:{x:9,y:0,w:3,h:2},tasks:{x:9,y:2,w:3,h:2},goals:{x:9,y:4,w:3,h:2},countdowns:{x:9,y:6,w:3,h:2}};
- if(mode==='countdowns') return{agenda:{x:0,y:0,w:6,h:3},weather:{x:6,y:0,w:6,h:2},tasks:{x:6,y:2,w:6,h:2},goals:{x:0,y:3,w:6,h:3},countdowns:{x:0,y:0,w:12,h:8}};
+   ?{agenda:{x:0,y:0,w:24,h:12},weather:{x:0,y:12,w:24,h:2},tasks:{x:0,y:14,w:8,h:2},goals:{x:8,y:14,w:8,h:2},countdowns:{x:16,y:14,w:8,h:2}}
+   :{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4}};
+ if(mode==='countdowns') return{agenda:{x:0,y:0,w:12,h:6},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:6,w:12,h:6},countdowns:{x:0,y:0,w:24,h:16}};
  return portrait
-   ?{agenda:{x:0,y:0,w:12,h:3},weather:{x:0,y:3,w:12,h:1},tasks:{x:0,y:4,w:12,h:1},goals:{x:0,y:5,w:12,h:1},countdowns:{x:0,y:6,w:12,h:2}}
-   :{agenda:{x:0,y:0,w:7,h:4},weather:{x:7,y:0,w:5,h:2},tasks:{x:7,y:2,w:5,h:2},goals:{x:0,y:4,w:6,h:4},countdowns:{x:6,y:4,w:6,h:4}};
+   ?{agenda:{x:0,y:0,w:24,h:6},weather:{x:0,y:6,w:24,h:2},tasks:{x:0,y:8,w:24,h:2},goals:{x:0,y:10,w:24,h:2},countdowns:{x:0,y:12,w:24,h:4}}
+   :{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:12,y:8,w:12,h:8}};
 }
 function setLayoutStatus(message,error=false){const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':''}
 function renderWidgetSettings(kind=selectedDisplayWidget){
@@ -900,6 +900,10 @@ function renderSectionLayoutEditor(renderSettings=true){
  displayLayoutDraft=displayLayoutsDraft[mode]||cloneDisplayLayout();
  const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor');
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);shell.style.aspectRatio=w+'/'+h;
+ const now=new Date(),modeLabels={dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'};
+ if($('layoutEditorDate'))$('layoutEditorDate').textContent=now.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
+ if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='24 × 16 grid · '+w+' × '+h+' preview';
  $('einkLayoutCard').classList.remove('disabled');
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];

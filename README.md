@@ -8,6 +8,7 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 - Search for a weather location by city/town, save its coordinates automatically, and show the current conditions plus a 7-day forecast on the Today dashboard.
 - Manage weather location and units in Settings, then place Weather as a resizable e-ink dashboard widget with Compact, Current conditions, or Forecast strip styles.
 - Customize Dashboard, Daily, Weekly, Monthly, and Countdowns modes independently. Each mode stores its own widget positions/sizes and per-widget visibility, style, and item limit settings.
+- The e-ink editor now uses a 24 × 16 grid for finer placement/resizing, migrates existing 12 × 8 layouts automatically, and uses a compact live date/mode/time header so more of the screen is available for widgets.
 - Keep colour e-ink and monochrome output modes; weather and calendar accents are quantized to the supported e-ink palette.
 - Build custom e-ink layouts with a drag-and-resize section editor: move Agenda, Tasks, Goals and Countdowns on a resolution-independent 12 × 8 grid, resize each section, and control per-section item limits.\n- Install the web app as a standalone PWA.\n
 

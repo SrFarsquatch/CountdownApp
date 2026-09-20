@@ -35,8 +35,8 @@ const GOAL_STYLES = ['bars', 'compact'];
 const COUNTDOWN_STYLES = ['detailed', 'compact'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
 const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns'];
-const DISPLAY_GRID_COLS = 12;
-const DISPLAY_GRID_ROWS = 8;
+const DISPLAY_GRID_COLS = 24;
+const DISPLAY_GRID_ROWS = 16;
 const TASK_STATUS = ['todo', 'progress', 'done'];
 const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 const GOAL_TYPES = ['number', 'checklist', 'deadline'];
@@ -63,32 +63,32 @@ const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max)
 
 function defaultSectionLayout(mode = 'dashboard') {
   if (mode === 'daily' || mode === 'weekly') return {
-    agenda: { x: 0, y: 0, w: 8, h: 8 },
-    weather: { x: 8, y: 0, w: 4, h: 2 },
-    tasks: { x: 8, y: 2, w: 4, h: 2 },
-    goals: { x: 8, y: 4, w: 4, h: 2 },
-    countdowns: { x: 8, y: 6, w: 4, h: 2 }
+    agenda: { x: 0, y: 0, w: 16, h: 16 },
+    weather: { x: 16, y: 0, w: 8, h: 4 },
+    tasks: { x: 16, y: 4, w: 8, h: 4 },
+    goals: { x: 16, y: 8, w: 8, h: 4 },
+    countdowns: { x: 16, y: 12, w: 8, h: 4 }
   };
   if (mode === 'monthly') return {
-    agenda: { x: 0, y: 0, w: 9, h: 8 },
-    weather: { x: 9, y: 0, w: 3, h: 2 },
-    tasks: { x: 9, y: 2, w: 3, h: 2 },
-    goals: { x: 9, y: 4, w: 3, h: 2 },
-    countdowns: { x: 9, y: 6, w: 3, h: 2 }
+    agenda: { x: 0, y: 0, w: 18, h: 16 },
+    weather: { x: 18, y: 0, w: 6, h: 4 },
+    tasks: { x: 18, y: 4, w: 6, h: 4 },
+    goals: { x: 18, y: 8, w: 6, h: 4 },
+    countdowns: { x: 18, y: 12, w: 6, h: 4 }
   };
   if (mode === 'countdowns') return {
-    agenda: { x: 0, y: 0, w: 6, h: 4 },
-    weather: { x: 6, y: 0, w: 6, h: 2 },
-    tasks: { x: 6, y: 2, w: 6, h: 2 },
-    goals: { x: 0, y: 4, w: 6, h: 4 },
-    countdowns: { x: 0, y: 0, w: 12, h: 8 }
+    agenda: { x: 0, y: 0, w: 12, h: 8 },
+    weather: { x: 12, y: 0, w: 12, h: 4 },
+    tasks: { x: 12, y: 4, w: 12, h: 4 },
+    goals: { x: 0, y: 8, w: 12, h: 8 },
+    countdowns: { x: 0, y: 0, w: 24, h: 16 }
   };
   return {
-    agenda: { x: 0, y: 0, w: 7, h: 4 },
-    weather: { x: 7, y: 0, w: 5, h: 2 },
-    tasks: { x: 7, y: 2, w: 5, h: 2 },
-    goals: { x: 0, y: 4, w: 6, h: 4 },
-    countdowns: { x: 6, y: 4, w: 6, h: 4 }
+    agenda: { x: 0, y: 0, w: 14, h: 8 },
+    weather: { x: 14, y: 0, w: 10, h: 4 },
+    tasks: { x: 14, y: 4, w: 10, h: 4 },
+    goals: { x: 0, y: 8, w: 12, h: 8 },
+    countdowns: { x: 12, y: 8, w: 12, h: 8 }
   };
 }
 function normalizeSectionLayout(input, mode = 'dashboard') {
@@ -105,6 +105,25 @@ function normalizeSectionLayout(input, mode = 'dashboard') {
   }
   return out;
 }
+function migrateLegacy12x8Layout(input, mode = 'dashboard') {
+  if (!input || typeof input !== 'object') return defaultSectionLayout(mode);
+  const base = defaultSectionLayout(mode);
+  const out = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = input[key];
+    if (!raw || typeof raw !== 'object') { out[key] = base[key]; continue; }
+    out[key] = {
+      x: clamp(Math.round(num(raw.x, 0) * 2), 0, DISPLAY_GRID_COLS - 2),
+      y: clamp(Math.round(num(raw.y, 0) * 2), 0, DISPLAY_GRID_ROWS - 1),
+      w: clamp(Math.round(num(raw.w, base[key].w / 2) * 2), 2, DISPLAY_GRID_COLS),
+      h: clamp(Math.round(num(raw.h, base[key].h / 2) * 2), 1, DISPLAY_GRID_ROWS)
+    };
+    out[key].x = clamp(out[key].x, 0, DISPLAY_GRID_COLS - out[key].w);
+    out[key].y = clamp(out[key].y, 0, DISPLAY_GRID_ROWS - out[key].h);
+  }
+  return out;
+}
+
 function defaultSectionSettings(mode = 'dashboard') {
   const countdownOnly = mode === 'countdowns';
   const agendaStyle = mode === 'daily' ? 'timeline' : mode === 'weekly' ? 'week' : mode === 'monthly' ? 'calendar' : 'list';
@@ -200,7 +219,7 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 4,
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 5,
       sectionLayoutMode: 'custom', sectionLayout: defaultSectionLayout('dashboard'), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
       modeLayouts: defaultModeLayouts(), modeSections: defaultModeSections(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
@@ -319,19 +338,29 @@ function load() {
       weather: normalizeWeather(parsed.weather || base.weather),
       display: (() => {
         const legacyDisplay = parsed.display || {};
+        const legacyVersion = num(legacyDisplay.plannerLayoutVersion, 0);
+        let migratedModeLayouts = legacyDisplay.modeLayouts;
+        let migratedSectionLayout = legacyDisplay.sectionLayout;
+        if (legacyVersion < 5) {
+          const sourceModes = legacyDisplay.modeLayouts && typeof legacyDisplay.modeLayouts === 'object' ? legacyDisplay.modeLayouts : {};
+          migratedModeLayouts = {};
+          for (const mode of DISPLAY_MODES) {
+            const source = sourceModes[mode] || (mode === 'dashboard' ? legacyDisplay.sectionLayout : null);
+            migratedModeLayouts[mode] = source ? migrateLegacy12x8Layout(source, mode) : defaultSectionLayout(mode);
+          }
+          migratedSectionLayout = migratedModeLayouts.dashboard;
+        }
         const display = {
           ...base.display,
           ...legacyDisplay,
-          sectionLayout: normalizeSectionLayout(legacyDisplay.sectionLayout, 'dashboard'),
+          sectionLayout: normalizeSectionLayout(migratedSectionLayout, 'dashboard'),
           sectionOrder: normalizeSectionOrder(legacyDisplay.sectionOrder),
-          modeLayouts: normalizeModeLayouts(legacyDisplay.modeLayouts, legacyDisplay.sectionLayout),
+          modeLayouts: normalizeModeLayouts(migratedModeLayouts, migratedSectionLayout),
           modeSections: normalizeModeSections(legacyDisplay.modeSections, legacyDisplay)
         };
-        if (num(legacyDisplay.plannerLayoutVersion, 0) < 2 && (!legacyDisplay.mode || legacyDisplay.mode === 'dashboard')) display.mode = 'daily';
-        if (num(legacyDisplay.plannerLayoutVersion, 0) < 4) {
-          display.sectionLayoutMode = 'custom';
-          display.plannerLayoutVersion = 4;
-        }
+        if (legacyVersion < 2 && (!legacyDisplay.mode || legacyDisplay.mode === 'dashboard')) display.mode = 'daily';
+        display.sectionLayoutMode = 'custom';
+        display.plannerLayoutVersion = 5;
         return display;
       })()
     };
@@ -1528,15 +1557,18 @@ function renderPlannerSvg(data, w, h, mode) {
 function renderSvg(data, w, h) {
   const palette = data.display.palette;
   const portrait = data.display.layout === 'portrait' || (data.display.layout === 'auto' && h > w);
-  const pad = Math.max(18, Math.round(Math.min(w, h) * 0.045));
+  const pad = Math.max(12, Math.round(Math.min(w, h) * 0.026));
   const black = '#111111', muted = '#666660', rule = '#c9c9c2';
   const now = new Date();
-  const dateText = now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateText = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+  const modeLabel = ({ dashboard:'DASHBOARD', daily:'DAY', weekly:'WEEK', monthly:'MONTH', countdowns:'COUNTDOWNS' })[data.display.mode] || 'PLANNER';
+  const timeText = now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
   let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#ffffff"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
 
-  svg += '<text x="' + pad + '" y="' + (pad + 18) + '" font-size="18" font-weight="800">' + esc(dateText) + '</text>';
-  svg += '<text x="' + (w - pad) + '" y="' + (pad + 18) + '" text-anchor="end" font-size="' + (portrait ? 22 : 26) + '" font-weight="800">' + esc(data.title) + '</text>';
-  svg += '<line x1="' + pad + '" y1="' + (pad + 34) + '" x2="' + (w - pad) + '" y2="' + (pad + 34) + '" class="line"/>';
+  const headerY = pad + 15;
+  svg += '<text x="' + pad + '" y="' + headerY + '" font-size="' + (portrait ? 11 : 12) + '" font-weight="800" letter-spacing="1">' + esc(dateText) + '</text>';
+  svg += '<text x="' + (w - pad) + '" y="' + headerY + '" text-anchor="end" font-size="' + (portrait ? 10 : 11) + '" font-weight="800" letter-spacing="1">' + esc(modeLabel + ' · ' + timeText) + '</text>';
+  svg += '<line x1="' + pad + '" y1="' + (pad + 23) + '" x2="' + (w - pad) + '" y2="' + (pad + 23) + '" class="line"/>';
 
   const activeSections = normalizeSectionSettings(data.display.modeSections, data.display.mode);
   const availableKinds = DISPLAY_SECTION_KEYS.filter(kind => activeSections[kind]?.enabled);
@@ -1698,8 +1730,8 @@ function renderSvg(data, w, h) {
     return cursor - y;
   }
 
-  const top = pad + 50;
-  const available = h - top - 24;
+  const top = pad + 31;
+  const available = h - top - 18;
   const custom = true;
 
   if (custom) {
@@ -2083,7 +2115,7 @@ const server = http.createServer(async (req, res) => {
       if (incoming.palette !== undefined) db.display.palette = en(incoming.palette, PALETTES, 'spectra6');
       if (incoming.dateWidgetStyle !== undefined) db.display.dateWidgetStyle = en(incoming.dateWidgetStyle, DATE_WIDGETS, 'plain');
       if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'daily');
-      db.display.plannerLayoutVersion = 4;
+      db.display.plannerLayoutVersion = 5;
       if (incoming.sectionLayoutMode !== undefined) db.display.sectionLayoutMode = en(incoming.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto');
       if (incoming.sectionLayout !== undefined) db.display.sectionLayout = normalizeSectionLayout(incoming.sectionLayout);
       if (incoming.sectionOrder !== undefined) db.display.sectionOrder = normalizeSectionOrder(incoming.sectionOrder);
