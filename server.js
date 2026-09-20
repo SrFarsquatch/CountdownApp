@@ -29,6 +29,10 @@ const DATE_WIDGETS = ['flipper', 'plain'];
 const DISPLAY_MODES = ['dashboard', 'daily', 'weekly', 'monthly', 'countdowns'];
 const WEATHER_UNITS = ['metric', 'imperial'];
 const WEATHER_STYLES = ['compact', 'current', 'forecast'];
+const AGENDA_STYLES = ['list', 'timeline', 'week', 'calendar'];
+const TASK_STYLES = ['checklist', 'compact'];
+const GOAL_STYLES = ['bars', 'compact'];
+const COUNTDOWN_STYLES = ['detailed', 'compact'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
 const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns'];
 const DISPLAY_GRID_COLS = 12;
@@ -57,7 +61,28 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 }[char]));
 const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max);
 
-function defaultSectionLayout() {
+function defaultSectionLayout(mode = 'dashboard') {
+  if (mode === 'daily' || mode === 'weekly') return {
+    agenda: { x: 0, y: 0, w: 8, h: 8 },
+    weather: { x: 8, y: 0, w: 4, h: 2 },
+    tasks: { x: 8, y: 2, w: 4, h: 2 },
+    goals: { x: 8, y: 4, w: 4, h: 2 },
+    countdowns: { x: 8, y: 6, w: 4, h: 2 }
+  };
+  if (mode === 'monthly') return {
+    agenda: { x: 0, y: 0, w: 9, h: 8 },
+    weather: { x: 9, y: 0, w: 3, h: 2 },
+    tasks: { x: 9, y: 2, w: 3, h: 2 },
+    goals: { x: 9, y: 4, w: 3, h: 2 },
+    countdowns: { x: 9, y: 6, w: 3, h: 2 }
+  };
+  if (mode === 'countdowns') return {
+    agenda: { x: 0, y: 0, w: 6, h: 4 },
+    weather: { x: 6, y: 0, w: 6, h: 2 },
+    tasks: { x: 6, y: 2, w: 6, h: 2 },
+    goals: { x: 0, y: 4, w: 6, h: 4 },
+    countdowns: { x: 0, y: 0, w: 12, h: 8 }
+  };
   return {
     agenda: { x: 0, y: 0, w: 7, h: 4 },
     weather: { x: 7, y: 0, w: 5, h: 2 },
@@ -66,8 +91,8 @@ function defaultSectionLayout() {
     countdowns: { x: 6, y: 4, w: 6, h: 4 }
   };
 }
-function normalizeSectionLayout(input) {
-  const base = defaultSectionLayout();
+function normalizeSectionLayout(input, mode = 'dashboard') {
+  const base = defaultSectionLayout(mode);
   const source = input && typeof input === 'object' ? input : {};
   const out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
@@ -77,6 +102,72 @@ function normalizeSectionLayout(input) {
     const x = clamp(Math.round(num(raw.x, base[key].x)), 0, DISPLAY_GRID_COLS - w);
     const y = clamp(Math.round(num(raw.y, base[key].y)), 0, DISPLAY_GRID_ROWS - h);
     out[key] = { x, y, w, h };
+  }
+  return out;
+}
+function defaultSectionSettings(mode = 'dashboard') {
+  const countdownOnly = mode === 'countdowns';
+  const agendaStyle = mode === 'daily' ? 'timeline' : mode === 'weekly' ? 'week' : mode === 'monthly' ? 'calendar' : 'list';
+  return {
+    agenda: { enabled: !countdownOnly, style: agendaStyle, limit: mode === 'weekly' ? 2 : mode === 'monthly' ? 3 : 6 },
+    weather: { enabled: !countdownOnly, style: 'forecast', limit: 5 },
+    tasks: { enabled: !countdownOnly, style: 'checklist', limit: 4 },
+    goals: { enabled: !countdownOnly, style: 'bars', limit: 2 },
+    countdowns: { enabled: true, style: 'detailed', limit: countdownOnly ? 8 : 3 }
+  };
+}
+function normalizeSectionSettings(input, mode = 'dashboard') {
+  const base = defaultSectionSettings(mode);
+  const source = input && typeof input === 'object' ? input : {};
+  const styles = {
+    agenda: AGENDA_STYLES,
+    weather: WEATHER_STYLES,
+    tasks: TASK_STYLES,
+    goals: GOAL_STYLES,
+    countdowns: COUNTDOWN_STYLES
+  };
+  const out = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = source[key] && typeof source[key] === 'object' ? source[key] : {};
+    out[key] = {
+      enabled: raw.enabled === undefined ? base[key].enabled : Boolean(raw.enabled),
+      style: en(raw.style, styles[key], base[key].style),
+      limit: clamp(Math.round(num(raw.limit, base[key].limit)), 1, 20)
+    };
+  }
+  return out;
+}
+function defaultModeLayouts() {
+  return Object.fromEntries(DISPLAY_MODES.map(mode => [mode, defaultSectionLayout(mode)]));
+}
+function defaultModeSections() {
+  return Object.fromEntries(DISPLAY_MODES.map(mode => [mode, defaultSectionSettings(mode)]));
+}
+function normalizeModeLayouts(input, legacyLayout) {
+  const source = input && typeof input === 'object' ? input : {};
+  const out = {};
+  for (const mode of DISPLAY_MODES) {
+    const fallback = mode === 'dashboard' && legacyLayout ? legacyLayout : defaultSectionLayout(mode);
+    out[mode] = normalizeSectionLayout(source[mode] || fallback, mode);
+  }
+  return out;
+}
+function normalizeModeSections(input, legacyDisplay = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const out = {};
+  for (const mode of DISPLAY_MODES) {
+    const base = defaultSectionSettings(mode);
+    const legacy = {
+      agenda: { ...base.agenda, enabled: legacyDisplay.showAgenda !== false, limit: clamp(num(legacyDisplay.maxEvents, base.agenda.limit), 1, 20) },
+      weather: { ...base.weather, enabled: legacyDisplay.showWeather !== false, style: en(legacyDisplay.weatherStyle, WEATHER_STYLES, base.weather.style) },
+      tasks: { ...base.tasks, enabled: legacyDisplay.showTasks !== false, limit: clamp(num(legacyDisplay.maxTasks, base.tasks.limit), 1, 20) },
+      goals: { ...base.goals, enabled: legacyDisplay.showGoals !== false, limit: clamp(num(legacyDisplay.maxGoals, base.goals.limit), 1, 20) },
+      countdowns: { ...base.countdowns, enabled: legacyDisplay.showCountdowns !== false, limit: clamp(num(legacyDisplay.maxCountdowns, base.countdowns.limit), 1, 20) }
+    };
+    if (mode === 'countdowns' && !source[mode]) {
+      legacy.agenda.enabled = false; legacy.weather.enabled = false; legacy.tasks.enabled = false; legacy.goals.enabled = false; legacy.countdowns.enabled = true;
+    }
+    out[mode] = normalizeSectionSettings(source[mode] || legacy, mode);
   }
   return out;
 }
@@ -109,8 +200,9 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 3,
-      sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 4,
+      sectionLayoutMode: 'custom', sectionLayout: defaultSectionLayout('dashboard'), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
+      modeLayouts: defaultModeLayouts(), modeSections: defaultModeSections(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
     }
   };
@@ -226,14 +318,19 @@ function load() {
       },
       weather: normalizeWeather(parsed.weather || base.weather),
       display: (() => {
-        const display = { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) };
-        if (num(parsed.display?.plannerLayoutVersion, 0) < 2) {
-          if (!parsed.display?.mode || parsed.display.mode === 'dashboard') display.mode = 'daily';
-        }
-        if (num(parsed.display?.plannerLayoutVersion, 0) < 3) {
-          if (parsed.display?.sectionLayoutMode === 'custom' && !parsed.display?.sectionLayout?.weather) display.sectionLayout = defaultSectionLayout();
-          display.weatherStyle = en(parsed.display?.weatherStyle, WEATHER_STYLES, 'forecast');
-          display.plannerLayoutVersion = 3;
+        const legacyDisplay = parsed.display || {};
+        const display = {
+          ...base.display,
+          ...legacyDisplay,
+          sectionLayout: normalizeSectionLayout(legacyDisplay.sectionLayout, 'dashboard'),
+          sectionOrder: normalizeSectionOrder(legacyDisplay.sectionOrder),
+          modeLayouts: normalizeModeLayouts(legacyDisplay.modeLayouts, legacyDisplay.sectionLayout),
+          modeSections: normalizeModeSections(legacyDisplay.modeSections, legacyDisplay)
+        };
+        if (num(legacyDisplay.plannerLayoutVersion, 0) < 2 && (!legacyDisplay.mode || legacyDisplay.mode === 'dashboard')) display.mode = 'daily';
+        if (num(legacyDisplay.plannerLayoutVersion, 0) < 4) {
+          display.sectionLayoutMode = 'custom';
+          display.plannerLayoutVersion = 4;
         }
         return display;
       })()
@@ -1091,8 +1188,11 @@ async function feed() {
     if (weatherLocationReady()) {
       try { weather = await weatherData(); }
       catch (error) { weatherError = error.message; }
-    } else weatherError = 'Set a weather latitude and longitude in Display settings.';
+    } else weatherError = 'Choose a weather location in Settings.';
   }
+  const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
+  const modeSections = normalizeSectionSettings(db.display.modeSections?.[mode], mode);
+  const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
   const now = Date.now();
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
@@ -1104,12 +1204,16 @@ async function feed() {
   return {
     generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather,
     nextEvent: ev[0] || null,
-    events: db.display.showAgenda === false ? [] : ev.slice(0, clamp(num(db.display.maxEvents, 5), 1, 20)),
-    calendarEvents: db.display.showAgenda === false ? [] : ev.slice(0, 250),
-    tasks: db.display.showTasks === false ? [] : tasks,
-    plannerTasks: db.display.showTasks === false ? [] : sortedTasks().filter(dueForDisplay).slice(0, 100),
-    goals: db.display.showGoals === false ? [] : goals,
-    countdowns: db.display.showCountdowns === false ? [] : countdowns,
+    events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
+    calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
+    tasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, modeSections.tasks.limit) : [],
+    plannerTasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, 100) : [],
+    goals: modeSections.goals.enabled ? db.goals.filter(g => g.status === 'active' && g.displayEnabled !== false)
+      .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
+      .slice(0, modeSections.goals.limit).map(g => ({ ...g, progress: goalProgress(g) })) : [],
+    countdowns: modeSections.countdowns.enabled ? sortedCountdowns()
+      .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
+      .slice(0, modeSections.countdowns.limit).map(c => countdownView(c, now)) : [],
     display: {
       layout: en(db.display.layout, LAYOUTS, 'auto'), palette: en(db.display.palette, PALETTES, 'spectra6'),
       dateWidgetStyle: en(db.display.dateWidgetStyle, DATE_WIDGETS, 'plain'), mode: en(db.display.mode, DISPLAY_MODES, 'dashboard'),
@@ -1119,7 +1223,10 @@ async function feed() {
       refreshMinutes: clamp(num(db.display.refreshMinutes, 15), 1, 1440),
       showAgenda: db.display.showAgenda !== false, showTasks: db.display.showTasks !== false,
       showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false,
-      showWeather: db.display.showWeather !== false, weatherStyle: en(db.display.weatherStyle, WEATHER_STYLES, 'forecast')
+      showWeather: modeSections.weather.enabled, weatherStyle: modeSections.weather.style,
+      modeLayout, modeSections,
+      modeLayouts: normalizeModeLayouts(db.display.modeLayouts, db.display.sectionLayout),
+      modeSectionsAll: normalizeModeSections(db.display.modeSections, db.display)
     }
   };
 }
@@ -1419,7 +1526,6 @@ function renderPlannerSvg(data, w, h, mode) {
 }
 
 function renderSvg(data, w, h) {
-  if (['daily', 'weekly', 'monthly'].includes(data.display.mode)) return renderPlannerSvg(data, w, h, data.display.mode);
   const palette = data.display.palette;
   const portrait = data.display.layout === 'portrait' || (data.display.layout === 'auto' && h > w);
   const pad = Math.max(18, Math.round(Math.min(w, h) * 0.045));
@@ -1432,16 +1538,8 @@ function renderSvg(data, w, h) {
   svg += '<text x="' + (w - pad) + '" y="' + (pad + 18) + '" text-anchor="end" font-size="' + (portrait ? 22 : 26) + '" font-weight="800">' + esc(data.title) + '</text>';
   svg += '<line x1="' + pad + '" y1="' + (pad + 34) + '" x2="' + (w - pad) + '" y2="' + (pad + 34) + '" class="line"/>';
 
-  const availableKinds = [];
-  if (data.display.mode === 'countdowns') {
-    availableKinds.push('countdowns');
-  } else {
-    if (data.display.showAgenda !== false) availableKinds.push('agenda');
-    if (data.display.showWeather !== false) availableKinds.push('weather');
-    if (data.display.showTasks !== false) availableKinds.push('tasks');
-    if (data.display.showGoals !== false) availableKinds.push('goals');
-    if (data.display.showCountdowns !== false) availableKinds.push('countdowns');
-  }
+  const activeSections = normalizeSectionSettings(data.display.modeSections, data.display.mode);
+  const availableKinds = DISPLAY_SECTION_KEYS.filter(kind => activeSections[kind]?.enabled);
 
   const sectionData = {
     agenda: data.events || [],
@@ -1473,20 +1571,60 @@ function renderSvg(data, w, h) {
     }
 
     if (kind === 'agenda') {
-      for (const event of items) {
-        if (cursor + 34 > y + maxHeight) break;
-        const d = new Date(event.start);
-        const when = event.allDay ? d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-        const title = truncateForWidth(event.title, width, 14, Math.min(92, width * 0.28));
-        svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
-        svg += '<text x="' + x + '" y="' + (cursor + 20) + '" font-size="14" font-weight="700">' + esc(title) + '</text>';
-        svg += '<text x="' + (x + width) + '" y="' + (cursor + 20) + '" text-anchor="end" font-size="12" class="muted">' + esc(when) + '</text>';
-        cursor += 32;
+      const agendaStyle = activeSections.agenda.style;
+      if (agendaStyle === 'week') {
+        const monday = plannerStartOfDay(new Date()); monday.setDate(monday.getDate() - ((monday.getDay()+6)%7));
+        const rowH = Math.max(22, Math.min(42, (maxHeight-24)/7));
+        for (let i=0;i<7 && cursor+rowH<=y+maxHeight;i++) {
+          const day=new Date(monday);day.setDate(day.getDate()+i);
+          const dayEvents=plannerEventsForDay(data,day).slice(0,2);
+          svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x+width) + '" y2="' + cursor + '" class="line"/>';
+          svg += '<text x="' + x + '" y="' + (cursor+15) + '" font-size="9" font-weight="800">' + esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()+' '+day.getDate()) + '</text>';
+          let tx=x+58;
+          for (const event of dayEvents) {
+            const accent=plannerEventAccent(event,palette);
+            svg += '<circle cx="' + tx + '" cy="' + (cursor+11) + '" r="3" fill="' + accent + '"/>';
+            svg += '<text x="' + (tx+7) + '" y="' + (cursor+15) + '" font-size="9.5">' + esc(truncateForWidth(event.title,Math.max(50,width-(tx-x)-8),9.5)) + '</text>';
+            tx += Math.max(90,width*.4);
+          }
+          cursor += rowH;
+        }
+      } else if (agendaStyle === 'calendar') {
+        const now=new Date(), first=new Date(now.getFullYear(),now.getMonth(),1), offset=(first.getDay()+6)%7, start=new Date(first);start.setDate(start.getDate()-offset);
+        const cellW=width/7, cellH=Math.max(26,Math.min(50,(maxHeight-24)/6));
+        ['M','T','W','T','F','S','S'].forEach((d,i)=>svg += '<text x="' + (x+i*cellW+cellW/2) + '" y="' + (cursor+9) + '" text-anchor="middle" font-size="7.5" font-weight="800" class="muted">' + d + '</text>');
+        cursor += 13;
+        for(let i=0;i<42 && cursor+cellH<=y+maxHeight;i++){
+          const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,cy=cursor+row*cellH;
+          svg += '<rect x="' + cx + '" y="' + cy + '" width="' + cellW + '" height="' + cellH + '" fill="none" stroke="' + rule + '"/>';
+          svg += '<text x="' + (cx+4) + '" y="' + (cy+11) + '" font-size="8">' + day.getDate() + '</text>';
+          plannerEventsForDay(data,day).slice(0,3).forEach((event,j)=>svg += '<circle cx="' + (cx+6+j*8) + '" cy="' + (cy+cellH-6) + '" r="2.5" fill="' + plannerEventAccent(event,palette) + '"/>');
+        }
+        cursor += cellH*6;
+      } else {
+        const timeline = agendaStyle === 'timeline';
+        for (const event of items.slice(0,activeSections.agenda.limit)) {
+          if (cursor + 34 > y + maxHeight) break;
+          const d = new Date(event.start);
+          const when = event.allDay ? 'All day' : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+          const accent = plannerEventAccent(event,palette);
+          svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
+          if (timeline) {
+            svg += '<text x="' + x + '" y="' + (cursor+20) + '" font-size="10" class="muted">' + esc(when) + '</text>';
+            svg += '<circle cx="' + (x+61) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
+            svg += '<text x="' + (x+72) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-72,13)) + '</text>';
+          } else {
+            svg += '<circle cx="' + (x+4) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
+            svg += '<text x="' + (x+14) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-14,13,80)) + '</text>';
+            svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" class="muted">' + esc(when) + '</text>';
+          }
+          cursor += 32;
+        }
       }
     }
     if (kind === 'weather') {
       const weather = data.weather;
-      const style = en(data.display.weatherStyle, WEATHER_STYLES, 'forecast');
+      const style = activeSections.weather.style;
       if (weather?.current) {
         const current = weather.current, today = (weather.days||[])[0], unitSymbol = weather.unitSymbol || '';
         if (style === 'compact') {
@@ -1504,7 +1642,7 @@ function renderSvg(data, w, h) {
         } else {
           svg += svgWeatherIcon(current.condition,x,cursor+1,30,palette);
           svg += '<text x="' + (x+40) + '" y="' + (cursor+20) + '" font-size="17" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
-          const days=(weather.days||[]).slice(0,4);
+          const days=(weather.days||[]).slice(0,activeSections.weather.limit);
           const startY=cursor+36, cellW=Math.max(46,(width-2)/Math.max(1,days.length));
           days.forEach((day,index)=>{
             const dx=x+index*cellW;
@@ -1520,30 +1658,31 @@ function renderSvg(data, w, h) {
       }
     }
     if (kind === 'tasks') {
-      for (const task of items) {
+      const taskStyle=activeSections.tasks.style;
+      for (const task of items.slice(0,activeSections.tasks.limit)) {
         if (cursor + 29 > y + maxHeight) break;
         const due = task.due ? new Date(task.due).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
         const title = truncateForWidth(task.title, width - 18, 13, due ? Math.min(74, width * 0.24) : 0);
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
-        svg += '<rect x="' + x + '" y="' + (cursor + 9) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
-        svg += '<text x="' + (x + 18) + '" y="' + (cursor + 19) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
+        if(taskStyle==='checklist') svg += '<rect x="' + x + '" y="' + (cursor + 9) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
+        svg += '<text x="' + (x + (taskStyle==='checklist'?18:0)) + '" y="' + (cursor + 19) + '" font-size="' + (taskStyle==='compact'?11:13) + '" font-weight="700">' + esc(title) + '</text>';
         if (due) svg += '<text x="' + (x + width) + '" y="' + (cursor + 19) + '" text-anchor="end" font-size="11" class="muted">' + esc(due) + '</text>';
         cursor += 28;
       }
     }
     if (kind === 'goals') {
-      for (const goal of items) {
+      for (const goal of items.slice(0,activeSections.goals.limit)) {
         if (cursor + 47 > y + maxHeight) break;
         const accent = color(goal.accentColor, palette);
         const title = truncateForWidth(goal.title, width, 13, 48);
         svg += '<text x="' + x + '" y="' + (cursor + 15) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
         svg += '<text x="' + (x + width) + '" y="' + (cursor + 15) + '" text-anchor="end" font-size="12" font-weight="700">' + Math.round(goal.progress) + '%</text>';
-        svg += svgBar(goal.progress, x, cursor + 24, width, 7, accent);
-        cursor += 44;
+        if(activeSections.goals.style==='bars') svg += svgBar(goal.progress, x, cursor + 24, width, 7, accent);
+        cursor += activeSections.goals.style==='bars'?44:26;
       }
     }
     if (kind === 'countdowns') {
-      for (const countdown of items) {
+      for (const countdown of items.slice(0,activeSections.countdowns.limit)) {
         if (cursor + 39 > y + maxHeight) break;
         const accent = color(countdown.accentColor, palette);
         const labelText = timeLabel(countdown);
@@ -1551,8 +1690,8 @@ function renderSvg(data, w, h) {
         svg += '<rect x="' + x + '" y="' + (cursor + 4) + '" width="4" height="26" rx="2" fill="' + accent + '"/>';
         svg += '<text x="' + (x + 12) + '" y="' + (cursor + 16) + '" font-size="13" font-weight="700">' + esc(title) + '</text>';
         svg += '<text x="' + (x + width) + '" y="' + (cursor + 16) + '" text-anchor="end" font-size="14" font-weight="800" fill="' + accent + '">' + esc(labelText) + '</text>';
-        if (countdown.showExactDate) svg += '<text x="' + (x + 12) + '" y="' + (cursor + 31) + '" font-size="10" class="muted">' + esc(formatDateServer(countdown.end, countdown.dateDisplayStyle)) + '</text>';
-        cursor += 38;
+        if (activeSections.countdowns.style==='detailed' && countdown.showExactDate) svg += '<text x="' + (x + 12) + '" y="' + (cursor + 31) + '" font-size="10" class="muted">' + esc(formatDateServer(countdown.end, countdown.dateDisplayStyle)) + '</text>';
+        cursor += activeSections.countdowns.style==='detailed'?38:25;
       }
     }
     if (clipId) svg += '</g>';
@@ -1561,11 +1700,11 @@ function renderSvg(data, w, h) {
 
   const top = pad + 50;
   const available = h - top - 24;
-  const custom = data.display.sectionLayoutMode === 'custom' && data.display.mode === 'dashboard';
+  const custom = true;
 
   if (custom) {
     const contentWidth = w - pad * 2;
-    const layout = normalizeSectionLayout(data.display.sectionLayout);
+    const layout = normalizeSectionLayout(data.display.modeLayout, data.display.mode);
     const order = normalizeSectionOrder(data.display.sectionOrder);
     let defs = '';
     const drawQueue = [];
@@ -1669,7 +1808,7 @@ function state() {
       })),
       countdownWindowDays: db.google.countdownWindowDays || 30
     },
-    display: { ...db.display, sectionLayout: normalizeSectionLayout(db.display.sectionLayout), sectionOrder: normalizeSectionOrder(db.display.sectionOrder), sectionLayoutMode: en(db.display.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto'), gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
+    display: { ...db.display, sectionLayout: normalizeSectionLayout(db.display.sectionLayout, 'dashboard'), modeLayouts: normalizeModeLayouts(db.display.modeLayouts, db.display.sectionLayout), modeSections: normalizeModeSections(db.display.modeSections, db.display), sectionOrder: normalizeSectionOrder(db.display.sectionOrder), sectionLayoutMode: 'custom', gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
   };
 }
 
@@ -1944,10 +2083,12 @@ const server = http.createServer(async (req, res) => {
       if (incoming.palette !== undefined) db.display.palette = en(incoming.palette, PALETTES, 'spectra6');
       if (incoming.dateWidgetStyle !== undefined) db.display.dateWidgetStyle = en(incoming.dateWidgetStyle, DATE_WIDGETS, 'plain');
       if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'daily');
-      db.display.plannerLayoutVersion = 2;
+      db.display.plannerLayoutVersion = 4;
       if (incoming.sectionLayoutMode !== undefined) db.display.sectionLayoutMode = en(incoming.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto');
       if (incoming.sectionLayout !== undefined) db.display.sectionLayout = normalizeSectionLayout(incoming.sectionLayout);
       if (incoming.sectionOrder !== undefined) db.display.sectionOrder = normalizeSectionOrder(incoming.sectionOrder);
+      if (incoming.modeLayouts !== undefined) db.display.modeLayouts = normalizeModeLayouts(incoming.modeLayouts, db.display.sectionLayout);
+      if (incoming.modeSections !== undefined) db.display.modeSections = normalizeModeSections(incoming.modeSections, db.display);
       if (incoming.refreshMinutes !== undefined) db.display.refreshMinutes = clamp(num(incoming.refreshMinutes, 15), 1, 1440);
       if (incoming.showAgenda !== undefined) db.display.showAgenda = Boolean(incoming.showAgenda);
       if (incoming.showTasks !== undefined) db.display.showTasks = Boolean(incoming.showTasks);
