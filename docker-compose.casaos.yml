@@ -22,6 +22,8 @@ services:
       - type: bind
         source: /DATA/AppData/$AppID/data
         target: /data
+    depends_on:
+      - countdown-updater
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
@@ -50,6 +52,31 @@ services:
           description:
             en_US: Countdown web interface and FrameOS API
 
+  countdown-updater:
+    image: ghcr.io/srfarsquatch/countdownapp:edge
+    pull_policy: always
+    container_name: countdownapp-updater
+    command: ["node", "/app/updater.js"]
+    environment:
+      PORT: "8090"
+      TARGET_CONTAINER: "countdownapp"
+      TARGET_IMAGE: "ghcr.io/srfarsquatch/countdownapp:edge"
+      UPDATE_TOKEN: "${UPDATE_TOKEN:-countdown-internal-updater}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    mem_limit: 96m
+    mem_reservation: 16m
+    cpus: "0.20"
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 x-casaos:
   id: countdownapp
   store_app_id: countdownapp
@@ -63,7 +90,7 @@ x-casaos:
   tagline:
     en_US: Self-hosted countdown, calendar and e-ink dashboard
   description:
-    en_US: Manage countdowns, read Google Calendar events, and publish a private FrameOS-friendly e-ink feed.
+    en_US: Manage countdowns, Google Calendar, e-ink displays, and install updates directly from the web interface.
   scheme: http
   port_map: "8088"
   index: /
