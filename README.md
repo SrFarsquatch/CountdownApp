@@ -2,7 +2,8 @@
 
 A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
-## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.\n- Install the web app as a standalone PWA.\n
+## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
+- Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.\n- Install the web app as a standalone PWA.\n
 
 - Create and edit multiple countdowns with per-countdown accent colors.
 - Choose days-only, days + hours, days + hours + minutes, live seconds, weeks + days, or target-date countdown displays.
@@ -43,7 +44,7 @@ Do not delete that AppData folder if you want to retain countdowns, Google Calen
 
 ## Google Calendar setup
 
-The app uses Google's `calendar.readonly` scope. OAuth tokens are stored server-side and encrypted with `APP_SECRET`.
+Planner requests Google's `calendar.events` and `calendar.calendarlist.readonly` scopes so it can read calendars and create, edit, and delete events while leaving calendar-subscription management read-only. OAuth tokens are stored server-side and encrypted with `APP_SECRET`.
 
 Create a Google Cloud OAuth 2.0 **Web application** credential with the Google Calendar API enabled.
 
@@ -66,11 +67,13 @@ Google generally requires HTTPS for web-app redirect URIs other than localhost, 
 
 After the environment variables are configured and the container is restarted:
 
-1. Open **Displays**.
+1. Open **Settings → Google Calendar**.
 2. Click **Connect Google Calendar**.
-3. Approve read-only Calendar access.
-4. Select the calendars you want this app to read.
-5. Choose the upcoming-event window.
+3. Approve Calendar event access and read-only calendar-list access.
+4. Select the calendars you want Planner to display.
+5. Planner only enables event editing on calendars where Google reports `writer` or `owner` access.
+
+If an account was connected before event writeback was enabled, reconnect that account once so Google can issue a token containing the new write scope.
 
 ## FrameOS
 
