@@ -78,6 +78,9 @@
         <div class="settings-row"><label class="small" for="displayTitle">Display title</label><input id="displayTitle" maxlength="80"></div>
         <div class="settings-row"><label class="small" for="maxEvents">Calendar events</label><input id="maxEvents" type="number" min="1" max="20"></div>
         <div class="settings-row"><label class="small" for="maxCountdowns">Countdowns</label><input id="maxCountdowns" type="number" min="1" max="20"></div>
+        <div class="settings-row"><label class="small" for="orientation">Orientation</label><select id="orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
+        <div class="settings-row"><label class="small" for="colorTheme">Spectra 6 theme</label><select id="colorTheme"><option value="spectrum">Full spectrum</option><option value="mono">Black & white</option><option value="red">Red accent</option><option value="blue">Blue accent</option><option value="green">Green accent</option><option value="yellow">Yellow accent</option></select></div>
+        <div class="settings-row wrap"><div><strong>Native palette</strong><div class="meta">Optimized for white, black, red, blue, green and yellow.</div></div><div style="display:flex;gap:7px" aria-label="Spectra 6 palette"><span style="width:22px;height:22px;background:#fff;border:1px solid #777"></span><span style="width:22px;height:22px;background:#000;border:1px solid #777"></span><span style="width:22px;height:22px;background:#d71920;border:1px solid #777"></span><span style="width:22px;height:22px;background:#1457d9;border:1px solid #777"></span><span style="width:22px;height:22px;background:#16833b;border:1px solid #777"></span><span style="width:22px;height:22px;background:#f2cf16;border:1px solid #777"></span></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="saveDisplay">Save display settings</button><button class="btn" id="previewDisplay">Open e-ink preview</button><button class="btn danger" id="rotateToken">Rotate display token</button></div>
       </div>
     </div>
@@ -138,7 +141,7 @@ function renderSettings(){
  $("windowDays").value=String(state.google.countdownWindowDays||30);
  $("feedUrl").textContent=location.origin+state.display.feedPath;
  $("viewUrl").textContent=location.origin+state.display.viewPath;
- $("displayTitle").value=state.display.title||"Upcoming";$("maxEvents").value=state.display.maxEvents||6;$("maxCountdowns").value=state.display.maxCountdowns||5;
+ $("displayTitle").value=state.display.title||"Upcoming";$("maxEvents").value=state.display.maxEvents||6;$("maxCountdowns").value=state.display.maxCountdowns||5;$("orientation").value=state.display.orientation||"landscape";$("colorTheme").value=state.display.colorTheme||"spectrum";
 }
 async function loadCalendars(saveAfter){
  if(!state.google.connected)return;
@@ -149,7 +152,7 @@ $("windowDays").onchange=saveCalendarSelection;
 $("connectGoogle").onclick=()=>location.href="/api/google/auth";
 $("disconnectGoogle").onclick=async()=>{if(!confirm("Disconnect Google Calendar?"))return;await api("/api/google/disconnect",{method:"POST"});await load()};
 $("refreshCalendar").onclick=loadAgenda;
-$("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value)})});await load()};
+$("saveDisplay").onclick=async()=>{await api("/api/settings",{method:"PUT",body:JSON.stringify({displayTitle:$("displayTitle").value,maxEvents:Number($("maxEvents").value),maxCountdowns:Number($("maxCountdowns").value),orientation:$("orientation").value,colorTheme:$("colorTheme").value})});await load()};
 $("previewDisplay").onclick=()=>window.open(state.display.viewPath,"_blank");
 $("rotateToken").onclick=async()=>{if(!confirm("Rotate the FrameOS token? Existing display URLs will stop working."))return;await api("/api/display/rotate-token",{method:"POST"});await load()};
 
