@@ -16,7 +16,7 @@ const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const TARGET_CONTAINER = process.env.TARGET_CONTAINER || 'countdownapp';
 const TARGET_IMAGE = process.env.TARGET_IMAGE || 'ghcr.io/srfarsquatch/countdownapp:edge';
 const UPDATE_STATUS_PATH = path.join(DATA_DIR, 'update-status.json');
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 
 const COLORS = ['black', 'red', 'blue', 'green', 'yellow', 'purple'];
 const PROGRESS_MODES = ['time', 'manual', 'none'];
@@ -292,6 +292,12 @@ function googleAccounts() {
 function googleAccount(accountId) {
   return googleAccounts().find(account => account.id === accountId) || null;
 }
+function accountCanWrite(account) {
+  const token = account ? decrypt(account.token) : null;
+  const scopes = String(token?.scope || '').split(/\s+/).filter(Boolean);
+  return scopes.includes('https://www.googleapis.com/auth/calendar.events') ||
+    scopes.includes('https://www.googleapis.com/auth/calendar');
+}
 async function accessToken(accountOrId) {
   const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
   if (!account) return null;
@@ -318,11 +324,28 @@ async function googleFetchWithAccess(access, endpoint) {
   if (!response.ok) throw new Error('Google Calendar request failed: ' + (await response.text()).slice(0, 180));
   return response.json();
 }
-async function gfetch(accountOrId, endpoint) {
+async function googleRequest(accountOrId, endpoint, method = 'GET', payload) {
   const account = typeof accountOrId === 'string' ? googleAccount(accountOrId) : accountOrId;
   const access = await accessToken(account);
   if (!account || !access) throw new Error('Google Calendar account is not connected.');
-  return googleFetchWithAccess(access, endpoint);
+  const hasBody = payload !== undefined && payload !== null;
+  const response = await fetch('https://www.googleapis.com/calendar/v3' + endpoint, {
+    method,
+    headers: { Authorization: 'Bearer ' + access, ...(hasBody ? { 'Content-Type': 'application/json' } : {}) },
+    body: hasBody ? JSON.stringify(payload) : undefined
+  });
+  if (response.status === 204) return null;
+  const raw = await response.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+  if (!response.ok) {
+    const detail = data?.error?.message || raw.slice(0, 180) || ('HTTP ' + response.status);
+    throw new Error('Google Calendar request failed: ' + detail);
+  }
+  return data;
+}
+async function gfetch(accountOrId, endpoint) {
+  return googleRequest(accountOrId, endpoint, 'GET');
 }
 function accountLabelFromCalendars(items = []) {
   const primary = items.find(calendar => calendar.primary) || items[0];
@@ -366,6 +389,52 @@ async function eventColors(account) {
     return {};
   }
 }
+async function writableCalendar(account, calendarId) {
+  const entry = await gfetch(account, '/users/me/calendarList/' + encodeURIComponent(calendarId));
+  const role = entry?.accessRole || 'reader';
+  if (!['writer', 'owner'].includes(role)) throw new Error('This calendar is read-only in Google Calendar.');
+  return entry;
+}
+function dateOnly(value) {
+  const text = String(value || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+function addDateOnlyDays(value, days) {
+  const d = new Date(value + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function googleEventPayload(incoming = {}, allowRecurrence = false) {
+  const summary = cleanText(incoming.title || incoming.summary, 500);
+  if (!summary) throw new Error('Event title is required.');
+  const allDay = Boolean(incoming.allDay);
+  let start, end;
+  if (allDay) {
+    const startDate = dateOnly(incoming.startDate);
+    const inclusiveEnd = dateOnly(incoming.endDate || incoming.startDate);
+    if (!startDate || !inclusiveEnd || inclusiveEnd < startDate) throw new Error('Valid all-day start and end dates are required.');
+    start = { date: startDate };
+    end = { date: addDateOnlyDays(inclusiveEnd, 1) };
+  } else {
+    const startIso = iso(incoming.start);
+    const endIso = iso(incoming.end);
+    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) throw new Error('Event end time must be after its start time.');
+    start = { dateTime: startIso };
+    end = { dateTime: endIso };
+  }
+  const payload = {
+    summary,
+    description: cleanText(incoming.description, 8000),
+    location: cleanText(incoming.location, 1000),
+    start, end,
+    transparency: incoming.transparency === 'transparent' ? 'transparent' : 'opaque'
+  };
+  if (allowRecurrence) {
+    const freq = en(String(incoming.repeat || 'none').toLowerCase(), ['none', 'daily', 'weekly', 'monthly', 'yearly'], 'none');
+    if (freq !== 'none') payload.recurrence = ['RRULE:FREQ=' + freq.toUpperCase()];
+  }
+  return payload;
+}
 async function identifyGoogleToken(token) {
   if (!token?.access_token) return { googleId: '', label: 'Google account' };
   const query = new URLSearchParams({ maxResults: '250' });
@@ -402,13 +471,16 @@ async function eventsBetween(from, to) {
         out.push({
           id: event.id, calendarId, accountId: account.id, accountLabel: account.label,
           calendarName: calendar.summary || 'Calendar',
+          accessRole: calendar.accessRole || 'reader',
           calendarColor: calendar.backgroundColor || '#6c5ce7',
           calendarForeground: calendar.foregroundColor || '#ffffff',
           eventColor: specificColor?.background || '',
           eventForeground: specificColor?.foreground || '',
           colorId: event.colorId || '',
-          title: event.summary || 'Busy', start,
+          title: event.summary || 'Busy', description: event.description || '', start,
           end: event.end?.dateTime || event.end?.date || start, allDay: Boolean(event.start?.date),
+          transparency: event.transparency || 'opaque',
+          recurringEventId: event.recurringEventId || '', recurrence: event.recurrence || [],
           location: event.location || '', htmlLink: event.htmlLink || ''
         });
       }
@@ -667,7 +739,8 @@ function state() {
       connected: googleAccounts().some(account => Boolean(decrypt(account.token))),
       accounts: googleAccounts().map(account => ({
         id: account.id, googleId: account.googleId, label: account.label,
-        selectedCalendarIds: account.selectedCalendarIds || [], connectedAt: account.connectedAt
+        selectedCalendarIds: account.selectedCalendarIds || [], connectedAt: account.connectedAt,
+        canWrite: accountCanWrite(account)
       })),
       countdownWindowDays: db.google.countdownWindowDays || 30
     },
@@ -816,6 +889,35 @@ const server = http.createServer(async (req, res) => {
       if (!accountId) return json(res, 400, { error: 'accountId is required.' });
       return json(res, 200, { calendars: await calendars(accountId) });
     }
+    const googleEventMatch = p.match(/^\/api\/google\/accounts\/([^/]+)\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
+    if (googleEventMatch) {
+      const accountId = decodeURIComponent(googleEventMatch[1]);
+      const calendarId = decodeURIComponent(googleEventMatch[2]);
+      const eventId = googleEventMatch[3] ? decodeURIComponent(googleEventMatch[3]) : '';
+      const account = googleAccount(accountId);
+      if (!account) return json(res, 404, { error: 'Google account was not found.' });
+      if (!accountCanWrite(account)) return json(res, 403, { error: 'Reconnect this Google account in Planner to grant event editing access.' });
+      await writableCalendar(account, calendarId);
+
+      if (req.method === 'POST' && !eventId) {
+        const incoming = await body(req);
+        const payload = googleEventPayload(incoming, true);
+        const created = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events?sendUpdates=none', 'POST', payload);
+        return json(res, 201, { ok: true, event: created });
+      }
+      if ((req.method === 'PATCH' || req.method === 'PUT') && eventId) {
+        const incoming = await body(req);
+        const payload = googleEventPayload(incoming, false);
+        const updated = await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=none', 'PATCH', payload);
+        return json(res, 200, { ok: true, event: updated });
+      }
+      if (req.method === 'DELETE' && eventId) {
+        await googleRequest(account, '/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(eventId) + '?sendUpdates=none', 'DELETE');
+        return json(res, 200, { ok: true });
+      }
+      return json(res, 405, { error: 'Unsupported event operation.' });
+    }
+
     if (p === '/api/google/events') {
       const from = url.searchParams.get('from');
       const to = url.searchParams.get('to');
