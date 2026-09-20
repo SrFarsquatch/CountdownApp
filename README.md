@@ -85,9 +85,25 @@ Treat the display token like a password. Use **Rotate display token** if a URL i
 
 For FrameOS, point an HTTP/JSON source or custom app at the full JSON feed URL. A browser-capable frame can instead use the monochrome view URL directly.
 
-## Updating
+## One-click updates
 
-Push changes to `main`. The **Publish Countdown container** workflow builds and publishes a fresh multi-architecture image. Then recreate/update the Countdown app in CasaOS to pull the new `edge` image.
+The current CasaOS deployment includes an internal `countdown-updater` sidecar. It is not exposed on a host port. The main web app talks to it only over the private Compose network.
+
+The updater has access to the Docker socket so it can:
+
+- pull the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
+- recreate only the CountdownApp application container,
+- preserve the existing environment, network, port binding and `/data` mount,
+- health-check the replacement,
+- restore the previous container automatically if the new container does not become healthy.
+
+Because older installations do not have the updater sidecar, **install/re-import the latest `docker-compose.casaos.yml` once**. After that, use **Displays → Updates → Update now** in CountdownApp for future application image updates.
+
+The updater intentionally can only target the fixed CountdownApp container/image defined in Compose. Its HTTP port is not published to the LAN or Tailscale network.
+
+## Updating the source
+
+Push changes to `main`. The **Publish Countdown container** workflow builds and publishes a fresh multi-architecture image. Once GitHub Actions finishes, an installed CountdownApp can pull it from its **Update now** button.
 
 ## Registry access
 
