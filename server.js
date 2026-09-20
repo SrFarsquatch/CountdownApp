@@ -107,7 +107,7 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'dashboard',
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 2,
       sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
     }
@@ -223,7 +223,14 @@ function load() {
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
       weather: normalizeWeather(parsed.weather || base.weather),
-      display: { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) }
+      display: (() => {
+        const display = { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) };
+        if (num(parsed.display?.plannerLayoutVersion, 0) < 2) {
+          if (!parsed.display?.mode || parsed.display.mode === 'dashboard') display.mode = 'daily';
+          display.plannerLayoutVersion = 2;
+        }
+        return display;
+      })()
     };
   } catch {
     const data = defaults();
@@ -982,7 +989,7 @@ async function weatherData() {
   const params = new URLSearchParams({
     latitude: String(db.weather.latitude),
     longitude: String(db.weather.longitude),
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code',
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code,precipitation,wind_speed_10m',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     timezone: 'auto',
     forecast_days: '10'
@@ -1013,7 +1020,8 @@ async function weatherData() {
       feelsLike: Number.isFinite(Number(raw.current?.apparent_temperature)) ? Math.round(Number(raw.current.apparent_temperature)) : null,
       humidity: clamp(num(raw.current?.relative_humidity_2m, 0), 0, 100),
       isDaytime: Number(raw.current?.is_day) !== 0,
-      precipitation: 0,
+      precipitation: Math.max(0, num(raw.current?.precipitation, 0)),
+      windSpeed: Math.max(0, num(raw.current?.wind_speed_10m, 0)),
       ...currentInfo
     },
     days: times.map((date, index) => {
@@ -1038,6 +1046,33 @@ async function weatherData() {
 
   weatherCache = { key, expiresAt: Date.now() + 15 * 60 * 1000, data };
   return data;
+}
+
+async function weatherLocationSearch(query) {
+  const q = cleanText(query, 120).trim();
+  if (q.length < 2) return [];
+  const params = new URLSearchParams({ name: q, count: '8', language: 'en', format: 'json' });
+  const response = await fetch('https://geocoding-api.open-meteo.com/v1/search?' + params);
+  if (!response.ok) throw new Error('Open-Meteo location search failed (' + response.status + ').');
+  const raw = await response.json();
+  if (raw.error) throw new Error(cleanText(raw.reason || 'Location search failed.', 180));
+  return (raw.results || []).map(item => {
+    const name = cleanText(item.name, 100);
+    const admin1 = cleanText(item.admin1, 100);
+    const country = cleanText(item.country, 100);
+    const parts = [name, admin1, country].filter((value, index, arr) => value && arr.indexOf(value) === index);
+    return {
+      id: String(item.id || ''),
+      name,
+      admin1,
+      country,
+      countryCode: cleanText(item.country_code, 8),
+      latitude: num(item.latitude, 0),
+      longitude: num(item.longitude, 0),
+      timezone: cleanText(item.timezone, 100),
+      label: parts.join(', ')
+    };
+  }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
 }
 
 async function feed() {
@@ -1228,6 +1263,8 @@ function renderPlannerSvg(data, w, h, mode) {
     const rightW = landscape ? w - pad - rightX : leftW;
     const dayStart = plannerStartOfDay(now), events = plannerEventsForDay(data, dayStart).slice(0, 7);
     svg += '<text x="' + pad + '" y="' + (headerY+22*scale) + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">TODAY</text>';
+    svg += '<text x="' + (pad+leftW-12*scale) + '" y="' + (headerY+22*scale) + '" text-anchor="end" font-size="' + (9*scale) + '" class="muted">' + events.length + ' EVENT' + (events.length===1?'':'S') + '</text>';
+    if (landscape) svg += '<line x1="' + (rightX-9*scale) + '" y1="' + (headerY+10*scale) + '" x2="' + (rightX-9*scale) + '" y2="' + bottom + '" class="rule"/>';
     let y = headerY + 42*scale, rowH = Math.max(38*scale, (bottom-y)/Math.max(4, events.length || 1));
     if (!events.length) svg += '<text x="' + pad + '" y="' + (y+18*scale) + '" font-size="' + (13*scale) + '" class="muted">Nothing scheduled.</text>';
     for (const event of events) {
@@ -1312,7 +1349,10 @@ function renderPlannerSvg(data, w, h, mode) {
         svg += '<text x="' + (eventX+12*scale) + '" y="' + (ey-3*scale) + '" font-size="' + (10.5*scale) + '" class="muted">' + esc(truncateForWidth(task.title,w-eventX-pad,10.5*scale)) + '</text>';
       }
     }
-    return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'WEEKLY' + (data.weather ? ' · Weather: Open-Meteo' : '')) + '</svg>';
+    const weekEnd = new Date(monday); weekEnd.setDate(weekEnd.getDate()+7);
+    const weekEvents = (data.calendarEvents || []).filter(event => new Date(event.start) < weekEnd && new Date(event.end || event.start) > monday).length;
+    const weekTasks = (data.plannerTasks || []).filter(task => task.due && new Date(task.due) >= monday && new Date(task.due) < weekEnd && task.status !== 'done').length;
+    return plannerFooter(svg,data,w,h,pad,scale,weekEvents + ' EVENTS · ' + weekTasks + ' TASKS' + (location?' · '+location:'') + (data.weather ? ' · Open-Meteo' : '')) + '</svg>';
   }
 
   const monthStart = new Date(now.getFullYear(),now.getMonth(),1);
@@ -1325,11 +1365,10 @@ function renderPlannerSvg(data, w, h, mode) {
   for(let i=0;i<42;i++){
     const day=new Date(gridStart);day.setDate(day.getDate()+i);
     const row=Math.floor(i/7),col=i%7,x=gridX+col*cellW,y=gridTop+dayHeadH+row*cellH,isMonth=day.getMonth()===now.getMonth(),isToday=plannerDateKey(day)===plannerDateKey(now);
-    svg += '<rect x="' + x + '" y="' + y + '" width="' + cellW + '" height="' + cellH + '" fill="#fff" stroke="' + rule + '" stroke-width="1"/>';
-    if(isToday)svg += '<rect x="' + (x+1.5*scale) + '" y="' + (y+1.5*scale) + '" width="' + (cellW-3*scale) + '" height="' + (cellH-3*scale) + '" fill="none" stroke="' + black + '" stroke-width="' + (2.4*scale) + '"/>';
-    svg += '<text x="' + (x+6*scale) + '" y="' + (y+14*scale) + '" font-size="' + (9.5*scale) + '" font-weight="' + (isToday?'800':'600') + '" fill="' + (isMonth?black:'#999999') + '">' + day.getDate() + '</text>';
+    svg += '<rect x="' + x + '" y="' + y + '" width="' + cellW + '" height="' + cellH + '" fill="' + (isToday?black:'#fff') + '" stroke="' + rule + '" stroke-width="1"/>';
+    svg += '<text x="' + (x+6*scale) + '" y="' + (y+14*scale) + '" font-size="' + (9.5*scale) + '" font-weight="' + (isToday?'800':'600') + '" fill="' + (isToday?'#ffffff':(isMonth?black:'#999999')) + '">' + day.getDate() + '</text>';
     const weather=data.display.showWeather!==false?plannerWeatherForDay(data,day):null;
-    if(weather&&isMonth)svg += svgWeatherIcon(weather.daytime?.condition,x+cellW-24*scale,y+4*scale,18*scale,palette);
+    if(weather&&isMonth&&!isToday)svg += svgWeatherIcon(weather.daytime?.condition,x+cellW-24*scale,y+4*scale,18*scale,palette);
     const dots=plannerEventsForDay(data,day).slice(0,3);
     dots.forEach((event,j)=>svg += '<circle cx="' + (x+9*scale+j*10*scale) + '" cy="' + (y+cellH-8*scale) + '" r="' + (3*scale) + '" fill="' + plannerEventAccent(event,palette) + '"/>');
   }
@@ -1825,6 +1864,18 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { events: await eventsBetween(from, to) });
     }
 
+    if (p === '/api/weather' && req.method === 'GET') {
+      if (!weatherLocationReady()) return json(res, 200, { weather: null, error: 'Choose a weather location in Displays.' });
+      try { return json(res, 200, { weather: await weatherData(), error: null }); }
+      catch (error) { return json(res, 200, { weather: weatherCache.data || null, error: error.message || 'Weather is unavailable.' }); }
+    }
+
+    if (p === '/api/weather/search' && req.method === 'GET') {
+      const q = url.searchParams.get('q') || '';
+      if (cleanText(q, 120).trim().length < 2) return json(res, 200, { results: [] });
+      return json(res, 200, { results: await weatherLocationSearch(q) });
+    }
+
     if (p === '/api/settings' && req.method === 'PUT') {
       const incoming = await body(req);
       if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
@@ -1837,7 +1888,8 @@ const server = http.createServer(async (req, res) => {
       if (incoming.layout !== undefined) db.display.layout = en(incoming.layout, LAYOUTS, 'auto');
       if (incoming.palette !== undefined) db.display.palette = en(incoming.palette, PALETTES, 'spectra6');
       if (incoming.dateWidgetStyle !== undefined) db.display.dateWidgetStyle = en(incoming.dateWidgetStyle, DATE_WIDGETS, 'plain');
-      if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'dashboard');
+      if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'daily');
+      db.display.plannerLayoutVersion = 2;
       if (incoming.sectionLayoutMode !== undefined) db.display.sectionLayoutMode = en(incoming.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto');
       if (incoming.sectionLayout !== undefined) db.display.sectionLayout = normalizeSectionLayout(incoming.sectionLayout);
       if (incoming.sectionOrder !== undefined) db.display.sectionOrder = normalizeSectionOrder(incoming.sectionOrder);
