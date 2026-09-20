@@ -98,6 +98,15 @@
   .cal-block-source{display:none}
 }
 
+
+/* Google event editing */
+.timeline-lane,.all-day-cell{cursor:crosshair}
+.event-form-note{margin:10px 0}
+.write-state{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;border:1px solid var(--line);background:var(--panel)}
+.write-state.ok{color:var(--green)}
+.write-state.warn{color:var(--orange)}
+.account-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+
 </style>
 </head>
 <body>
@@ -209,7 +218,7 @@
 </div></div>
 
 <script>
-let state=null,calEvents=[],taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date();
+let state=null,calEvents=[],taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={};
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const fmtDate=(v,o={})=>new Date(v).toLocaleDateString([],{month:'short',day:'numeric',...o});
@@ -220,6 +229,16 @@ const safeColor=v=>/^#[0-9a-f]{6}$/i.test(String(v||''))?String(v):'#6c5ce7';
 const safeHttpUrl=v=>{try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:''}catch{return''}};
 const eventColorFor=e=>safeColor(e?.eventColor||e?.calendarColor);
 const eventKey=e=>[e.accountId||'',e.calendarId||'',e.id||'',e.start||''].join('|');
+const dateKeyLocal=d=>{const x=new Date(d);return [x.getFullYear(),String(x.getMonth()+1).padStart(2,'0'),String(x.getDate()).padStart(2,'0')].join('-')};
+const parseDateKey=v=>{const [y,m,d]=String(v||'').split('-').map(Number);return new Date(y,m-1,d)};
+const addDateKey=(v,days)=>{const d=parseDateKey(v);d.setDate(d.getDate()+days);return dateKeyLocal(d)};
+async function googleCalendarsFor(accountId,force=false){
+ if(!force&&calendarCache[accountId])return calendarCache[accountId];
+ const data=await api('/api/google/calendars?accountId='+encodeURIComponent(accountId));
+ calendarCache[accountId]=data.calendars||[];
+ return calendarCache[accountId];
+}
+
 function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
@@ -230,12 +249,115 @@ $('syncBtn').onclick=()=>loadAll(true);
 function openModal(title,html){$('modalTitle').textContent=title;$('modalBody').innerHTML=html;$('modalWrap').classList.add('open')}
 function closeModal(){$('modalWrap').classList.remove('open');$('modalBody').innerHTML=''}
 $('modalClose').onclick=closeModal;$('modalWrap').onclick=e=>{if(e.target===$('modalWrap'))closeModal()};
-function openChooser(){openModal('Add something',`<div class="goal-grid"><button class="btn" onclick="openCreate('task')">Task</button><button class="btn" onclick="openCreate('goal')">Goal</button><button class="btn" onclick="openCreate('countdown')">Countdown</button></div>`)}
+function openChooser(){
+ openModal('Add something','<div class="goal-grid"><button class="btn" onclick="openCreate(\'event\')">Event</button><button class="btn" onclick="openCreate(\'task\')">Task</button><button class="btn" onclick="openCreate(\'goal\')">Goal</button><button class="btn" onclick="openCreate(\'countdown\')">Countdown</button></div>');
+}
 function openCreate(type,item=null){
+ if(type==='event')return eventModal(item);
  if(type==='task')return taskModal(item);
  if(type==='goal')return goalModal(item);
  if(type==='countdown')return countdownModal(item);
 }
+async function eventModal(item=null,preset={}){
+ const allAccounts=state?.google?.accounts||[];
+ const writable=allAccounts.filter(a=>a.canWrite);
+ if(!item&&!writable.length){
+   const connected=allAccounts.length>0;
+   openModal('New event','<div class="notice">'+(connected?'Your Google account is still using the old read-only token. Reconnect it once to grant Planner event editing access.':'Connect a Google account before creating calendar events.')+'</div><div class="modal-actions"><button class="btn primary" id="eventConnectGoogle">'+(connected?'Reconnect Google':'Open Google settings')+'</button></div>');
+   $('eventConnectGoogle').onclick=()=>connected?location.href='/api/google/auth':setView('settings');
+   return;
+ }
+ const editing=Boolean(item);
+ const accountId=item?.accountId||writable[0]?.id||allAccounts[0]?.id||'';
+ const account=allAccounts.find(a=>a.id===accountId);
+ const canWrite=Boolean(account?.canWrite)&&(!item||['writer','owner'].includes(item.accessRole||''));
+ let start=preset.start?new Date(preset.start):(item&&!item.allDay?new Date(item.start):new Date());
+ if(!preset.start&&!item){start.setSeconds(0,0);start.setMinutes(Math.ceil(start.getMinutes()/30)*30)}
+ let end=preset.end?new Date(preset.end):(item&&!item.allDay?new Date(item.end):new Date(start.getTime()+3600000));
+ if(end<=start)end=new Date(start.getTime()+3600000);
+ const allDay=Boolean(preset.allDay??item?.allDay);
+ const startDate=preset.startDate||((item?.allDay&&String(item.start).slice(0,10))||dateKeyLocal(start));
+ const endDate=preset.endDate||((item?.allDay&&addDateKey(String(item.end).slice(0,10),-1))||startDate);
+ const accountsForForm=editing?[account].filter(Boolean):writable;
+ const accountOptions=accountsForForm.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label||a.googleId||'Google account')+'</option>').join('');
+ const repeatField=editing?'':'<div class="field"><label>Repeat</label><select id="fEventRepeat"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>';
+ const recurringNotice=item?.recurringEventId?'<div class="notice event-form-note">This is one occurrence of a recurring event. Editing or deleting here applies to this occurrence.</div>':'';
+ const permissionNotice=!canWrite?'<div class="notice event-form-note">This account or calendar is read-only in Planner. Reconnect the Google account if you expect write access.</div>':'';
+ let form='<form id="eventForm">'+recurringNotice+permissionNotice+'<div class="form-grid">';
+ form+='<div class="field full"><label>Title</label><input id="fEventTitle" required value="'+esc(item?.title||'')+'" placeholder="Event title"></div>';
+ form+='<div class="field"><label>Google account</label><select id="fEventAccount" '+(editing?'disabled':'')+'>'+accountOptions+'</select></div>';
+ form+='<div class="field"><label>Calendar</label><select id="fEventCalendar" '+(editing?'disabled':'')+'><option>Loading…</option></select></div>';
+ form+='<div class="field full"><label><input id="fEventAllDay" type="checkbox" style="width:auto" '+(allDay?'checked':'')+'> All day</label></div>';
+ form+='<div class="field event-timed"><label>Start</label><input id="fEventStart" type="datetime-local" value="'+localInput(start)+'"></div>';
+ form+='<div class="field event-timed"><label>End</label><input id="fEventEnd" type="datetime-local" value="'+localInput(end)+'"></div>';
+ form+='<div class="field event-allday"><label>Start date</label><input id="fEventStartDate" type="date" value="'+esc(startDate)+'"></div>';
+ form+='<div class="field event-allday"><label>End date</label><input id="fEventEndDate" type="date" value="'+esc(endDate)+'"></div>';
+ form+='<div class="field full"><label>Location</label><input id="fEventLocation" value="'+esc(item?.location||'')+'" placeholder="Optional"></div>';
+ form+='<div class="field full"><label>Description / notes</label><textarea id="fEventDescription" placeholder="Optional notes">'+esc(item?.description||'')+'</textarea></div>';
+ form+=repeatField;
+ form+='<div class="field"><label>Show as</label><select id="fEventTransparency"><option value="opaque">Busy</option><option value="transparent">Free</option></select></div>';
+ form+='</div><div id="eventFormStatus" class="meta" style="margin-top:10px"></div>';
+ form+='<div class="modal-actions">'+(editing&&canWrite?'<button type="button" class="btn" id="deleteGoogleEvent">Delete</button>':'')+'<button class="btn primary" id="saveGoogleEvent" '+(canWrite?'':'disabled')+'>'+(editing?'Save changes':'Create event')+'</button></div></form>';
+ openModal(editing?'Edit event':'New event',form);
+ $('fEventAccount').value=accountId;
+ $('fEventTransparency').value=item?.transparency==='transparent'?'transparent':'opaque';
+ const syncAllDay=()=>{document.querySelectorAll('.event-timed').forEach(x=>x.style.display=$('fEventAllDay').checked?'none':'grid');document.querySelectorAll('.event-allday').forEach(x=>x.style.display=$('fEventAllDay').checked?'grid':'none')};
+ $('fEventAllDay').onchange=syncAllDay;syncAllDay();
+
+ async function populateCalendars(selectedId=''){
+   const select=$('fEventCalendar');select.innerHTML='<option>Loading…</option>';$('saveGoogleEvent').disabled=true;
+   try{
+     const calendars=await googleCalendarsFor($('fEventAccount').value);
+     const writableCalendars=calendars.filter(cal=>['writer','owner'].includes(cal.accessRole));
+     const choices=editing?calendars.filter(cal=>cal.id===selectedId):writableCalendars;
+     select.innerHTML=choices.length?choices.map(cal=>'<option value="'+esc(cal.id)+'">'+esc(cal.summary)+(cal.primary?' (primary)':'')+'</option>').join(''):'<option value="">No writable calendars</option>';
+     if(selectedId&&choices.some(cal=>cal.id===selectedId))select.value=selectedId;
+     else if(!editing){const primary=choices.find(cal=>cal.primary);if(primary)select.value=primary.id}
+     $('saveGoogleEvent').disabled=!canWrite||!select.value;
+     $('eventFormStatus').textContent=choices.length?'':'No writable calendars were found for this account.';
+   }catch(error){
+     select.innerHTML='<option value="">Could not load calendars</option>';$('eventFormStatus').textContent=error.message;
+   }
+ }
+ $('fEventAccount').onchange=()=>populateCalendars('');
+ await populateCalendars(item?.calendarId||'');
+
+ $('eventForm').onsubmit=async e=>{
+   e.preventDefault();if(!canWrite)return;
+   const allDayValue=$('fEventAllDay').checked;
+   const payload={
+     title:$('fEventTitle').value.trim(),
+     allDay:allDayValue,
+     location:$('fEventLocation').value.trim(),
+     description:$('fEventDescription').value,
+     transparency:$('fEventTransparency').value
+   };
+   if(allDayValue){
+     payload.startDate=$('fEventStartDate').value;payload.endDate=$('fEventEndDate').value||payload.startDate;
+   }else{
+     if(!$('fEventStart').value||!$('fEventEnd').value){$('eventFormStatus').textContent='Start and end times are required.';return}
+     payload.start=new Date($('fEventStart').value).toISOString();payload.end=new Date($('fEventEnd').value).toISOString();
+   }
+   if(!editing)payload.repeat=$('fEventRepeat').value;
+   const accountValue=$('fEventAccount').value,calendarValue=$('fEventCalendar').value;
+   if(!accountValue||!calendarValue){$('eventFormStatus').textContent='Choose a writable Google calendar.';return}
+   $('saveGoogleEvent').disabled=true;$('eventFormStatus').textContent=editing?'Saving changes…':'Creating event…';
+   try{
+     const path='/api/google/accounts/'+encodeURIComponent(accountValue)+'/calendars/'+encodeURIComponent(calendarValue)+'/events'+(editing?'/'+encodeURIComponent(item.id):'');
+     await api(path,{method:editing?'PATCH':'POST',body:JSON.stringify(payload)});
+     closeModal();calendarCache={};await loadAll(true);
+   }catch(error){$('eventFormStatus').textContent=error.message;$('saveGoogleEvent').disabled=false}
+ };
+ if(editing&&canWrite&&$('deleteGoogleEvent'))$('deleteGoogleEvent').onclick=async()=>{
+   if(!confirm('Delete this event from Google Calendar?'))return;
+   $('deleteGoogleEvent').disabled=true;$('saveGoogleEvent').disabled=true;$('eventFormStatus').textContent='Deleting event…';
+   try{
+     await api('/api/google/accounts/'+encodeURIComponent(item.accountId)+'/calendars/'+encodeURIComponent(item.calendarId)+'/events/'+encodeURIComponent(item.id),{method:'DELETE'});
+     closeModal();calendarCache={};await loadAll(true);
+   }catch(error){$('eventFormStatus').textContent=error.message;$('deleteGoogleEvent').disabled=false;$('saveGoogleEvent').disabled=false}
+ };
+}
+
 function taskModal(item){
  const goals=(state.goals||[]).map(g=>`<option value="${esc(g.id)}" ${item?.goalId===g.id?'selected':''}>${esc(g.title)}</option>`).join('');
  openModal(item?'Edit task':'New task',`<form id="entityForm"><div class="form-grid">
