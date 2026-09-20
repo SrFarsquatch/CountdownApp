@@ -30,6 +30,7 @@ const DISPLAY_MODES = ['dashboard', 'daily', 'weekly', 'monthly', 'countdowns'];
 const WEATHER_UNITS = ['metric', 'imperial'];
 const WEATHER_STYLES = ['compact', 'current', 'forecast'];
 const AGENDA_STYLES = ['list', 'timeline', 'week', 'calendar'];
+const AGENDA_SCOPES = ['today', 'week', 'month', 'upcoming'];
 const TASK_STYLES = ['checklist', 'compact'];
 const GOAL_STYLES = ['bars', 'compact'];
 const COUNTDOWN_STYLES = ['detailed', 'compact'];
@@ -127,8 +128,9 @@ function migrateLegacy12x8Layout(input, mode = 'dashboard') {
 function defaultSectionSettings(mode = 'dashboard') {
   const countdownOnly = mode === 'countdowns';
   const agendaStyle = mode === 'daily' ? 'timeline' : mode === 'weekly' ? 'week' : mode === 'monthly' ? 'calendar' : 'list';
+  const agendaScope = mode === 'daily' ? 'today' : mode === 'weekly' ? 'week' : mode === 'monthly' ? 'month' : 'upcoming';
   return {
-    agenda: { enabled: !countdownOnly, style: agendaStyle, limit: mode === 'weekly' ? 2 : mode === 'monthly' ? 3 : 6 },
+    agenda: { enabled: !countdownOnly, style: agendaStyle, scope: agendaScope, limit: mode === 'weekly' ? 14 : mode === 'monthly' ? 20 : 12 },
     weather: { enabled: !countdownOnly, style: 'forecast', limit: 5 },
     tasks: { enabled: !countdownOnly, style: 'checklist', limit: 4 },
     goals: { enabled: !countdownOnly, style: 'bars', limit: 2 },
@@ -153,6 +155,7 @@ function normalizeSectionSettings(input, mode = 'dashboard') {
       style: en(raw.style, styles[key], base[key].style),
       limit: clamp(Math.round(num(raw.limit, base[key].limit)), 1, 20)
     };
+    if (key === 'agenda') out[key].scope = en(raw.scope, AGENDA_SCOPES, base.agenda.scope);
   }
   return out;
 }
@@ -1113,7 +1116,7 @@ function weatherCodeInfo(code) {
   return { condition: 'CLOUDY', description: 'Weather' };
 }
 async function weatherData() {
-  if (!weatherLocationReady()) throw new Error('Set a weather latitude and longitude in Display settings.');
+  if (!weatherLocationReady()) throw new Error('Choose a weather location in Settings.');
   const units = en(db.weather.units, WEATHER_UNITS, 'metric');
   const key = [db.weather.latitude, db.weather.longitude, units, db.weather.locationLabel || ''].join('|');
   if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
@@ -1207,22 +1210,43 @@ async function weatherLocationSearch(query) {
   }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
 }
 
+function agendaRange(scope, now = new Date()) {
+  const startOfDay = value => { const d = new Date(value); d.setHours(0, 0, 0, 0); return d; };
+  if (scope === 'today') {
+    const start = startOfDay(now), end = new Date(start); end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+  if (scope === 'week') {
+    const start = startOfDay(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    const end = new Date(start); end.setDate(end.getDate() + 7);
+    return { start, end };
+  }
+  if (scope === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return { start, end };
+  }
+  return { start: new Date(now), end: new Date(now.getTime() + clamp(num(db.google.countdownWindowDays, 30), 1, 365) * 86400000) };
+}
+
 async function feed() {
   let ev = [], calendarError = null, weather = null, weatherError = null;
-  if (googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
-    try { ev = await events(); }
+  const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
+  const modeSections = normalizeSectionSettings(db.display.modeSections?.[mode], mode);
+  const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
+  const nowDate = new Date();
+  const now = nowDate.getTime();
+  if (modeSections.agenda.enabled && googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
+    const range = agendaRange(modeSections.agenda.scope, nowDate);
+    try { ev = await eventsBetween(range.start.toISOString(), range.end.toISOString()); }
     catch (error) { calendarError = error.message; }
   }
-  if (db.display.showWeather !== false) {
+  if (modeSections.weather.enabled) {
     if (weatherLocationReady()) {
       try { weather = await weatherData(); }
       catch (error) { weatherError = error.message; }
     } else weatherError = 'Choose a weather location in Settings.';
   }
-  const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
-  const modeSections = normalizeSectionSettings(db.display.modeSections?.[mode], mode);
-  const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
-  const now = Date.now();
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
     .slice(0, clamp(num(db.display.maxCountdowns, 3), 1, 20)).map(c => countdownView(c, now));
@@ -1232,7 +1256,7 @@ async function feed() {
     .slice(0, clamp(num(db.display.maxGoals, 3), 1, 20)).map(g => ({ ...g, progress: goalProgress(g) }));
   return {
     generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather,
-    nextEvent: ev[0] || null,
+    nextEvent: ev.find(event => new Date(event.end || event.start).getTime() >= now) || null,
     events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
     calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
     tasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, modeSections.tasks.limit) : [],
