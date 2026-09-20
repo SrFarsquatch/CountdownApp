@@ -29,6 +29,10 @@ const DATE_WIDGETS = ['flipper', 'plain'];
 const DISPLAY_MODES = ['dashboard', 'daily', 'weekly', 'monthly', 'countdowns'];
 const WEATHER_UNITS = ['metric', 'imperial'];
 const WEATHER_STYLES = ['compact', 'current', 'forecast'];
+const AGENDA_STYLES = ['list', 'timeline', 'week', 'calendar'];
+const TASK_STYLES = ['checklist', 'compact'];
+const GOAL_STYLES = ['bars', 'compact'];
+const COUNTDOWN_STYLES = ['detailed', 'compact'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
 const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns'];
 const DISPLAY_GRID_COLS = 12;
@@ -57,7 +61,28 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 }[char]));
 const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max);
 
-function defaultSectionLayout() {
+function defaultSectionLayout(mode = 'dashboard') {
+  if (mode === 'daily' || mode === 'weekly') return {
+    agenda: { x: 0, y: 0, w: 8, h: 8 },
+    weather: { x: 8, y: 0, w: 4, h: 2 },
+    tasks: { x: 8, y: 2, w: 4, h: 2 },
+    goals: { x: 8, y: 4, w: 4, h: 2 },
+    countdowns: { x: 8, y: 6, w: 4, h: 2 }
+  };
+  if (mode === 'monthly') return {
+    agenda: { x: 0, y: 0, w: 9, h: 8 },
+    weather: { x: 9, y: 0, w: 3, h: 2 },
+    tasks: { x: 9, y: 2, w: 3, h: 2 },
+    goals: { x: 9, y: 4, w: 3, h: 2 },
+    countdowns: { x: 9, y: 6, w: 3, h: 2 }
+  };
+  if (mode === 'countdowns') return {
+    agenda: { x: 0, y: 0, w: 6, h: 4 },
+    weather: { x: 6, y: 0, w: 6, h: 2 },
+    tasks: { x: 6, y: 2, w: 6, h: 2 },
+    goals: { x: 0, y: 4, w: 6, h: 4 },
+    countdowns: { x: 0, y: 0, w: 12, h: 8 }
+  };
   return {
     agenda: { x: 0, y: 0, w: 7, h: 4 },
     weather: { x: 7, y: 0, w: 5, h: 2 },
@@ -66,8 +91,8 @@ function defaultSectionLayout() {
     countdowns: { x: 6, y: 4, w: 6, h: 4 }
   };
 }
-function normalizeSectionLayout(input) {
-  const base = defaultSectionLayout();
+function normalizeSectionLayout(input, mode = 'dashboard') {
+  const base = defaultSectionLayout(mode);
   const source = input && typeof input === 'object' ? input : {};
   const out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
@@ -77,6 +102,72 @@ function normalizeSectionLayout(input) {
     const x = clamp(Math.round(num(raw.x, base[key].x)), 0, DISPLAY_GRID_COLS - w);
     const y = clamp(Math.round(num(raw.y, base[key].y)), 0, DISPLAY_GRID_ROWS - h);
     out[key] = { x, y, w, h };
+  }
+  return out;
+}
+function defaultSectionSettings(mode = 'dashboard') {
+  const countdownOnly = mode === 'countdowns';
+  const agendaStyle = mode === 'daily' ? 'timeline' : mode === 'weekly' ? 'week' : mode === 'monthly' ? 'calendar' : 'list';
+  return {
+    agenda: { enabled: !countdownOnly, style: agendaStyle, limit: mode === 'weekly' ? 2 : mode === 'monthly' ? 3 : 6 },
+    weather: { enabled: !countdownOnly, style: 'forecast', limit: 5 },
+    tasks: { enabled: !countdownOnly, style: 'checklist', limit: 4 },
+    goals: { enabled: !countdownOnly, style: 'bars', limit: 2 },
+    countdowns: { enabled: true, style: 'detailed', limit: countdownOnly ? 8 : 3 }
+  };
+}
+function normalizeSectionSettings(input, mode = 'dashboard') {
+  const base = defaultSectionSettings(mode);
+  const source = input && typeof input === 'object' ? input : {};
+  const styles = {
+    agenda: AGENDA_STYLES,
+    weather: WEATHER_STYLES,
+    tasks: TASK_STYLES,
+    goals: GOAL_STYLES,
+    countdowns: COUNTDOWN_STYLES
+  };
+  const out = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = source[key] && typeof source[key] === 'object' ? source[key] : {};
+    out[key] = {
+      enabled: raw.enabled === undefined ? base[key].enabled : Boolean(raw.enabled),
+      style: en(raw.style, styles[key], base[key].style),
+      limit: clamp(Math.round(num(raw.limit, base[key].limit)), 1, 20)
+    };
+  }
+  return out;
+}
+function defaultModeLayouts() {
+  return Object.fromEntries(DISPLAY_MODES.map(mode => [mode, defaultSectionLayout(mode)]));
+}
+function defaultModeSections() {
+  return Object.fromEntries(DISPLAY_MODES.map(mode => [mode, defaultSectionSettings(mode)]));
+}
+function normalizeModeLayouts(input, legacyLayout) {
+  const source = input && typeof input === 'object' ? input : {};
+  const out = {};
+  for (const mode of DISPLAY_MODES) {
+    const fallback = mode === 'dashboard' && legacyLayout ? legacyLayout : defaultSectionLayout(mode);
+    out[mode] = normalizeSectionLayout(source[mode] || fallback, mode);
+  }
+  return out;
+}
+function normalizeModeSections(input, legacyDisplay = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const out = {};
+  for (const mode of DISPLAY_MODES) {
+    const base = defaultSectionSettings(mode);
+    const legacy = {
+      agenda: { ...base.agenda, enabled: legacyDisplay.showAgenda !== false, limit: clamp(num(legacyDisplay.maxEvents, base.agenda.limit), 1, 20) },
+      weather: { ...base.weather, enabled: legacyDisplay.showWeather !== false, style: en(legacyDisplay.weatherStyle, WEATHER_STYLES, base.weather.style) },
+      tasks: { ...base.tasks, enabled: legacyDisplay.showTasks !== false, limit: clamp(num(legacyDisplay.maxTasks, base.tasks.limit), 1, 20) },
+      goals: { ...base.goals, enabled: legacyDisplay.showGoals !== false, limit: clamp(num(legacyDisplay.maxGoals, base.goals.limit), 1, 20) },
+      countdowns: { ...base.countdowns, enabled: legacyDisplay.showCountdowns !== false, limit: clamp(num(legacyDisplay.maxCountdowns, base.countdowns.limit), 1, 20) }
+    };
+    if (mode === 'countdowns' && !source[mode]) {
+      legacy.agenda.enabled = false; legacy.weather.enabled = false; legacy.tasks.enabled = false; legacy.goals.enabled = false; legacy.countdowns.enabled = true;
+    }
+    out[mode] = normalizeSectionSettings(source[mode] || legacy, mode);
   }
   return out;
 }
@@ -109,8 +200,9 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 3,
-      sectionLayoutMode: 'auto', sectionLayout: defaultSectionLayout(), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 4,
+      sectionLayoutMode: 'custom', sectionLayout: defaultSectionLayout('dashboard'), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
+      modeLayouts: defaultModeLayouts(), modeSections: defaultModeSections(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
     }
   };
@@ -226,14 +318,19 @@ function load() {
       },
       weather: normalizeWeather(parsed.weather || base.weather),
       display: (() => {
-        const display = { ...base.display, ...(parsed.display || {}), sectionLayout: normalizeSectionLayout(parsed.display?.sectionLayout), sectionOrder: normalizeSectionOrder(parsed.display?.sectionOrder) };
-        if (num(parsed.display?.plannerLayoutVersion, 0) < 2) {
-          if (!parsed.display?.mode || parsed.display.mode === 'dashboard') display.mode = 'daily';
-        }
-        if (num(parsed.display?.plannerLayoutVersion, 0) < 3) {
-          if (parsed.display?.sectionLayoutMode === 'custom' && !parsed.display?.sectionLayout?.weather) display.sectionLayout = defaultSectionLayout();
-          display.weatherStyle = en(parsed.display?.weatherStyle, WEATHER_STYLES, 'forecast');
-          display.plannerLayoutVersion = 3;
+        const legacyDisplay = parsed.display || {};
+        const display = {
+          ...base.display,
+          ...legacyDisplay,
+          sectionLayout: normalizeSectionLayout(legacyDisplay.sectionLayout, 'dashboard'),
+          sectionOrder: normalizeSectionOrder(legacyDisplay.sectionOrder),
+          modeLayouts: normalizeModeLayouts(legacyDisplay.modeLayouts, legacyDisplay.sectionLayout),
+          modeSections: normalizeModeSections(legacyDisplay.modeSections, legacyDisplay)
+        };
+        if (num(legacyDisplay.plannerLayoutVersion, 0) < 2 && (!legacyDisplay.mode || legacyDisplay.mode === 'dashboard')) display.mode = 'daily';
+        if (num(legacyDisplay.plannerLayoutVersion, 0) < 4) {
+          display.sectionLayoutMode = 'custom';
+          display.plannerLayoutVersion = 4;
         }
         return display;
       })()
