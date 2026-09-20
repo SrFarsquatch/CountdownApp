@@ -106,13 +106,20 @@ Per-countdown display controls include accent color, time/date format, progress 
 
 The **Displays → Section editor** can switch between automatic layout and a custom grid. In custom mode, drag sections to reposition them and use the bottom-right handle to resize them. **Arrange for resolution** creates a two-column landscape layout or a stacked portrait layout based on the preview dimensions. Long agenda/task labels are clipped and shortened inside their section so they do not bleed into neighboring content.
 
+## Update Center
+
+Planner checks the published GHCR image in the background and shows an **Update** badge on Settings when a newer container is available. The Settings update card shows the installed build, latest build, last check time, and a staged progress bar while an update is being installed.
+
+Update progress survives the brief container restart because it is written to the persistent `/data/update-status.json` file. The UI polls the status endpoint through the restart and reloads Planner after the new container reports healthy.
+
 ## One-click updates
 
 The CasaOS install still runs as a single long-lived application container. There is no permanent updater sidecar and no `depends_on` install dependency.
 
-The app mounts `/var/run/docker.sock` so **Display → Application updates → Update now** can launch a short-lived helper container only when requested. That helper:
+The app mounts `/var/run/docker.sock` so **Settings → Application updates** can check the published image and launch a short-lived helper container only when **Install update** is requested. That helper:
 
 - pulls the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
+- reports staged progress for download, preparation, restart, health verification and cleanup,
 - recreates only the `countdownapp` container,
 - preserves the current environment, port, network, labels, health check and mounts,
 - waits for the replacement to become healthy,
