@@ -2,7 +2,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),crypto=require(
 const {URL}=require('url');
 const PORT=Number(process.env.PORT||8080),DATA_DIR=process.env.DATA_DIR||'/data',DB_PATH=path.join(DATA_DIR,'countdown-data.json'),PUBLIC_DIR=path.join(__dirname,'public');
 const GOOGLE_CLIENT_ID=process.env.GOOGLE_CLIENT_ID||'',GOOGLE_CLIENT_SECRET=process.env.GOOGLE_CLIENT_SECRET||'',APP_BASE_URL=(process.env.APP_BASE_URL||'').replace(/\/$/,''),APP_SECRET=process.env.APP_SECRET||'';
-const UPDATER_URL=process.env.UPDATER_URL||'',UPDATE_TOKEN=process.env.UPDATE_TOKEN||'';
+const DOCKER_SOCKET=process.env.DOCKER_SOCKET||'/var/run/docker.sock',TARGET_CONTAINER=process.env.TARGET_CONTAINER||'countdownapp',TARGET_IMAGE=process.env.TARGET_IMAGE||'ghcr.io/srfarsquatch/countdownapp:edge',UPDATE_STATUS_PATH=path.join(DATA_DIR,'update-status.json');
 const SCOPES='https://www.googleapis.com/auth/calendar.readonly';
 const COLORS=['black','red','blue','green','yellow'],PROGRESS_MODES=['time','manual','none'],PROGRESS_STYLES=['solid','segmented','thin'],DATE_STYLES=['short','medium','long','numeric'],TIME_STYLES=['days','compact','full','date'],LAYOUTS=['auto','landscape','portrait'],PALETTES=['spectra6','mono'],DATE_WIDGETS=['flipper','plain'];
 const HEX={black:'#111111',red:'#d62828',blue:'#1769aa',green:'#2f7d32',yellow:'#e0a800'};
@@ -32,7 +32,30 @@ function encrypt(v){const k=key();if(!k)return null;const iv=crypto.randomBytes(
 function decrypt(v){const k=key();if(!v||!k)return null;try{const [i,t,d]=v.split('.'),c=crypto.createDecipheriv('aes-256-gcm',k,Buffer.from(i,'base64url'));c.setAuthTag(Buffer.from(t,'base64url'));return JSON.parse(Buffer.concat([c.update(Buffer.from(d,'base64url')),c.final()]).toString('utf8'))}catch{return null}}
 function base(req){if(APP_BASE_URL)return APP_BASE_URL;const proto=String(req.headers['x-forwarded-proto']||'http').split(',')[0].trim(),host=req.headers['x-forwarded-host']||req.headers.host;return proto+'://'+host}
 const googleConfigured=()=>Boolean(GOOGLE_CLIENT_ID&&GOOGLE_CLIENT_SECRET&&APP_SECRET);
-async function updaterFetch(endpoint,options={}){if(!UPDATER_URL||!UPDATE_TOKEN)throw new Error('Updater is not configured');const r=await fetch(UPDATER_URL+endpoint,{...options,headers:{'X-Update-Token':UPDATE_TOKEN,...(options.headers||{})}}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Updater request failed');return d}
+function updaterConfigured(){try{fs.accessSync(DOCKER_SOCKET,fs.constants.R_OK|fs.constants.W_OK);return true}catch{return false}}
+function updateStatus(){try{return{configured:updaterConfigured(),...JSON.parse(fs.readFileSync(UPDATE_STATUS_PATH,'utf8'))}}catch{return{configured:updaterConfigured(),phase:'idle',message:updaterConfigured()?'Ready to update':'Updater unavailable: Docker socket is not mounted',startedAt:null,finishedAt:null,error:null}}}
+function dockerRaw(method,endpoint,payload){
+ return new Promise((resolve,reject)=>{
+  const data=payload===undefined?null:Buffer.from(JSON.stringify(payload));
+  const r=http.request({socketPath:DOCKER_SOCKET,path:endpoint,method,headers:data?{'Content-Type':'application/json','Content-Length':data.length}:{}},resp=>{
+   const chunks=[];resp.on('data',x=>chunks.push(x));resp.on('end',()=>{const raw=Buffer.concat(chunks).toString('utf8');if(resp.statusCode>=200&&resp.statusCode<300)return resolve({status:resp.statusCode,raw});reject(new Error('Docker API '+method+' '+endpoint+' failed ('+resp.statusCode+'): '+raw.slice(0,300)))})
+  });r.on('error',reject);if(data)r.write(data);r.end()
+ })
+}
+async function dockerApiVersion(){const r=await dockerRaw('GET','/version');const d=JSON.parse(r.raw);return d.ApiVersion?'/v'+d.ApiVersion:''}
+async function launchUpdater(){
+ if(!updaterConfigured())throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
+ const v=await dockerApiVersion(),name='countdownapp-update-'+Date.now().toString(36);
+ const config={
+  Image:TARGET_IMAGE,
+  Cmd:['node','/app/updater.js','--once'],
+  Env:['RUN_ONCE=1','TARGET_CONTAINER='+TARGET_CONTAINER,'TARGET_IMAGE='+TARGET_IMAGE,'DATA_DIR=/data','DOCKER_SOCKET=/var/run/docker.sock'],
+  HostConfig:{AutoRemove:true,Binds:['/var/run/docker.sock:/var/run/docker.sock','/DATA/AppData/countdownapp/data:/data']}
+ };
+ await dockerRaw('POST',v+'/containers/create?name='+encodeURIComponent(name),config);
+ await dockerRaw('POST',v+'/containers/'+encodeURIComponent(name)+'/start');
+ return{name}
+}
 async function exchange(code,req){const b=new URLSearchParams({code,client_id:GOOGLE_CLIENT_ID,client_secret:GOOGLE_CLIENT_SECRET,redirect_uri:base(req)+'/api/google/callback',grant_type:'authorization_code'}),r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});if(!r.ok)throw new Error('Google token exchange failed.');return r.json()}
 async function accessToken(){const t=decrypt(db.google.token);if(!t)return null;if(t.access_token&&t.expires_at&&Date.now()<t.expires_at-60000)return t.access_token;if(!t.refresh_token)return null;const b=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:GOOGLE_CLIENT_SECRET,refresh_token:t.refresh_token,grant_type:'refresh_token'}),r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});if(!r.ok)return null;const n=await r.json(),m={...t,...n,refresh_token:t.refresh_token,expires_at:Date.now()+num(n.expires_in,3600)*1000};db.google.token=encrypt(m);save(db);return m.access_token}
 async function gfetch(ep){const a=await accessToken();if(!a)throw new Error('Google Calendar is not connected.');const r=await fetch('https://www.googleapis.com/calendar/v3'+ep,{headers:{Authorization:'Bearer '+a}});if(!r.ok)throw new Error('Google Calendar request failed: '+(await r.text()).slice(0,180));return r.json()}
@@ -58,7 +81,7 @@ function renderSvg(data,w,h){
 }
 function serve(res,p){let f=p==='/'?'/index.html':p;f=path.normalize(f).replace(/^(\.\.(\/|\\|$))+/,'');const full=path.join(PUBLIC_DIR,f);if(!full.startsWith(PUBLIC_DIR))return text(res,403,'Forbidden');fs.readFile(full,(e,d)=>{if(e)return text(res,404,'Not found');const t={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'}[path.extname(full).toLowerCase()]||'application/octet-stream';res.writeHead(200,{'Content-Type':t});res.end(d)})}
 const authorized=u=>Boolean(u.searchParams.get('token')&&u.searchParams.get('token')===db.display.token);
-function state(){return{countdowns:sorted(),updater:{configured:Boolean(UPDATER_URL&&UPDATE_TOKEN)},options:{colors:COLORS,progressModes:PROGRESS_MODES,progressStyles:PROGRESS_STYLES,dateStyles:DATE_STYLES,timeStyles:TIME_STYLES},google:{configured:googleConfigured(),connected:Boolean(decrypt(db.google.token)),selectedCalendarIds:db.google.selectedCalendarIds||[],countdownWindowDays:db.google.countdownWindowDays||30},display:{...db.display,feedPath:'/api/frameos/feed?token='+db.display.token,svgPath:'/api/frameos/svg?token='+db.display.token,viewPath:'/frame?token='+db.display.token}}}
+function state(){return{countdowns:sorted(),updater:{configured:updaterConfigured()},options:{colors:COLORS,progressModes:PROGRESS_MODES,progressStyles:PROGRESS_STYLES,dateStyles:DATE_STYLES,timeStyles:TIME_STYLES},google:{configured:googleConfigured(),connected:Boolean(decrypt(db.google.token)),selectedCalendarIds:db.google.selectedCalendarIds||[],countdownWindowDays:db.google.countdownWindowDays||30},display:{...db.display,feedPath:'/api/frameos/feed?token='+db.display.token,svgPath:'/api/frameos/svg?token='+db.display.token,viewPath:'/frame?token='+db.display.token}}}
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://local'),p=u.pathname;try{
  if(p==='/healthz')return text(res,200,'ok');
  if(p==='/api/state'&&req.method==='GET')return json(res,200,state());
@@ -71,8 +94,8 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
  if(p==='/api/google/calendars')return json(res,200,{calendars:await calendars()});
  if(p==='/api/google/events')return json(res,200,{events:await events()});
  if(p==='/api/settings'&&req.method==='PUT'){const b=await body(req);if(Array.isArray(b.selectedCalendarIds))db.google.selectedCalendarIds=b.selectedCalendarIds.slice(0,30);if(b.countdownWindowDays!==undefined)db.google.countdownWindowDays=clamp(num(b.countdownWindowDays,30),1,365);if(b.displayTitle!==undefined)db.display.title=String(b.displayTitle||'Upcoming').slice(0,80);if(b.maxEvents!==undefined)db.display.maxEvents=clamp(num(b.maxEvents,5),1,20);if(b.maxCountdowns!==undefined)db.display.maxCountdowns=clamp(num(b.maxCountdowns,4),1,20);if(b.layout!==undefined)db.display.layout=en(b.layout,LAYOUTS,'auto');if(b.palette!==undefined)db.display.palette=en(b.palette,PALETTES,'spectra6');if(b.dateWidgetStyle!==undefined)db.display.dateWidgetStyle=en(b.dateWidgetStyle,DATE_WIDGETS,'flipper');if(b.refreshMinutes!==undefined)db.display.refreshMinutes=clamp(num(b.refreshMinutes,15),1,1440);if(b.showAgenda!==undefined)db.display.showAgenda=Boolean(b.showAgenda);if(b.showCountdowns!==undefined)db.display.showCountdowns=Boolean(b.showCountdowns);save(db);return json(res,200,{ok:true})}
- if(p==='/api/update/status'&&req.method==='GET'){if(!UPDATER_URL||!UPDATE_TOKEN)return json(res,200,{configured:false,phase:'disabled',message:'Updater is not configured'});try{return json(res,200,{configured:true,...await updaterFetch('/status')})}catch(e){return json(res,200,{configured:true,phase:'error',message:'Updater unavailable',error:e.message})}}
- if(p==='/api/update/start'&&req.method==='POST'){if(req.headers['x-countdown-action']!=='update')return json(res,403,{error:'Invalid update request'});if(!UPDATER_URL||!UPDATE_TOKEN)return json(res,503,{error:'Updater is not configured'});return json(res,202,await updaterFetch('/update',{method:'POST'}))}
+ if(p==='/api/update/status'&&req.method==='GET')return json(res,200,updateStatus());
+ if(p==='/api/update/start'&&req.method==='POST'){if(req.headers['x-countdown-action']!=='update')return json(res,403,{error:'Invalid update request'});const s=updateStatus();if(['pulling','preparing','restarting'].includes(s.phase))return json(res,409,{error:'An update is already running'});const launched=await launchUpdater();return json(res,202,{ok:true,message:'Update started',helper:launched.name})}
  if(p==='/api/display/rotate-token'&&req.method==='POST'){db.display.token=crypto.randomBytes(24).toString('hex');save(db);return json(res,200,{feedPath:'/api/frameos/feed?token='+db.display.token,svgPath:'/api/frameos/svg?token='+db.display.token,viewPath:'/frame?token='+db.display.token})}
  if(p==='/api/frameos/feed'){if(!authorized(u))return json(res,401,{error:'Invalid display token'});return json(res,200,await feed())}
  if(p==='/api/frameos/svg'){if(!authorized(u))return text(res,401,'Invalid display token');const w=clamp(num(u.searchParams.get('w'),800),300,2000),h=clamp(num(u.searchParams.get('h'),480),300,2000),d=await feed();return text(res,200,renderSvg(d,w,h),'image/svg+xml; charset=utf-8',{'X-FrameOS-Refresh-Minutes':String(d.display.refreshMinutes)})}
