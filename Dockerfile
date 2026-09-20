@@ -6,6 +6,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY server.js ./server.js
+COPY updater.js ./updater.js
 COPY public ./public
 
 RUN mkdir -p /data && chown -R node:node /app /data
