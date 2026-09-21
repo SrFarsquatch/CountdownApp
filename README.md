@@ -1,5 +1,7 @@
 # Quest Log
 
+> **Deployment model:** Quest Log now uses one codebase for both the existing CasaOS/Docker deployment and the staged Cloudflare deployment. Shared UI/features live in `public/` and both targets follow `main`. See `cloudflare/README.md` for the Cloudflare Access + Tunnel bridge and the D1 migration path.
+
 Quest Log is a self-hosted personal planning app for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
 ## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
