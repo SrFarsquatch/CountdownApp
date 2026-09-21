@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#6C5CE7">
+  <title>Sign in · Quest Log</title>
+  <style>
+    :root{color-scheme:light;--purple:#6C5CE7;--purple-dark:#5848d5;--ink:#171717;--muted:#706d79;--paper:#fff;--warm:#f7f5ff;--line:rgba(33,24,82,.12);--gold:#c99a45}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--purple);color:var(--ink)}
+    body{min-height:100vh;overflow-x:hidden}
+    .shell{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr)}
+    .brand{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:46px 52px;color:#fff}
+    .brand:before,.brand:after{content:"";position:absolute;border:1px solid rgba(255,255,255,.16);border-radius:999px;pointer-events:none}
+    .brand:before{width:560px;height:560px;right:-210px;top:-210px}
+    .brand:after{width:360px;height:360px;left:-180px;bottom:-180px}
+    .mark-row{position:relative;z-index:1;display:flex;align-items:center;gap:14px;font-weight:800;letter-spacing:-.02em;font-size:20px}
+    .mark{width:48px;height:48px;display:block;filter:drop-shadow(0 8px 24px rgba(29,19,93,.18))}
+    .hero{position:relative;z-index:1;max-width:690px;margin:56px 0}
+    .eyebrow{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;opacity:.74;margin-bottom:18px}
+    h1{font-size:clamp(44px,6vw,78px);line-height:.98;letter-spacing:-.055em;margin:0 0 24px;max-width:650px}
+    .hero p{margin:0;font-size:clamp(17px,2vw,21px);line-height:1.55;max-width:580px;color:rgba(255,255,255,.78)}
+    .mini-planner{position:relative;z-index:1;width:min(620px,100%);display:grid;grid-template-columns:1.35fr .8fr;gap:10px;padding:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);border-radius:22px;backdrop-filter:blur(8px)}
+    .mini-card{min-height:104px;border-radius:14px;background:rgba(255,255,255,.12);padding:15px}
+    .mini-card strong{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.78}
+    .rows{display:grid;gap:9px;margin-top:13px}
+    .row{display:flex;align-items:center;gap:9px;font-size:12px;color:rgba(255,255,255,.8)}
+    .dot{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.9}
+    .check{width:13px;height:13px;border:1.5px solid rgba(255,255,255,.75);border-radius:4px}
+    .signin{background:#f8f7fb;display:flex;align-items:center;justify-content:center;padding:42px}
+    .panel{width:min(440px,100%)}
+    .mobile-mark{display:none}
+    .kicker{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--purple);margin-bottom:14px}
+    h2{font-size:40px;line-height:1.05;letter-spacing:-.04em;margin:0 0 12px}
+    .lede{margin:0 0 30px;color:var(--muted);font-size:15px;line-height:1.6}
+    .google{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:54px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);font-size:15px;font-weight:750;text-decoration:none;box-shadow:0 10px 30px rgba(43,32,102,.08);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+    .google:hover{transform:translateY(-1px);box-shadow:0 14px 34px rgba(43,32,102,.12);border-color:rgba(108,92,231,.28)}
+    .google:focus-visible{outline:3px solid rgba(108,92,231,.22);outline-offset:3px}
+    .google svg{width:20px;height:20px;flex:0 0 auto}
+    .note{display:flex;gap:9px;align-items:flex-start;margin:18px 2px 0;color:#85818c;font-size:12px;line-height:1.5}
+    .lock{width:16px;height:16px;flex:0 0 16px;margin-top:1px}
+    .divider{height:1px;background:var(--line);margin:30px 0 22px}
+    .features{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .feature{padding:14px;border-radius:12px;background:#fff;border:1px solid rgba(33,24,82,.08)}
+    .feature b{display:block;font-size:12px;margin-bottom:4px}
+    .feature span{font-size:11px;color:#888491;line-height:1.45}
+    .foot{margin-top:30px;font-size:11px;color:#9a96a3}
+    @media(max-width:880px){
+      .shell{grid-template-columns:1fr}
+      .brand{display:none}
+      .signin{min-height:100vh;padding:28px 22px;background:linear-gradient(180deg,var(--purple) 0,var(--purple) 33%,#f8f7fb 33%,#f8f7fb 100%);align-items:flex-start}
+      .panel{margin:42px auto 0;background:#f8f7fb;border-radius:24px;padding:26px;box-shadow:0 18px 50px rgba(33,24,82,.16)}
+      .mobile-mark{display:flex;align-items:center;gap:11px;color:#fff;font-size:18px;font-weight:800;margin:-2px 0 54px}
+      .mobile-mark .mark{width:42px;height:42px}
+      h2{font-size:34px}
+    }
+    @media(max-width:480px){.signin{padding:18px 14px}.panel{padding:22px}.features{grid-template-columns:1fr}.mobile-mark{margin-bottom:44px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="brand" aria-label="Quest Log">
+      <div class="mark-row">
+        <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+          <rect width="1024" height="1024" rx="220" fill="#5f5a52"/>
+          <path d="M206 724Q342 684 512 812Q682 684 818 724V804Q684 764 512 888Q340 764 206 804Z" fill="#c99a45"/>
+          <path d="M218 652Q356 614 500 720V844Q356 742 218 770Z" fill="#f4eddf"/>
+          <path d="M806 652Q668 614 524 720V844Q668 742 806 770Z" fill="#f4eddf"/>
+          <path d="M512 142C370 142 256 256 256 398C256 554 386 654 512 778C638 654 768 554 768 398C768 256 654 142 512 142Z" fill="#f4eddf"/>
+          <circle cx="512" cy="398" r="145" fill="#5f5a52"/>
+          <path d="M512 260L545 365L650 398L545 431L512 536L479 431L374 398L479 365Z" fill="#c99a45"/>
+        </svg>
+        <span>Quest Log</span>
+      </div>
+      <div class="hero">
+        <div class="eyebrow">Your day, clearly planned</div>
+        <h1>Keep the important things in view.</h1>
+        <p>Calendar, tasks, goals, countdowns, weather and the little things that keep your day moving.</p>
+      </div>
+      <div class="mini-planner" aria-hidden="true">
+        <div class="mini-card">
+          <strong>Today</strong>
+          <div class="rows">
+            <div class="row"><span class="dot"></span><span>9:30 · Project review</span></div>
+            <div class="row"><span class="dot"></span><span>12:00 · Lunch</span></div>
+            <div class="row"><span class="dot"></span><span>4:15 · Wrap up</span></div>
+          </div>
+        </div>
+        <div class="mini-card">
+          <strong>Tasks</strong>
+          <div class="rows">
+            <div class="row"><span class="check"></span><span>Plan the week</span></div>
+            <div class="row"><span class="check"></span><span>Review goals</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="signin">
+      <div class="panel">
+        <div class="mobile-mark">
+          <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+            <rect width="1024" height="1024" rx="220" fill="#5f5a52"/>
+            <path d="M206 724Q342 684 512 812Q682 684 818 724V804Q684 764 512 888Q340 764 206 804Z" fill="#c99a45"/>
+            <path d="M218 652Q356 614 500 720V844Q356 742 218 770Z" fill="#f4eddf"/>
+            <path d="M806 652Q668 614 524 720V844Q668 742 806 770Z" fill="#f4eddf"/>
+            <path d="M512 142C370 142 256 256 256 398C256 554 386 654 512 778C638 654 768 554 768 398C768 256 654 142 512 142Z" fill="#f4eddf"/>
+            <circle cx="512" cy="398" r="145" fill="#5f5a52"/>
+            <path d="M512 260L545 365L650 398L545 431L512 536L479 431L374 398L479 365Z" fill="#c99a45"/>
+          </svg>
+          <span>Quest Log</span>
+        </div>
+        <div class="kicker">Quest Log</div>
+        <h2>Welcome back.</h2>
+        <p class="lede">Sign in to open your planner and pick up where you left off.</p>
+        <a class="google" href="/login/start?next=%2F" rel="nofollow">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41z"/><path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.64-2.36l-3.24-2.54c-.9.6-2.05.96-3.4.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.39 13.93A6.02 6.02 0 0 1 6.07 12c0-.67.12-1.32.32-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.13 1.04 4.55l3.35-2.62z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.88-2.88A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.96 5.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94z"/></svg>
+          <span>Continue with Google</span>
+        </a>
+        <div class="note">
+          <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <span>Authentication is handled by Google and Cloudflare Access. Quest Log never receives your Google password.</span>
+        </div>
+        <div class="divider"></div>
+        <div class="features">
+          <div class="feature"><b>Private workspace</b><span>Only approved accounts can enter.</span></div>
+          <div class="feature"><b>One connected view</b><span>Calendar, tasks and goals together.</span></div>
+        </div>
+        <div class="foot">Quest Log · Personal planner</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

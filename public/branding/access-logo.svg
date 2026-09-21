@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" role="img" aria-labelledby="title desc">
+  <title id="title">Quest Log</title>
+  <desc id="desc">Quest Log compass and open book mark with wordmark</desc>
+  <g transform="translate(24 16)">
+    <rect x="0" y="0" width="208" height="208" rx="48" fill="#5f5a52"/>
+    <path d="M42 147Q69 139 104 165Q139 139 166 147V164Q139 156 104 181Q69 156 42 164Z" fill="#c99a45"/>
+    <path d="M44 132Q72 124 101 146V171Q72 150 44 156Z" fill="#f4eddf"/>
+    <path d="M164 132Q136 124 107 146V171Q136 150 164 156Z" fill="#f4eddf"/>
+    <path d="M104 29C75 29 52 52 52 81C52 113 78 133 104 158C130 133 156 113 156 81C156 52 133 29 104 29Z" fill="#f4eddf"/>
+    <circle cx="104" cy="81" r="29" fill="#5f5a52"/>
+    <path d="M104 53L111 74L132 81L111 88L104 109L97 88L76 81L97 74Z" fill="#c99a45"/>
+  </g>
+  <g fill="#171717">
+    <text x="280" y="116" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="800" letter-spacing="-2">QUEST LOG</text>
+    <text x="284" y="160" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600" fill="#77756f" letter-spacing="1">YOUR DAY, CLEARLY PLANNED</text>
+  </g>
+</svg>

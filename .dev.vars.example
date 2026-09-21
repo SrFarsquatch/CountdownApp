@@ -3,14 +3,20 @@
 
 AUTH_BYPASS=true
 DEV_USER_EMAIL=local-dev@questlog.local
+CLOUD_WORKSPACE_ID=default
 
-# Start the self-hosted app on port 8080, then let Wrangler proxy API requests to it.
-ORIGIN_BASE_URL=http://127.0.0.1:8080
-ALLOW_UNPROTECTED_ORIGIN=true
-
-# Production values are configured in Cloudflare:
+# Production Access values:
 # CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
 # CF_ACCESS_AUD=your-access-application-aud
 # ALLOWED_EMAILS=you@example.com
-# ORIGIN_ACCESS_CLIENT_ID=<Cloudflare Access service token client id>
-# ORIGIN_ACCESS_CLIENT_SECRET=<Cloudflare Access service token client secret>
+
+# Cloud-only integration secrets/variables are configured directly on the Worker:
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# APP_SECRET
+# OPENAI_API_KEY
+# OPENAI_MODEL=gpt-5.6-luna
+# ALPHA_VANTAGE_API_KEY
+#
+# The standalone Cloudflare runtime does NOT use ORIGIN_BASE_URL,
+# Cloudflare Tunnel, CasaOS, or origin service tokens.

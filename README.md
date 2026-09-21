@@ -1,6 +1,6 @@
 # Quest Log
 
-> **Deployment model:** Quest Log now uses one codebase for both the existing CasaOS/Docker deployment and the staged Cloudflare deployment. Shared UI/features live in `public/` and both targets follow `main`. See `cloudflare/README.md` for the Cloudflare Access + Tunnel bridge and the D1 migration path.
+> **Deployment model:** Quest Log uses one codebase for two independent runtimes: CasaOS/Docker with local JSON persistence, and Cloudflare Workers with D1 persistence. Shared UI/features live in `public/` and both targets follow `main`; the deployments do not share data, APIs, or network connectivity. See `cloudflare/README.md` for the standalone cloud architecture.
 
 Quest Log is a self-hosted personal planning app for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
