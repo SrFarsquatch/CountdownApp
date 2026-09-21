@@ -32,6 +32,19 @@ async function body(request){
 function cleanTeamDomain(value){
   return String(value||'').trim().replace(/^https?:\/\//i,'').replace(/\/$/,'').split('/')[0];
 }
+function accessLoginUrl(request,env,next='/'){
+  const teamDomain=cleanTeamDomain(env.CF_ACCESS_TEAM_DOMAIN),audience=String(env.CF_ACCESS_AUD||'').trim();
+  if(!teamDomain||!audience)throw new Error('Cloudflare Access is not configured.');
+  let redirectPath='/';
+  try{
+    const base=new URL(request.url),target=new URL(String(next||'/'),base.origin);
+    if(target.origin===base.origin)redirectPath=target.pathname+target.search;
+  }catch{}
+  const hostname=new URL(request.url).hostname;
+  const login=new URL('/cdn-cgi/access/login/'+hostname,'https://'+teamDomain);
+  login.search=new URLSearchParams({kid:audience,redirect_url:redirectPath}).toString();
+  return login.toString();
+}
 function base64UrlBytes(value){
   const normalized=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
   const padded=normalized+'='.repeat((4-normalized.length%4)%4);
@@ -356,6 +369,11 @@ export default{
   async fetch(request,env){
     const url=new URL(request.url);
     if(url.pathname==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
+    if(url.pathname==='/login')return env.ASSETS.fetch(new Request(new URL('/login.html',url),request));
+    if(url.pathname==='/login/start'){
+      try{return Response.redirect(accessLoginUrl(request,env,url.searchParams.get('next')||'/'),302)}
+      catch(error){return text(error.message||'Login is unavailable.',503)}
+    }
     const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/svg';
     if(machineDisplay){
       try{
