@@ -60,6 +60,8 @@ Quest Log supports **System**, **Light**, and **Dark** appearance modes plus six
 
 Website appearance is independent from the e-ink display palette, so changing the Quest Log theme does not alter Spectra 6 or monochrome FrameOS output.
 
+The Quest Log mark uses the same book + waypoint/compass symbol across all themes. The sidebar mark and browser favicon follow the selected theme automatically; the installed PWA icon uses the Quest variant as the stable default because operating systems generally do not live-update installed app icons when an in-app theme changes.
+
 ## CasaOS deployment
 
 GitHub Actions builds the application image from `main` and publishes:

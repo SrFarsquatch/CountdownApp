@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f4f1">
 <title>Quest Log</title>
+<link id="appFavicon" rel="icon" type="image/svg+xml" href="/branding/icon-quest.svg">
 <link rel="manifest" href="/manifest.webmanifest">
 <script>
 (()=>{try{
@@ -17,6 +18,8 @@
   document.documentElement.dataset.colorMode=resolved;
   document.documentElement.dataset.theme=theme;
   document.documentElement.dataset.density=density;
+  const favicon=document.getElementById('appFavicon');
+  if(favicon)favicon.href='/branding/icon-'+theme+'.svg';
 }catch{}}
 )();
 </script>
@@ -44,7 +47,7 @@
 :root[data-theme="slate"][data-color-mode="light"]{--accent:#516b7a;--accent-soft:#e4ebef;--accent-contrast:#fff}
 :root[data-theme="slate"][data-color-mode="dark"]{--accent:#9eb9c8;--accent-soft:#26333a;--accent-contrast:#132027}
 :root[data-density="compact"]{--density-scale:.86}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}.app{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}.side{padding:22px 14px;border-right:1px solid var(--line);background:var(--panel);position:sticky;top:0;height:100vh}.brand{display:flex;align-items:center;gap:10px;padding:0 10px 20px;font-weight:850;font-size:19px}.logo{width:34px;height:34px;border-radius:11px;background:var(--accent);color:var(--accent-contrast);display:grid;place-items:center;font-size:18px}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;border-radius:10px;text-align:left;padding:10px 12px;font-weight:720;color:var(--muted)}.nav button.on{background:var(--accent-soft);color:var(--text)}.nav .sep{height:1px;background:var(--line);margin:10px 8px}.side-foot{position:absolute;bottom:18px;left:14px;right:14px;color:var(--muted);font-size:12px}.main{min-width:0}.top{height:74px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(18px);position:sticky;top:0;z-index:20}.top h1{margin:0;font-size:22px;letter-spacing:-.03em}.top-actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 13px;font-weight:750}.btn.primary{background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}.btn.ghost{background:transparent}.content{padding:26px 28px 88px;max-width:1480px;margin:auto}.view{display:none}.view.on{display:block}.hero{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:22px}.hero h2{margin:0;font-size:34px;letter-spacing:-.045em}.hero p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}.span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-6{grid-column:span 6}.span-12{grid-column:span 12}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.section-title h3{margin:0;font-size:15px}.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:850;color:var(--muted)}.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.stat{padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}.stat b{display:block;font-size:24px;letter-spacing:-.04em}.stat span{color:var(--muted);font-size:12px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}.app{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}.side{padding:22px 14px;border-right:1px solid var(--line);background:var(--panel);position:sticky;top:0;height:100vh}.brand{display:flex;align-items:center;gap:10px;padding:0 10px 20px;font-weight:850;font-size:19px}.logo{width:34px;height:34px;border-radius:10px;overflow:hidden;display:grid;place-items:center;flex:0 0 auto}.logo img{display:block;width:100%;height:100%;object-fit:cover}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;border-radius:10px;text-align:left;padding:10px 12px;font-weight:720;color:var(--muted)}.nav button.on{background:var(--accent-soft);color:var(--text)}.nav .sep{height:1px;background:var(--line);margin:10px 8px}.side-foot{position:absolute;bottom:18px;left:14px;right:14px;color:var(--muted);font-size:12px}.main{min-width:0}.top{height:74px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(18px);position:sticky;top:0;z-index:20}.top h1{margin:0;font-size:22px;letter-spacing:-.03em}.top-actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 13px;font-weight:750}.btn.primary{background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}.btn.ghost{background:transparent}.content{padding:26px 28px 88px;max-width:1480px;margin:auto}.view{display:none}.view.on{display:block}.hero{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:22px}.hero h2{margin:0;font-size:34px;letter-spacing:-.045em}.hero p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}.span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-6{grid-column:span 6}.span-12{grid-column:span 12}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.section-title h3{margin:0;font-size:15px}.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:850;color:var(--muted)}.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.stat{padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}.stat b{display:block;font-size:24px;letter-spacing:-.04em}.stat span{color:var(--muted);font-size:12px}
 .weather-card{overflow:hidden}.weather-main{display:grid;grid-template-columns:minmax(210px,.8fr) minmax(0,1.6fr);gap:20px;align-items:center}
 .weather-now{display:flex;align-items:center;gap:16px;min-width:0}.weather-glyph{width:58px;height:58px;display:grid;place-items:center;flex:0 0 auto}.weather-glyph svg{width:58px;height:58px}.weather-temp{font-size:40px;font-weight:880;letter-spacing:-.055em;line-height:1}.weather-desc{font-weight:780;margin-top:4px}.weather-location{color:var(--muted);font-size:12px;margin-top:2px}
 .weather-metrics{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:11px}.weather-source-note{margin-top:8px;color:var(--muted);font-size:10px}.forecast-strip{display:grid;grid-template-columns:repeat(7,minmax(72px,1fr));gap:8px}
@@ -67,7 +70,6 @@
 .header-weather-condition{font-size:12px;font-weight:820;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-weather-detail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .header-weather-alert{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;background:color-mix(in srgb,var(--orange) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--orange) 45%,var(--line));color:var(--orange);font-size:10px;font-weight:850;white-space:nowrap}
-.today-hero-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .header-weather-empty{font-size:11px;color:var(--muted);padding:6px 0}
 .market-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
 .market-card{border:1px solid var(--line);background:var(--panel2);border-radius:13px;padding:12px;min-width:0}
@@ -88,7 +90,6 @@
   .today-hero-side{margin-left:0;width:100%;min-width:0;justify-items:start}
   .header-weather{width:100%;padding:9px 10px;background:var(--panel2);border:1px solid var(--line)}
   .header-weather-main{min-width:0}
-  .today-hero-status{justify-content:flex-start}
   .grid{grid-template-columns:1fr;gap:12px}
   .grid>.span-8,.grid>.span-6,.grid>.span-4,.grid>.span-12{grid-column:1/-1!important;min-width:0}
   .card{min-width:0}
@@ -275,7 +276,7 @@
 <body>
 <div class="app">
 <aside class="side">
-  <div class="brand"><div class="logo">Q</div><span>Quest Log</span></div>
+  <div class="brand"><div class="logo"><img id="appBrandIcon" src="/branding/icon-quest.svg" alt="" aria-hidden="true"></div><span>Quest Log</span></div>
   <nav class="nav">
     <button class="on" data-view="today">Today</button>
     <button data-view="planner">Planner</button>
@@ -297,7 +298,6 @@
     <div><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
     <div class="today-hero-side">
       <div class="header-weather" id="todayWeather"><div class="header-weather-empty">Loading weather…</div></div>
-      <div class="today-hero-status"><div class="pill" id="calendarStatus">Calendar</div></div>
     </div>
   </div>
   <div class="stat-row">
@@ -479,6 +479,9 @@ function normalizedAppearance(value={}){
 function applyAppearance(value,persistCache=true){
  const a=normalizedAppearance(value),root=document.documentElement,resolved=a.mode==='system'?(systemDarkQuery.matches?'dark':'light'):a.mode;
  root.dataset.appearanceMode=a.mode;root.dataset.colorMode=resolved;root.dataset.theme=a.theme;root.dataset.density=a.density;
+ const iconPath='/branding/icon-'+a.theme+'.svg';
+ const favicon=$('appFavicon');if(favicon)favicon.href=iconPath;
+ const brandIcon=$('appBrandIcon');if(brandIcon)brandIcon.src=iconPath;
  const themeMeta=document.querySelector('meta[name="theme-color"]');
  if(themeMeta)themeMeta.content=resolved==='dark'?'#141412':'#f3f2ef';
  if(persistCache)try{localStorage.setItem('questlog-appearance',JSON.stringify(a))}catch{}
@@ -766,7 +769,6 @@ function renderToday(){
  const now=new Date(),hour=now.getHours();$('greeting').textContent=(hour<12?'Good morning':hour<18?'Good afternoon':'Good evening');
  $('todayDate').textContent=now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
  const open=state.tasks.filter(t=>t.status!=='done');$('statTasks').textContent=open.length;$('statEvents').textContent=calEvents.length;$('statGoals').textContent=state.goals.filter(g=>g.status==='active').length;$('statCountdowns').textContent=state.countdowns.filter(c=>new Date(c.end)>now).length;
- $('calendarStatus').textContent=state.google.connected?'Google Calendar connected':'Calendar not connected';
  const start=new Date(now);start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);
  const todaysEvents=calEvents.filter(e=>eventOverlapsDay(e,start,end)).slice(0,6);
  $('todayAgenda').innerHTML=todaysEvents.length?todaysEvents.map(e=>'<div class="item agenda-event" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'"><div class="pill">'+(e.allDay?'All day':fmtTime(e.start))+'</div><div><div class="title">'+esc(e.title)+'</div><div class="meta">'+esc(e.calendarName||'Google Calendar')+(e.location?' · '+esc(e.location):'')+'</div></div><span></span></div>').join(''):'<div class="empty">No calendar events today.</div>';
