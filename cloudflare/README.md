@@ -248,3 +248,24 @@ New shared features should:
 4. ship both deployments from the same `main` commit.
 
 That keeps the cloud and self-hosted editions on the same product version without sharing infrastructure or data.
+
+## Cloud e-ink / FrameOS access
+
+The cloud e-ink display is independent from the self-hosted Quest Log instance.
+
+The Worker now provides token-protected machine endpoints:
+
+- `/frame?token=...`
+- `/api/frameos/feed?token=...`
+- `/api/frameos/svg?token=...&w=800&h=480`
+
+These endpoints read cloud D1 state and cloud integrations directly. They do not proxy to CasaOS.
+
+Because Cloudflare Access protects the main Quest Log hostname before requests reach the Worker, create narrowly scoped Access applications for the machine display paths with a **Bypass / Everyone** policy:
+
+- `questlog.mattmoonie.ca/frame`
+- `questlog.mattmoonie.ca/api/frameos/*`
+
+The more-specific path applications take precedence over the parent Quest Log Access application. The Worker still requires the private display token, so these paths are not anonymously usable without that token.
+
+Do not bypass Access for the rest of the Quest Log hostname.
