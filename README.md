@@ -42,9 +42,9 @@ The API key is never sent to the browser. The watchlist is capped at eight symbo
 
 ## CasaOS updater behavior
 
-Planner no longer renames or replaces its own CasaOS-managed container. The Maintenance page can check GHCR and pre-pull the newest image, but CasaOS remains responsible for applying/recreating the container. This avoids stale CasaOS container IDs after an in-app update.
+Planner keeps the one-click **Install update** experience without renaming or replacing CasaOS-managed containers behind CasaOS's back. Planner pulls the newest GHCR image, launches a short-lived helper, and hands the existing compose configuration back to CasaOS App Management so CasaOS performs the recreate itself. The helper waits for the new container to become healthy, updates the Maintenance progress state, and then removes itself automatically.
 
-If an older build left CasaOS pointing at a deleted container, back up `/DATA/AppData/countdownapp/data`, remove/recreate only the app container, and re-import the current CasaOS compose without deleting that data directory.
+If an older build previously left CasaOS pointing at a deleted container, back up `/DATA/AppData/countdownapp/data`, remove/recreate only the app container once, and re-import the current CasaOS compose without deleting that data directory.
 
 ## CasaOS deployment
 
@@ -140,26 +140,21 @@ Update progress survives the brief container restart because it is written to th
 
 ## One-click updates
 
-The CasaOS install still runs as a single long-lived application container. There is no permanent updater sidecar and no `depends_on` install dependency.
+The CasaOS install runs as one long-lived Planner container. **Settings → Application updates → Install update** is a one-click flow with no second CasaOS confirmation step.
 
-The app mounts `/var/run/docker.sock` so **Settings → Application updates** can check the published image and launch a short-lived helper container only when **Install update** is requested. That helper:
+When selected, Planner:
 
 - pulls the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
-- reports staged progress for download, preparation, restart, health verification and cleanup,
-- recreates only the `countdownapp` container,
-- preserves the current environment, port, network, labels, health check and mounts,
-- waits for the replacement to become healthy,
-- restores the previous container if the replacement fails,
-- writes update progress to `/DATA/AppData/countdownapp/data/update-status.json`,
-- removes itself automatically when finished.
+- starts a short-lived helper on the CasaOS host network,
+- reads the current compose definition from CasaOS App Management,
+- asks CasaOS App Management to apply that same compose definition after the new image has been pulled,
+- lets CasaOS recreate the managed Planner container so its internal container tracking stays correct,
+- waits for the replacement container to be running and healthy,
+- records progress in `/DATA/AppData/countdownapp/data/update-status.json`,
+- reloads Planner when the update finishes,
+- removes the helper automatically.
 
-Because Docker socket access is effectively host-level Docker control, only expose CountdownApp to people you trust.
-
-Existing installations created from the single-container compose must be re-imported once after this change so the Docker socket mount is added. After that, future updates can be installed directly from the app page.
-
-Persistent application data remains at:
-
-`/DATA/AppData/countdownapp/data`
+The helper accesses CasaOS App Management only through CasaOS's local runtime address and uses the already-mounted Docker socket to launch the temporary update process. Docker socket access is effectively host-level Docker control, so only expose Planner to people you trust.
 
 ## Updating the source
 
