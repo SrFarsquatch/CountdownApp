@@ -10,7 +10,7 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY || '';
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
@@ -228,7 +228,7 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
-    markets: { watchlist: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
+    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 480 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -324,38 +324,62 @@ function normalizeWeather(x = {}) {
   };
 }
 
+function alphaProviderSymbol(source = {}) {
+  const raw = cleanText(source.providerSymbol || source.alphaSymbol || source.symbol, 32).toUpperCase();
+  if (!raw) return '';
+  if (raw.includes('.') || raw.includes('/')) return raw;
+  const exchange = cleanText(source.exchange, 80).toUpperCase();
+  const region = cleanText(source.region || source.country, 80).toUpperCase();
+  if (/TSXV|VENTURE/.test(exchange) || /VENTURE/.test(region)) return raw + '.TRV';
+  if (/TSX|TORONTO/.test(exchange) || /TORONTO/.test(region)) return raw + '.TRT';
+  return raw;
+}
+function alphaDisplaySymbol(providerSymbol = '') {
+  return cleanText(providerSymbol, 32).toUpperCase().replace(/\.(TRT|TRV)$/i, '');
+}
 function normalizeMarketInstrument(value = {}) {
   const source = typeof value === 'string' ? { symbol: value } : (value && typeof value === 'object' ? value : {});
-  const symbol = cleanText(source.symbol, 32).toUpperCase();
+  const providerSymbol = alphaProviderSymbol(source);
+  const displaySymbol = cleanText(source.displaySymbol || source.symbol || alphaDisplaySymbol(providerSymbol), 32).toUpperCase();
   return {
-    symbol,
+    symbol: displaySymbol || alphaDisplaySymbol(providerSymbol),
+    providerSymbol,
     name: cleanText(source.name || source.instrumentName, 120),
-    exchange: cleanText(source.exchange, 50).toUpperCase(),
-    micCode: cleanText(source.micCode || source.mic_code, 16).toUpperCase(),
+    exchange: cleanText(source.exchange || source.region, 80),
+    region: cleanText(source.region || source.country, 80),
     type: cleanText(source.type || source.instrumentType, 60),
-    country: cleanText(source.country, 60),
     currency: cleanText(source.currency, 12).toUpperCase(),
-    access: cleanText(source.access, 30)
+    marketOpen: cleanText(source.marketOpen, 20),
+    marketClose: cleanText(source.marketClose, 20),
+    timezone: cleanText(source.timezone, 60),
+    matchScore: cleanText(source.matchScore, 20)
   };
 }
+function defaultMarketWatchlist() {
+  return [
+    normalizeMarketInstrument({ symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', currency: 'USD' }),
+    normalizeMarketInstrument({ symbol: 'QQQ', name: 'Invesco QQQ Trust', currency: 'USD' }),
+    normalizeMarketInstrument({ symbol: 'RY', providerSymbol: 'RY.TRT', name: 'Royal Bank of Canada', exchange: 'Toronto', region: 'Canada', currency: 'CAD' }),
+    normalizeMarketInstrument({ symbol: 'XEQT', providerSymbol: 'XEQT.TRT', name: 'iShares Core Equity ETF Portfolio', exchange: 'Toronto', region: 'Canada', currency: 'CAD' })
+  ];
+}
 function normalizeMarkets(x = {}) {
-  const raw = Array.isArray(x.watchlist) ? x.watchlist : (Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD']);
+  const raw = Array.isArray(x.watchlist) ? x.watchlist : (Array.isArray(x.symbols) ? x.symbols : defaultMarketWatchlist());
   const seen = new Set();
   const watchlist = [];
   for (const value of raw) {
     const item = normalizeMarketInstrument(value);
-    if (!item.symbol) continue;
-    const key = item.symbol + '|' + item.exchange + '|' + item.micCode;
+    if (!item.providerSymbol) continue;
+    const key = item.providerSymbol;
     if (seen.has(key)) continue;
     seen.add(key); watchlist.push(item);
     if (watchlist.length >= 8) break;
   }
-  const fallback = ['SPY', 'QQQ', 'DIA', 'BTC/USD'].map(symbol => normalizeMarketInstrument(symbol));
-  const normalized = watchlist.length ? watchlist : fallback;
+  const normalized = watchlist.length ? watchlist : defaultMarketWatchlist();
   return {
     watchlist: normalized,
     symbols: normalized.map(item => item.symbol),
-    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 30, 180)
+    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 480)), 240, 1440)
   };
 }
 
@@ -1257,28 +1281,31 @@ async function weatherLocationSearch(query) {
 }
 
 let marketCache = { key: '', expiresAt: 0, data: null };
-function marketConfigured() { return Boolean(TWELVE_DATA_API_KEY); }
+function marketConfigured() { return Boolean(ALPHA_VANTAGE_API_KEY); }
 function marketNumber(value) {
-  const n = Number(value); return Number.isFinite(n) ? n : null;
+  const n = Number(String(value ?? '').replace('%','')); return Number.isFinite(n) ? n : null;
+}
+function alphaEffectiveRefreshMinutes(config) {
+  const count = Math.max(1, config.watchlist.length);
+  const quotaSafe = Math.ceil((count * 1440) / 20);
+  return Math.max(config.refreshMinutes, quotaSafe);
 }
 function normalizeMarketQuote(raw = {}, fallback = {}) {
-  const requested = normalizeMarketInstrument(typeof fallback === 'string' ? { symbol: fallback } : fallback);
-  const close = marketNumber(raw.close ?? raw.price);
-  const change = marketNumber(raw.change);
-  const percentChange = marketNumber(raw.percent_change);
+  const requested = normalizeMarketInstrument(fallback);
+  const close = marketNumber(raw['05. price']);
   return {
-    symbol: cleanText(raw.symbol || requested.symbol, 32).toUpperCase(),
-    name: cleanText(raw.name || raw.instrument_name || requested.name, 120),
-    exchange: cleanText(raw.exchange || requested.exchange, 50).toUpperCase(),
-    micCode: cleanText(raw.mic_code || requested.micCode, 16).toUpperCase(),
-    currency: cleanText(raw.currency || requested.currency, 12).toUpperCase(),
-    type: cleanText(raw.type || requested.type, 60),
-    country: cleanText(requested.country, 60),
-    access: cleanText(requested.access, 30),
-    datetime: cleanText(raw.datetime || '', 50),
-    close, open: marketNumber(raw.open), high: marketNumber(raw.high), low: marketNumber(raw.low),
-    previousClose: marketNumber(raw.previous_close), change, percentChange,
-    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open),
+    ...requested,
+    providerSymbol: cleanText(raw['01. symbol'] || requested.providerSymbol, 32).toUpperCase(),
+    close,
+    open: marketNumber(raw['02. open']),
+    high: marketNumber(raw['03. high']),
+    low: marketNumber(raw['04. low']),
+    volume: marketNumber(raw['06. volume']),
+    datetime: cleanText(raw['07. latest trading day'] || '', 50),
+    previousClose: marketNumber(raw['08. previous close']),
+    change: marketNumber(raw['09. change']),
+    percentChange: marketNumber(raw['10. change percent']),
+    marketOpen: null,
     available: close !== null,
     error: ''
   };
@@ -1292,87 +1319,73 @@ function unavailableMarketQuote(item, message = 'No quote returned for this watc
     datetime: '', available: false, error: cleanText(message, 220)
   };
 }
-async function twelveDataFetch(pathname, params = {}) {
-  if (!marketConfigured()) throw new Error('Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.');
-  const query = new URLSearchParams(params);
-  const response = await fetch('https://api.twelvedata.com' + pathname + '?' + query, {
-    headers: { Authorization: 'apikey ' + TWELVE_DATA_API_KEY }
-  });
+async function alphaVantageFetch(params = {}) {
+  if (!marketConfigured()) throw new Error('Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.');
+  const query = new URLSearchParams({ ...params, apikey: ALPHA_VANTAGE_API_KEY });
+  const response = await fetch('https://www.alphavantage.co/query?' + query);
   const raw = await response.json().catch(() => ({}));
-  if (!response.ok || raw.status === 'error' || raw.code >= 400) throw new Error(cleanText(raw.message || 'Twelve Data request failed (' + response.status + ').', 220));
-  return { raw, headers: response.headers };
+  const apiMessage = raw['Error Message'] || raw.Note || raw.Information;
+  if (!response.ok || apiMessage) throw new Error(cleanText(apiMessage || 'Alpha Vantage request failed (' + response.status + ').', 260));
+  return raw;
 }
-async function resolveMarketInstrument(item) {
-  const normalized = normalizeMarketInstrument(item);
-  if (normalized.exchange || normalized.symbol.includes('/')) return normalized;
-  try {
-    const results = await marketSearch(normalized.symbol);
-    const exact = results.find(result => result.symbol === normalized.symbol) || results[0];
-    return exact ? normalizeMarketInstrument(exact) : normalized;
-  } catch {
-    return normalized;
-  }
-}
-
 async function marketData() {
-  let config = normalizeMarkets(db.markets);
-  let enriched = false;
-  const resolved = [];
-  for (const item of config.watchlist) {
-    const next = await resolveMarketInstrument(item);
-    resolved.push(next);
-    if ((!item.exchange && next.exchange) || (!item.name && next.name) || (!item.currency && next.currency)) enriched = true;
-  }
-  if (enriched) {
-    db.markets = normalizeMarkets({ ...db.markets, watchlist: resolved });
-    save(db);
-    config = normalizeMarkets(db.markets);
-  }
-
-  const key = config.watchlist.map(item => [item.symbol,item.exchange,item.micCode].join('|')).join(',');
+  const config = normalizeMarkets(db.markets);
+  const effectiveRefreshMinutes = alphaEffectiveRefreshMinutes(config);
+  const key = config.watchlist.map(item => item.providerSymbol).join(',');
   if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
 
-  const results = await Promise.all(config.watchlist.map(async item => {
-    try {
-      const params = { symbol: item.symbol };
-      if (item.exchange) params.exchange = item.exchange;
-      if (item.micCode) params.mic_code = item.micCode;
-      const { raw, headers } = await twelveDataFetch('/quote', params);
-      if (raw.status === 'error' || raw.code >= 400) return { quote: unavailableMarketQuote(item, raw.message), headers };
-      return { quote: normalizeMarketQuote(raw, item), headers };
-    } catch (error) {
-      return { quote: unavailableMarketQuote(item, error.message || 'Quote unavailable.'), headers: null };
+  const quotes = [];
+  for (const item of config.watchlist) {
+    if (item.providerSymbol.includes('/')) {
+      quotes.push(unavailableMarketQuote(item, 'Crypto pairs are not included in the Alpha Vantage stock quote watchlist. Remove and re-add this item as a supported equity or ETF.'));
+      continue;
     }
-  }));
+    try {
+      const raw = await alphaVantageFetch({ function: 'GLOBAL_QUOTE', symbol: item.providerSymbol });
+      const quote = raw['Global Quote'] || {};
+      quotes.push(Object.keys(quote).length ? normalizeMarketQuote(quote, item) : unavailableMarketQuote(item, 'Alpha Vantage returned no quote for this symbol.'));
+    } catch (error) {
+      quotes.push(unavailableMarketQuote(item, error.message || 'Quote unavailable.'));
+      if (/frequency|limit|25 requests|rate|standard api call/i.test(String(error.message || ''))) break;
+    }
+  }
+  while (quotes.length < config.watchlist.length) {
+    quotes.push(unavailableMarketQuote(config.watchlist[quotes.length], 'Skipped because the Alpha Vantage API quota was reached.'));
+  }
 
-  const quotes = results.map(result => result.quote);
-  const creditValues = results.map(result => Number(result.headers?.get('api-credits-used') || result.headers?.get('api-credits-request') || 0)).filter(Number.isFinite);
   const data = {
-    provider: 'Twelve Data',
+    provider: 'Alpha Vantage',
     quotes,
     watchlist: config.watchlist,
     symbols: config.symbols,
     updatedAt: new Date().toISOString(),
-    creditsUsed: creditValues.length ? String(creditValues.reduce((sum, value) => sum + value, 0)) : '',
-    creditsLeft: results.map(result => result.headers?.get('api-credits-left')).find(Boolean) || ''
+    refreshMinutes: config.refreshMinutes,
+    effectiveRefreshMinutes,
+    freeDailyRequestLimit: 25
   };
-  marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
+  marketCache = { key, expiresAt: Date.now() + effectiveRefreshMinutes * 60000, data };
   return data;
 }
 async function marketSearch(query) {
   const q = cleanText(query, 80).trim();
-  if (q.length < 1) return [];
-  const { raw } = await twelveDataFetch('/symbol_search', { symbol: q, outputsize: '10', show_plan: 'true' });
-  return (raw.data || []).map(item => ({
-    symbol: cleanText(item.symbol, 32).toUpperCase(),
-    name: cleanText(item.instrument_name, 120),
-    exchange: cleanText(item.exchange, 50).toUpperCase(),
-    micCode: cleanText(item.mic_code, 16).toUpperCase(),
-    type: cleanText(item.instrument_type, 60),
-    country: cleanText(item.country, 60),
-    currency: cleanText(item.currency, 12).toUpperCase(),
-    access: cleanText(item.access?.plan || item.access?.global || '', 30)
-  })).filter(item => item.symbol);
+  if (!q) return [];
+  const raw = await alphaVantageFetch({ function: 'SYMBOL_SEARCH', keywords: q });
+  return (raw.bestMatches || []).slice(0, 10).map(item => {
+    const providerSymbol = cleanText(item['1. symbol'], 32).toUpperCase();
+    return normalizeMarketInstrument({
+      symbol: alphaDisplaySymbol(providerSymbol),
+      providerSymbol,
+      name: item['2. name'],
+      type: item['3. type'],
+      region: item['4. region'],
+      exchange: item['4. region'],
+      marketOpen: item['5. marketOpen'],
+      marketClose: item['6. marketClose'],
+      timezone: item['7. timezone'],
+      currency: item['8. currency'],
+      matchScore: item['9. matchScore']
+    });
+  }).filter(item => item.providerSymbol);
 }
 
 function agendaRange(scope, now = new Date()) {
@@ -1416,7 +1429,7 @@ async function feed() {
     if (marketConfigured()) {
       try { markets = await marketData(); }
       catch (error) { marketError = error.message; }
-    } else marketError = 'Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.';
+    } else marketError = 'Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.';
   }
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
@@ -2041,7 +2054,7 @@ function state() {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
-    markets: { ...normalizeMarkets(db.markets), configured: marketConfigured(), provider: 'Twelve Data' },
+    markets: (() => { const config = normalizeMarkets(db.markets); return { ...config, configured: marketConfigured(), provider: 'Alpha Vantage', effectiveRefreshMinutes: alphaEffectiveRefreshMinutes(config), freeDailyRequestLimit: 25 }; })(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
@@ -2320,13 +2333,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/markets' && req.method === 'GET') {
-      if (!marketConfigured()) return json(res, 200, { markets: null, error: 'Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.' });
+      if (!marketConfigured()) return json(res, 200, { markets: null, error: 'Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.' });
       try { return json(res, 200, { markets: await marketData(), error: null }); }
       catch (error) { return json(res, 200, { markets: marketCache.data || null, error: error.message || 'Market data is unavailable.' }); }
     }
     if (p === '/api/markets/search' && req.method === 'GET') {
       const q = url.searchParams.get('q') || '';
-      if (!marketConfigured()) return json(res, 400, { error: 'TWELVE_DATA_API_KEY is not configured.' });
+      if (!marketConfigured()) return json(res, 400, { error: 'ALPHA_VANTAGE_API_KEY is not configured.' });
       if (!cleanText(q, 80).trim()) return json(res, 200, { results: [] });
       return json(res, 200, { results: await marketSearch(q) });
     }

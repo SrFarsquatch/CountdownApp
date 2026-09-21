@@ -29,16 +29,16 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 - Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
 
 
-## Twelve Data market setup
+## Alpha Vantage market setup
 
-Planner can show an automatic market watchlist on the Today dashboard, a dedicated Markets page, and a configurable e-ink Markets widget. Market prices are fetched server-side from Twelve Data and cached to reduce API usage.
+Planner can show an automatic market watchlist on the Today dashboard, a dedicated Markets page, and a configurable e-ink Markets widget. Market prices are fetched server-side from Alpha Vantage and cached aggressively to protect the free API quota.
 
-1. Create a Twelve Data account and copy the API key from the Twelve Data dashboard.
-2. Add this environment variable to the CasaOS app: `TWELVE_DATA_API_KEY`.
+1. Create a Alpha Vantage account and copy the API key from the Alpha Vantage dashboard.
+2. Add this environment variable to the CasaOS app: `ALPHA_VANTAGE_API_KEY`.
 3. Recreate/restart the container after adding the variable.
-4. Open **Markets** in Planner and search for the stocks, ETFs, or crypto pairs you want to follow.
+4. Open **Markets** in Planner and search for the stocks or ETFs you want to follow. Canadian Toronto/TSX Venture results are stored using Alpha Vantage's provider-qualified symbol.
 
-The API key is never sent to the browser. The watchlist is capped at eight symbols and quotes are cached for at least 30 minutes to stay comfortably within Twelve Data's Basic-plan daily quota. Each watchlist entry keeps its selected exchange so similarly named symbols resolve correctly.
+The API key is never sent to the browser. The watchlist is capped at eight symbols. Alpha Vantage's standard free allowance is small, so Planner automatically enforces a quota-safe cache interval based on watchlist size (and never less than the configured 4–24 hour cache). Canadian symbols should be added through the in-app search so the correct Alpha Vantage symbol is preserved.
 
 ## CasaOS deployment
 

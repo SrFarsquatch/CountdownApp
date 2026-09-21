@@ -262,12 +262,12 @@
 </section>
 
 <section class="view" id="view-markets">
-  <div class="hero"><div><h2>Markets</h2><p>Automatic market prices from Twelve Data. No manual price tracking.</p></div><span class="pill" id="marketProviderStatus">Twelve Data</span></div>
+  <div class="hero"><div><h2>Markets</h2><p>Automatic market prices from Alpha Vantage. No manual price tracking.</p></div><span class="pill" id="marketProviderStatus">Alpha Vantage</span></div>
   <div id="marketStatus" class="notice" style="display:none"></div>
   <div id="marketGrid" class="market-grid"></div>
   <div class="settings-grid" style="margin-top:14px">
     <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Planner to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
-    <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Twelve Data</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
+    <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Alpha Vantage</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
   </div>
 </section>
 
@@ -325,7 +325,7 @@
   <div class="settings-grid">
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Planner.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" style="margin-top:8px">Provider: Open-Meteo · no API key required.</div></div>
-    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Twelve Data</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option></select></div><div class="modal-actions"><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="meta" style="margin-top:8px">API key stays server-side in <code>TWELVE_DATA_API_KEY</code>.</div></div>
+    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Alpha Vantage</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="240">4 hours</option><option value="480">8 hours</option><option value="720">12 hours</option><option value="1440">24 hours</option></select></div><div class="modal-actions"><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="meta" style="margin-top:8px">API key stays server-side in <code>ALPHA_VANTAGE_API_KEY</code>.</div></div>
     <div class="card setting-card update-card">
       <div class="update-head">
         <div><div class="eyebrow">Maintenance</div><h3 style="margin-bottom:2px">Application updates</h3></div>
@@ -1012,29 +1012,29 @@ async function searchMarkets(){
  root.innerHTML='<div class="meta">Searching…</div>';
  try{
   const results=(await api('/api/markets/search?q='+encodeURIComponent(q))).results||[];
-  root.innerHTML=results.length?results.map((r,i)=>'<button class="market-search-result" type="button" data-market-result="'+i+'"><strong>'+esc(r.symbol)+'</strong> · '+esc(r.name||r.type||'')+'<div class="meta">'+esc([r.exchange,r.country,r.currency,r.access].filter(Boolean).join(' · '))+'</div></button>').join(''):'<div class="meta">No matching symbols.</div>';
+  root.innerHTML=results.length?results.map((r,i)=>'<button class="market-search-result" type="button" data-market-result="'+i+'"><strong>'+esc(r.symbol)+'</strong> · '+esc(r.name||r.type||'')+'<div class="meta">'+esc([r.region||r.exchange,r.type,r.currency].filter(Boolean).join(' · '))+'</div></button>').join(''):'<div class="meta">No matching symbols.</div>';
   root.querySelectorAll('[data-market-result]').forEach(btn=>btn.onclick=async()=>{
    const r=results[Number(btn.dataset.marketResult)],watchlist=[...(state.markets?.watchlist||[])];if(!r)return;
    if(watchlist.some(item=>item.symbol===r.symbol&&String(item.exchange||'')===String(r.exchange||'')))return;
-   if(watchlist.length>=8){alert('The watchlist is capped at 8 symbols to protect the Twelve Data free-tier quota.');return}
-   await saveMarketWatchlist([...watchlist,{symbol:r.symbol,name:r.name,exchange:r.exchange,micCode:r.micCode,type:r.type,country:r.country,currency:r.currency,access:r.access}]);root.innerHTML='';$('marketSearchInput').value='';
+   if(watchlist.length>=8){alert('The watchlist is capped at 8 symbols to protect the Alpha Vantage free API quota.');return}
+   await saveMarketWatchlist([...watchlist,{symbol:r.symbol,providerSymbol:r.providerSymbol,name:r.name,exchange:r.exchange,region:r.region,type:r.type,currency:r.currency,marketOpen:r.marketOpen,marketClose:r.marketClose,timezone:r.timezone,matchScore:r.matchScore}]);root.innerHTML='';$('marketSearchInput').value='';
   });
  }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
 }
 function renderMarkets(){
  const configured=state.markets?.configured;
- $('marketProviderStatus').textContent=configured?'Twelve Data connected':'Twelve Data not configured';
- const status=$('marketStatus'),unavailable=(marketData?.quotes||[]).filter(q=>q.available===false);const statusText=marketError||(unavailable.length?unavailable.length+' watchlist symbol'+(unavailable.length===1?' is':'s are')+' unavailable from your current Twelve Data access.':'');status.style.display=statusText?'block':'none';status.textContent=statusText;
+ $('marketProviderStatus').textContent=configured?'Alpha Vantage connected':'Alpha Vantage not configured';
+ const status=$('marketStatus'),unavailable=(marketData?.quotes||[]).filter(q=>q.available===false);const statusText=marketError||(unavailable.length?unavailable.length+' watchlist symbol'+(unavailable.length===1?' is':'s are')+' unavailable from Alpha Vantage or the current API allowance.':'');status.style.display=statusText?'block':'none';status.textContent=statusText;
  renderMarketSummary('marketGrid');
  const watchlist=state.markets?.watchlist||[],quotes=marketData?.quotes||[];
  $('marketWatchlist').innerHTML=watchlist.length?watchlist.map((item,index)=>{
-   const q=quotes.find(q=>q.symbol===item.symbol&&(!item.exchange||q.exchange===item.exchange))||quotes.find(q=>q.symbol===item.symbol);
+   const q=quotes.find(q=>q.providerSymbol===item.providerSymbol)||quotes.find(q=>q.symbol===item.symbol);
    const stat=q&&q.close!=null?marketMoney(q.close,q.currency)+' · '+(Number(q.percentChange)>=0?'▲ ':'▼ ')+Math.abs(Number(q.percentChange)||0).toFixed(2)+'%':(q?.error||'Quote unavailable');
    return '<div class="market-watch-row"><div><strong>'+esc(item.symbol)+'</strong><div class="meta">'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div><div class="meta">'+esc(stat)+'</div></div><button class="btn tiny ghost" data-remove-market="'+index+'">Remove</button></div>'
  }).join(''):'<div class="empty">No symbols selected.</div>';
  $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketWatchlist(watchlist.filter((_,i)=>i!==Number(btn.dataset.removeMarket))));
  $('marketSearchInput').disabled=!configured;$('marketSearchButton').disabled=!configured;
- if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Add TWELVE_DATA_API_KEY in Settings/CasaOS first.</div>';
+ if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Add ALPHA_VANTAGE_API_KEY in Settings/CasaOS first.</div>';
 }
 $('marketSearchButton').onclick=searchMarkets;
 $('marketSearchInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMarkets()}};
@@ -1067,7 +1067,7 @@ $('saveWeatherSettings').onclick=async()=>{
 };
 function renderMarketSettings(){
  const mc=state.markets||{};
- $('settingsMarketStatus').textContent=mc.configured?'Twelve Data is configured. Quotes are cached server-side to protect your API quota.':'Add TWELVE_DATA_API_KEY to the CasaOS app environment, then restart the container.';
+ $('settingsMarketStatus').textContent=mc.configured?'Alpha Vantage is configured. Effective cache: '+(mc.effectiveRefreshMinutes||mc.refreshMinutes||480)+' minutes to protect the free 25-request/day quota.':'Add ALPHA_VANTAGE_API_KEY to the CasaOS app environment, then restart the container.';
  $('settingsMarketRefresh').value=String(mc.refreshMinutes||30);
  $('saveMarketSettings').disabled=!mc.configured;
 }
