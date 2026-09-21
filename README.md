@@ -40,6 +40,12 @@ Planner can show an automatic market watchlist on the Today dashboard, a dedicat
 
 The API key is never sent to the browser. The watchlist is capped at eight symbols. Alpha Vantage's standard free allowance is small, so Planner automatically enforces a quota-safe cache interval based on watchlist size (and never less than the configured 4–24 hour cache). Canadian symbols should be added through the in-app search so the correct Alpha Vantage symbol is preserved.
 
+## CasaOS updater behavior
+
+Planner no longer renames or replaces its own CasaOS-managed container. The Maintenance page can check GHCR and pre-pull the newest image, but CasaOS remains responsible for applying/recreating the container. This avoids stale CasaOS container IDs after an in-app update.
+
+If an older build left CasaOS pointing at a deleted container, back up `/DATA/AppData/countdownapp/data`, remove/recreate only the app container, and re-import the current CasaOS compose without deleting that data directory.
+
 ## CasaOS deployment
 
 GitHub Actions builds the application image from `main` and publishes:

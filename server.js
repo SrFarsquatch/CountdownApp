@@ -540,7 +540,8 @@ function defaultUpdateState() {
     startedAt: null, finishedAt: null, error: null,
     checking: false, available: null, lastCheckedAt: null, checkError: null,
     currentImageId: '', latestImageId: '', currentRevision: '', latestRevision: '',
-    currentVersion: '', latestVersion: '', latestCreatedAt: ''
+    currentVersion: '', latestVersion: '', latestCreatedAt: '',
+    containerRef: '', installMode: 'casaos'
   };
 }
 function readUpdateState() {
@@ -591,6 +592,34 @@ async function dockerJson(version, method, endpoint, payload) {
   const response = await dockerRaw(method, version + endpoint, payload);
   return response.raw ? JSON.parse(response.raw) : {};
 }
+async function tryInspectContainer(version, ref) {
+  if (!ref) return null;
+  try { return await dockerJson(version, 'GET', '/containers/' + encodeURIComponent(ref) + '/json'); }
+  catch (error) {
+    if (/failed \(404\)/.test(String(error.message || ''))) return null;
+    throw error;
+  }
+}
+async function resolveCurrentContainer(version) {
+  const hostname = cleanText(process.env.HOSTNAME, 128);
+  const candidates = [...new Set([hostname, TARGET_CONTAINER].filter(Boolean))];
+  for (const candidate of candidates) {
+    const found = await tryInspectContainer(version, candidate);
+    if (found) return found;
+  }
+
+  const containers = await dockerJson(version, 'GET', '/containers/json?all=1');
+  const running = (Array.isArray(containers) ? containers : []).filter(item => item?.State === 'running');
+  const byHostname = hostname ? running.find(item => String(item.Id || '').startsWith(hostname)) : null;
+  const byName = running.find(item => (item.Names || []).some(name => name.replace(/^\//, '') === TARGET_CONTAINER));
+  const byImage = running.find(item => item.Image === TARGET_IMAGE || String(item.Image || '').startsWith(TARGET_IMAGE.split(':')[0] + ':'));
+  const match = byHostname || byName || byImage;
+  if (match?.Id) {
+    const found = await tryInspectContainer(version, match.Id);
+    if (found) return found;
+  }
+  throw new Error('Could not identify the running Planner container. CasaOS may have a stale container record; apply the app compose again in CasaOS.');
+}
 function splitImageReference(ref) {
   const slash = ref.lastIndexOf('/');
   const colon = ref.lastIndexOf(':');
@@ -632,15 +661,13 @@ let updateCheckPromise = null;
 async function checkForUpdate() {
   if (!updaterConfigured()) throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
   const currentStatus = readUpdateState();
-  if (['queued', 'pulling', 'preparing', 'restarting', 'verifying'].includes(currentStatus.phase)) {
-    throw new Error('An update is already running.');
-  }
+  if (currentStatus.phase === 'pulling') throw new Error('An update image is already being prepared.');
   if (updateCheckPromise) return updateCheckPromise;
   updateCheckPromise = (async () => {
-    writeUpdateState({ checking: true, checkError: null, message: 'Checking for updates…' });
+    writeUpdateState({ phase: 'idle', step: 'idle', progress: 0, checking: true, checkError: null, error: null, message: 'Checking for updates…' });
     try {
       const version = await dockerApiVersion();
-      const container = await dockerJson(version, 'GET', '/containers/' + encodeURIComponent(TARGET_CONTAINER) + '/json');
+      const container = await resolveCurrentContainer(version);
       const currentImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(container.Image) + '/json');
       await pullTargetImage(version);
       const latestImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(TARGET_IMAGE) + '/json');
@@ -648,19 +675,21 @@ async function checkForUpdate() {
       const latestMeta = dockerImageMetadata(latestImage);
       const available = container.Image !== latestImage.Id;
       return writeUpdateState({
-        phase: 'idle', step: 'idle', progress: 0, checking: false, available,
-        lastCheckedAt: new Date().toISOString(), checkError: null,
-        message: available ? 'Update available' : 'Planner is up to date',
+        phase: available ? 'ready' : 'idle', step: available ? 'casaos' : 'idle',
+        progress: available ? 100 : 0, checking: false, available,
+        lastCheckedAt: new Date().toISOString(), checkError: null, error: null,
+        message: available ? 'Update image ready — apply it from CasaOS' : 'Planner is up to date',
         currentImageId: currentMeta.imageId, latestImageId: latestMeta.imageId,
         currentRevision: currentMeta.revision, latestRevision: latestMeta.revision,
         currentVersion: currentMeta.version, latestVersion: latestMeta.version,
-        latestCreatedAt: latestMeta.createdAt
+        latestCreatedAt: latestMeta.createdAt,
+        containerRef: String(container.Name || '').replace(/^\//, '') || container.Id || '',
+        installMode: 'casaos'
       });
     } catch (error) {
       writeUpdateState({
-        checking: false, checkError: error.message,
-        lastCheckedAt: new Date().toISOString(),
-        message: 'Could not check for updates'
+        phase: 'error', step: 'error', progress: 0, checking: false, checkError: error.message, error: null,
+        lastCheckedAt: new Date().toISOString(), message: 'Could not check for updates'
       });
       throw error;
     } finally {
@@ -669,28 +698,54 @@ async function checkForUpdate() {
   })();
   return updateCheckPromise;
 }
-async function launchUpdater() {
+
+let updatePreparePromise = null;
+async function prepareUpdateForCasaOS() {
   if (!updaterConfigured()) throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
-  const version = await dockerApiVersion();
-  const name = 'countdownapp-update-' + Date.now().toString(36);
-  writeUpdateState({
-    phase: 'queued', step: 'starting', progress: 2,
-    message: 'Starting update…', startedAt: new Date().toISOString(),
-    finishedAt: null, error: null, checking: false
-  });
-  const config = {
-    Image: TARGET_IMAGE, Cmd: ['node', '/app/updater.js', '--once'],
-    Env: ['RUN_ONCE=1', 'TARGET_CONTAINER=' + TARGET_CONTAINER, 'TARGET_IMAGE=' + TARGET_IMAGE, 'DATA_DIR=/data', 'DOCKER_SOCKET=/var/run/docker.sock'],
-    HostConfig: { AutoRemove: true, Binds: ['/var/run/docker.sock:/var/run/docker.sock', '/DATA/AppData/countdownapp/data:/data'] }
-  };
-  try {
-    await dockerRaw('POST', version + '/containers/create?name=' + encodeURIComponent(name), config);
-    await dockerRaw('POST', version + '/containers/' + encodeURIComponent(name) + '/start');
-    return { name };
-  } catch (error) {
-    writeUpdateState({ phase: 'error', step: 'error', progress: 0, message: 'Could not start update', error: error.message, finishedAt: new Date().toISOString() });
-    throw error;
-  }
+  if (updatePreparePromise) return updatePreparePromise;
+  updatePreparePromise = (async () => {
+    writeUpdateState({
+      phase: 'pulling', step: 'download', progress: 15,
+      message: 'Preparing the latest image for CasaOS…',
+      startedAt: new Date().toISOString(), finishedAt: null,
+      checking: false, checkError: null, error: null, installMode: 'casaos'
+    });
+    try {
+      const version = await dockerApiVersion();
+      const container = await resolveCurrentContainer(version);
+      const currentImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(container.Image) + '/json');
+      await pullTargetImage(version);
+      const latestImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(TARGET_IMAGE) + '/json');
+      const currentMeta = dockerImageMetadata(currentImage);
+      const latestMeta = dockerImageMetadata(latestImage);
+      const available = container.Image !== latestImage.Id;
+      return writeUpdateState({
+        phase: available ? 'ready' : 'complete', step: available ? 'casaos' : 'complete',
+        progress: 100, available,
+        message: available
+          ? 'Latest image downloaded. Use CasaOS Update/Apply to recreate the managed container safely.'
+          : 'Planner is already up to date',
+        currentImageId: currentMeta.imageId, latestImageId: latestMeta.imageId,
+        currentRevision: currentMeta.revision, latestRevision: latestMeta.revision,
+        currentVersion: currentMeta.version, latestVersion: latestMeta.version,
+        latestCreatedAt: latestMeta.createdAt,
+        lastCheckedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        containerRef: String(container.Name || '').replace(/^\//, '') || container.Id || '',
+        error: null, checkError: null, installMode: 'casaos'
+      });
+    } catch (error) {
+      writeUpdateState({
+        phase: 'error', step: 'error', progress: 0,
+        message: 'Could not prepare update', error: error.message,
+        finishedAt: new Date().toISOString(), installMode: 'casaos'
+      });
+      throw error;
+    } finally {
+      updatePreparePromise = null;
+    }
+  })();
+  return updatePreparePromise;
 }
 
 async function exchange(code, req) {
@@ -2400,9 +2455,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/update/start' && req.method === 'POST') {
       if (req.headers['x-countdown-action'] !== 'update') return json(res, 403, { error: 'Invalid update request' });
       const status = updateStatus();
-      if (['queued', 'pulling', 'preparing', 'restarting', 'verifying'].includes(status.phase)) return json(res, 409, { error: 'An update is already running' });
-      const launched = await launchUpdater();
-      return json(res, 202, { ok: true, message: 'Update started', helper: launched.name });
+      if (status.phase === 'pulling') return json(res, 409, { error: 'An update image is already being prepared' });
+      const prepared = await prepareUpdateForCasaOS();
+      return json(res, 200, { ok: true, message: prepared.message, ...prepared });
     }
 
     if (p === '/api/display/rotate-token' && req.method === 'POST') {
