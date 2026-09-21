@@ -56,6 +56,19 @@
 .weather-search{display:grid;gap:8px}.weather-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}.weather-search-results{display:grid;gap:5px;max-height:200px;overflow:auto}
 .weather-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.weather-result:hover{border-color:var(--text)}
 .weather-selected{padding:8px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font-size:12px}
+.today-hero{align-items:center;min-height:78px}
+.today-hero-side{margin-left:auto;display:grid;gap:7px;justify-items:end;min-width:280px}
+.header-weather{display:flex;align-items:center;gap:11px;min-height:50px;padding:5px 7px;border-radius:12px}
+.header-weather-icon{width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto}
+.header-weather-icon svg{width:44px;height:44px}
+.header-weather-main{display:flex;align-items:center;gap:10px;min-width:0}
+.header-weather-temp{font-size:26px;font-weight:880;letter-spacing:-.045em;line-height:1;white-space:nowrap}
+.header-weather-copy{display:grid;gap:1px;min-width:0}
+.header-weather-condition{font-size:12px;font-weight:820;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-weather-detail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-weather-alert{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;background:color-mix(in srgb,var(--orange) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--orange) 45%,var(--line));color:var(--orange);font-size:10px;font-weight:850;white-space:nowrap}
+.today-hero-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.header-weather-empty{font-size:11px;color:var(--muted);padding:6px 0}
 .market-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
 .market-card{border:1px solid var(--line);background:var(--panel2);border-radius:13px;padding:12px;min-width:0}
 .market-symbol{font-size:12px;font-weight:900;letter-spacing:.04em}.market-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
@@ -71,6 +84,11 @@
 
 @media(max-width:760px){
   .content{padding:18px 14px calc(104px + env(safe-area-inset-bottom))}
+  .today-hero{display:grid;grid-template-columns:1fr;align-items:start}
+  .today-hero-side{margin-left:0;width:100%;min-width:0;justify-items:start}
+  .header-weather{width:100%;padding:9px 10px;background:var(--panel2);border:1px solid var(--line)}
+  .header-weather-main{min-width:0}
+  .today-hero-status{justify-content:flex-start}
   .grid{grid-template-columns:1fr;gap:12px}
   .grid>.span-8,.grid>.span-6,.grid>.span-4,.grid>.span-12{grid-column:1/-1!important;min-width:0}
   .card{min-width:0}
@@ -275,7 +293,13 @@
 <header class="top"><h1 id="pageTitle">Today</h1><div class="top-actions"><button class="btn" id="syncBtn">Refresh</button><button class="btn primary" id="topAdd">+ Add</button></div></header>
 <div class="content">
 <section class="view on" id="view-today">
-  <div class="hero"><div><h2 id="greeting">Your day</h2><p id="todayDate"></p></div><div class="pill" id="calendarStatus">Calendar</div></div>
+  <div class="hero today-hero">
+    <div><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
+    <div class="today-hero-side">
+      <div class="header-weather" id="todayWeather"><div class="header-weather-empty">Loading weather…</div></div>
+      <div class="today-hero-status"><div class="pill" id="calendarStatus">Calendar</div></div>
+    </div>
+  </div>
   <div class="stat-row">
     <div class="stat"><b id="statTasks">0</b><span>Open tasks</span></div>
     <div class="stat"><b id="statEvents">0</b><span>Upcoming events</span></div>
@@ -287,7 +311,6 @@
     <div class="card span-4"><div class="section-title"><h3>Upcoming</h3><button class="btn tiny ghost" data-jump="countdowns">View all</button></div><div id="todayCountdowns" class="count-grid"></div></div>
     <div class="card span-6"><div class="section-title"><h3>Tasks</h3><button class="btn tiny ghost" data-jump="tasks">View all</button></div><div id="todayTasks" class="list"></div></div>
     <div class="card span-6"><div class="section-title"><h3>Goals</h3><button class="btn tiny ghost" data-jump="goals">View all</button></div><div id="todayGoals" class="list"></div></div>
-    <div class="card span-12 weather-card"><div class="section-title"><h3>Weather</h3><span class="meta" id="weatherAttribution">Open-Meteo</span></div><div id="todayWeather"></div></div>
     <div class="card span-12"><div class="section-title"><h3>Markets</h3><button class="btn tiny ghost" data-jump="markets">Open markets</button></div><div id="todayMarkets" class="market-grid"></div></div>
   </div>
 </section>
@@ -711,29 +734,20 @@ function weatherIcon(condition){
 function renderWeather(){
  const root=$('todayWeather');if(!root)return;
  if(!weatherData){
-   root.innerHTML='<div class="weather-error">'+esc(weatherError||'Choose a weather location under Settings to add the forecast here.')+'</div>';
+   root.innerHTML='<div class="header-weather-empty">'+esc(weatherError||'Weather unavailable')+'</div>';
+   root.title=weatherError||'Weather unavailable';
    return;
  }
- const w=weatherData,current=w.current||{},days=(w.days||[]).slice(0,7),unit=w.unitSymbol||'',official=w.official||null;
- $('weatherAttribution').textContent=w.provider||'Open-Meteo';
- const forecast=days.map((d,i)=>{
-   const date=new Date(d.date+'T12:00:00'),name=i===0?'Today':date.toLocaleDateString([],{weekday:'short'});
-   return '<div class="forecast-day '+(i===0?'today':'')+'"><div class="forecast-name">'+esc(name)+'</div><div class="forecast-icon">'+weatherIcon(d.daytime?.condition)+'</div><div class="forecast-temps">'+esc((d.high??'—')+'° / '+(d.low??'—')+'°')+'</div><div class="forecast-rain">'+Math.round(d.daytime?.precipitation||0)+'% precip</div></div>'
- }).join('');
- const alerts=(official?.warnings||[]).map(a=>{
-   const details=[a.type,a.colourLevel||a.priority].filter(Boolean).join(' · ');
-   return '<div class="weather-alert"><div class="weather-alert-icon">!</div><div><strong>'+esc(a.title||'Weather alert')+'</strong>'+(details?'<div class="meta">'+esc(details)+'</div>':'')+'</div></div>'
- }).join('');
- const firstOfficial=(official?.forecasts||[])[0]||null;
- const officialOutlook=firstOfficial&&firstOfficial.summary?'<div class="weather-official"><div class="weather-official-badge">Environment Canada</div><div class="weather-official-text"><strong>'+esc(firstOfficial.period||'Official forecast')+'</strong> · '+esc(firstOfficial.summary)+'</div></div>':'';
- const sourceBits=[];
- if(current.source)sourceBits.push('Current: '+current.source);
- if(official?.station)sourceBits.push('Station: '+official.station);
- if(official?.distanceKm!=null)sourceBits.push(official.distanceKm+' km from selected location');
- if(w.sourceStatus?.environmentCanada===false&&w.sourceStatus?.environmentCanadaError)sourceBits.push('Environment Canada unavailable — using Open-Meteo');
- root.innerHTML='<div class="weather-main"><div class="weather-now"><div class="weather-glyph">'+weatherIcon(current.condition)+'</div><div><div class="weather-temp">'+esc((current.temperature??'—')+unit)+'</div><div class="weather-desc">'+esc(current.description||'Weather')+'</div><div class="weather-location">'+esc(w.locationLabel||official?.locationName||'Selected location')+'</div><div class="weather-metrics"><span>Feels '+esc((current.feelsLike??'—')+unit)+'</span><span>'+Math.round(current.humidity||0)+'% humidity</span><span>'+esc(Math.round(current.windSpeed||0)+(w.units==='imperial'?' mph':' km/h'))+'</span>'+(current.windGust?'<span>Gust '+esc(Math.round(current.windGust)+(w.units==='imperial'?' mph':' km/h'))+'</span>':'')+'</div>'+(sourceBits.length?'<div class="weather-source-note">'+esc(sourceBits.join(' · '))+'</div>':'')+'</div></div><div class="forecast-strip">'+forecast+'</div></div>'+officialOutlook+(alerts?'<div class="weather-alerts">'+alerts+'</div>':'');
+ const w=weatherData,current=w.current||{},today=(w.days||[])[0]||{},unit=w.unitSymbol||'',official=w.official||null;
+ const alerts=official?.warnings||[];
+ const detail=[
+   today.high!=null&&today.low!=null?'H '+today.high+'° / L '+today.low+'°':'',
+   w.locationLabel||official?.locationName||''
+ ].filter(Boolean).join(' · ');
+ const alert=alerts.length?'<span class="header-weather-alert" title="'+esc(alerts[0]?.title||'Weather alert')+'">! Weather alert</span>':'';
+ root.innerHTML='<div class="header-weather-main"><div class="header-weather-icon">'+weatherIcon(current.condition)+'</div><div class="header-weather-temp">'+esc((current.temperature??'—')+unit)+'</div><div class="header-weather-copy"><div class="header-weather-condition">'+esc(current.description||'Weather')+'</div><div class="header-weather-detail">'+esc(detail)+'</div></div></div>'+alert;
+ root.title=w.attribution||w.provider||'Weather';
 }
-
 function marketMoney(value,currency=''){const n=Number(value);if(!Number.isFinite(n))return '—';return (currency?currency+' ':'')+n.toLocaleString([],{minimumFractionDigits:2,maximumFractionDigits:2})}
 function marketCard(q){
  const pct=Number(q.percentChange),chg=Number(q.change),up=Number.isFinite(pct)&&pct>0,down=Number.isFinite(pct)&&pct<0,cls=up?'up':down?'down':'',arrow=up?'▲':down?'▼':'•';
