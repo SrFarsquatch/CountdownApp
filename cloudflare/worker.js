@@ -137,7 +137,16 @@ async function handleApi(request,env,identity){
   }
 
   let state=await loadState(env);
-  if(p==='/api/state'&&method==='GET')return json(publicState(state,env));
+  if(p==='/api/state'&&method==='GET'){
+    const view=publicState(state,env);
+    view.google.accounts=await Promise.all((state.google.accounts||[]).map(async a=>{
+      const caps=await accountCapabilities(a,env);
+      return{id:a.id,googleId:a.googleId,label:a.label,selectedCalendarIds:a.selectedCalendarIds||[],selectedTaskListIds:a.selectedTaskListIds||[],defaultTaskListId:a.defaultTaskListId||'',connectedAt:a.connectedAt,canWrite:caps.canWrite,canTasks:caps.canTasks};
+    }));
+    view.google.connected=view.google.accounts.length>0;
+    view.google.configured=googleConfigured(env);
+    return json(view);
+  }
 
   if(p==='/api/countdowns'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
