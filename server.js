@@ -621,7 +621,7 @@ async function resolveCurrentContainer(version) {
     const found = await tryInspectContainer(version, match.Id);
     if (found) return found;
   }
-  throw new Error('Could not identify the running Planner container. CasaOS may have a stale container record; apply the app compose again in CasaOS.');
+  throw new Error('Could not identify the running Quest Log container. CasaOS may have a stale container record; apply the app compose again in CasaOS.');
 }
 function splitImageReference(ref) {
   const slash = ref.lastIndexOf('/');
@@ -681,7 +681,7 @@ async function checkForUpdate() {
         phase: available ? 'ready' : 'idle', step: available ? 'casaos' : 'idle',
         progress: available ? 100 : 0, checking: false, available,
         lastCheckedAt: new Date().toISOString(), checkError: null, error: null,
-        message: available ? 'Update image ready — apply it from CasaOS' : 'Planner is up to date',
+        message: available ? 'Update image ready — apply it from CasaOS' : 'Quest Log is up to date',
         currentImageId: currentMeta.imageId, latestImageId: latestMeta.imageId,
         currentRevision: currentMeta.revision, latestRevision: latestMeta.revision,
         currentVersion: currentMeta.version, latestVersion: latestMeta.version,
@@ -757,7 +757,7 @@ async function installUpdateWithCasaOS() {
       if (container.Image === latestImage.Id) {
         return writeUpdateState({
           phase: 'complete', step: 'complete', progress: 100, available: false,
-          message: 'Planner is already up to date',
+          message: 'Quest Log is already up to date',
           currentImageId: latestMeta.imageId, latestImageId: latestMeta.imageId,
           currentRevision: latestMeta.revision, latestRevision: latestMeta.revision,
           currentVersion: latestMeta.version, latestVersion: latestMeta.version,
@@ -2535,7 +2535,7 @@ const server = http.createServer(async (req, res) => {
       const eventId = googleEventMatch[3] ? decodeURIComponent(googleEventMatch[3]) : '';
       const account = googleAccount(accountId);
       if (!account) return json(res, 404, { error: 'Google account was not found.' });
-      if (!accountCanWrite(account)) return json(res, 403, { error: 'Reconnect this Google account in Planner to grant event editing access.' });
+      if (!accountCanWrite(account)) return json(res, 403, { error: 'Reconnect this Google account in Quest Log to grant event editing access.' });
       await writableCalendar(account, calendarId);
 
       if (req.method === 'POST' && !eventId) {
@@ -2680,7 +2680,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('CountdownApp Planner listening on :' + PORT);
+  console.log('Quest Log listening on :' + PORT);
   setTimeout(() => syncGoogleTasks().catch(error => console.warn('Google Tasks startup sync failed:', error.message)), 5000);
 });
 setInterval(() => syncGoogleTasks().catch(error => console.warn('Google Tasks background sync failed:', error.message)), 5 * 60 * 1000);
