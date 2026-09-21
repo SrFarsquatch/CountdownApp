@@ -1449,7 +1449,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function alphaProviderError(raw = {}, status = 0) {
   const message = cleanText(raw['Error Message'] || raw.Note || raw.Information || '', 260);
   if (/1 request per second|spread.*sparsely|call frequency/i.test(message)) {
-    return { kind: 'burst', message: 'Alpha Vantage rate limit hit. Planner will retry automatically.' };
+    return { kind: 'burst', message: 'Alpha Vantage rate limit hit. Quest Log will retry automatically.' };
   }
   if (/25 requests per day|daily.*limit|standard api call frequency/i.test(message)) {
     return { kind: 'daily', message: 'Alpha Vantage daily free API limit reached. Cached market data will be used until the allowance resets.' };
