@@ -12,7 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketSearch } from './markets.js';
-import { testAgent, chat as agentChat, applyActions as applyAgentActions } from './agent.js';
+import { testAgent, chat, applyActions } from './agent.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -314,11 +314,11 @@ async function handleApi(request,env,identity){
   if(p==='/api/agent/chat'&&method==='POST'){
     const incoming=await body(request);
     if(state.agent?.enabled===false)return json({error:'Enable Navi in Settings first.'},400);
-    return json(await agentChat(state,env,incoming.messages||[]));
+    return json(await chat(state,env,incoming.messages||[]));
   }
   if(p==='/api/agent/actions'&&method==='POST'){
     const incoming=await body(request);
-    return json({ok:true,results:await applyAgentActions(state,env,incoming.actions||[])});
+    return json({ok:true,results:await applyActions(state,env,incoming.actions||[])});
   }
 
   if(p==='/api/display/rotate-token'&&method==='POST'){
