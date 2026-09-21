@@ -1391,7 +1391,7 @@ function agentSystemPrompt() {
     'Allowed action types and fields:',
     'create_task: title, description?, due? ISO-8601, start? ISO-8601, priority? low|medium|high|urgent, project?, goalId?, estimatedMinutes?',
     'update_task: id plus any create_task fields, or status? todo|progress|done',
-    'create_goal: title, description?, type? number|checklist|deadline, current?, target?, unit?, deadline? ISO-8601, project?, status? active|complete|paused',
+    'create_goal: title, description?, goalType? number|checklist|deadline, current?, target?, unit?, deadline? ISO-8601, project?, status? active|complete|paused',
     'update_goal: id plus any create_goal fields',
     'create_countdown: name, end ISO-8601, pinned?, goalId?, accentColor? black|red|blue|green|yellow|purple',
     'update_countdown: id plus any create_countdown fields',
@@ -1447,7 +1447,7 @@ function normalizeAgentAction(raw = {}) {
     if (type === 'update_goal') { out.id = cleanText(raw.id, 120); if (!out.id) return null; }
     copyText('title', 160); copyText('description', 2000); copyText('unit', 30); copyText('project', 80);
     copyIso('deadline'); copyNumber('current'); copyNumber('target');
-    if (raw.type !== undefined) out.goalType = en(raw.goalType || raw.type, GOAL_TYPES, 'number');
+    if (raw.goalType !== undefined) out.goalType = en(raw.goalType, GOAL_TYPES, 'number');
     if (raw.status !== undefined) out.status = en(raw.status, GOAL_STATUS, 'active');
     if (raw.accentColor !== undefined) out.accentColor = en(raw.accentColor, COLORS, 'purple');
     if (type === 'create_goal' && !out.title) return null;
