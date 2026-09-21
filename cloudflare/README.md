@@ -1,155 +1,216 @@
 # Quest Log Cloudflare deployment
 
-Quest Log uses one codebase for both CasaOS and Cloudflare. Do not maintain a separate cloud fork.
-
-## Stage 1: authenticated bridge
-
-The first cloud stage deliberately keeps the existing Node backend and JSON data store as the source of truth.
+Quest Log supports two independent runtimes from the same GitHub repository and the same `main` branch.
 
 ```text
-Browser
-  |
-  | Google login through Cloudflare Access
-  v
-quest.example.com
-Cloudflare Worker
-  |-- shared public/ frontend
-  |
-  | Cloudflare Access service token
-  v
-quest-origin.example.com
-Cloudflare Tunnel
-  v
-CasaOS :8088
-  v
-existing Quest Log Node backend + JSON data
+                    SrFarsquatch/CountdownApp
+                              main
+                                |
+                 +--------------+--------------+
+                 |                             |
+           CasaOS / Docker                Cloudflare
+              Node.js                       Worker
+                 |                             |
+          JSON persistence                    D1
+                 |                             |
+      local environment vars              Worker secrets
 ```
 
-This means the cloud and self-hosted URLs use the same frontend from the same Git commit and the same live planner data. There is no feature fork while the Worker backend is migrated to D1.
+There is deliberately **no network connection between the two deployments**.
 
-## Why this is staged
+The self-hosted runtime keeps using `/data/countdown-data.json` on CasaOS.
 
-The current Node server contains persistence, Google Calendar/Tasks OAuth, Navi, weather, markets, FrameOS output and the CasaOS updater in one runtime. Rewriting all of it at once would create two implementations that could drift.
+The cloud runtime uses Cloudflare D1 as its own source of truth.
 
-Bridge mode gives the private cloud URL first. API routes can then move to the Worker behind the same `/api/*` contract.
+Both deployments share the same frontend in `public/` and should keep the same API contract wherever practical so feature development stays synchronized.
 
-## Cloudflare Worker configuration
+## Cloud runtime
 
-The Worker is configured by `wrangler.jsonc`.
-
-Static files come directly from `public/`. Requests to `/api/*` and `/frame` are handled by the Worker first and forwarded to the private origin during bridge mode.
-
-### Public Access application
-
-Create a Cloudflare Access self-hosted application for the public Quest Log hostname, such as:
+The standalone Worker is defined in:
 
 ```text
-quest.example.com
+cloudflare/worker.js
 ```
 
-Use Google as the identity provider and create an Allow policy containing only the Google account(s) that should be able to open Quest Log.
+Cloud persistence helpers are in:
+
+```text
+cloudflare/state.js
+```
+
+The initial D1 schema is:
+
+```text
+cloudflare/migrations/0001_state_store.sql
+```
+
+The Worker serves the same `public/` directory as the self-hosted app.
+
+## Required Cloudflare resources
+
+### 1. D1 database
+
+Create a D1 database named:
+
+```text
+quest-log
+```
+
+Bind it to the Worker using the binding name:
+
+```text
+DB
+```
+
+The D1 database ID should also be added to `wrangler.jsonc` so GitHub/Workers Builds deploy the binding consistently.
+
+### 2. Cloudflare Access
+
+Protect the public Quest Log hostname, for example:
+
+```text
+questlog.mattmoonie.ca
+```
+
+with a Cloudflare Access self-hosted application.
+
+Use Google as the identity provider and allow only the email addresses that should be able to open the cloud application.
 
 Configure these Worker variables:
 
-- `CF_ACCESS_TEAM_DOMAIN` - for example `your-team.cloudflareaccess.com`
-- `CF_ACCESS_AUD` - Application Audience (AUD) from the public Access application
-- `ALLOWED_EMAILS` - optional comma-separated email allowlist used as defense in depth
-- `ORIGIN_BASE_URL` - for example `https://quest-origin.example.com`
+- `CF_ACCESS_TEAM_DOMAIN`
+- `CF_ACCESS_AUD`
+- `ALLOWED_EMAILS`
 
-The Worker validates the Access JWT itself before serving the application.
+The Worker validates the Access JWT in addition to the Access policy.
 
-### Private origin application
+### 3. Cloud workspace
 
-Create a Cloudflare Tunnel from the home network to the existing CasaOS service and give it a different hostname, for example:
-
-```text
-quest-origin.example.com -> http://<casaos-host>:8088
-```
-
-Create a second Cloudflare Access self-hosted application for that origin hostname. Give it a **Service Auth** policy, not a normal user Allow policy.
-
-Create a dedicated Access service token and save its values as Worker secrets:
-
-- `ORIGIN_ACCESS_CLIENT_ID`
-- `ORIGIN_ACCESS_CLIENT_SECRET`
-
-The public Worker sends those service-token headers when it forwards requests to the origin.
-
-Do not leave the origin hostname publicly accessible.
-
-## Google OAuth
-
-When traffic is coming through the bridge, the Node backend uses the forwarded public hostname to build its Google redirect URI.
-
-For the production cloud deployment, register:
+By default the Worker uses one shared cloud workspace called:
 
 ```text
-https://quest.example.com/api/google/callback
+default
 ```
 
-in the Google OAuth Web application.
+You can override it with:
 
-The direct CasaOS URL still works for normal planner access. If you also need a separate OAuth callback for direct self-hosted access, register that callback with Google as an additional authorized redirect URI and use the appropriate external URL.
+```text
+CLOUD_WORKSPACE_ID
+```
+
+Every Google login allowed through Cloudflare Access currently sees the same Quest Log cloud workspace. Multi-workspace/user isolation can be added later without coupling the cloud deployment to CasaOS.
+
+## Cloud-only integrations
+
+The cloud runtime uses its own credentials. Do not reuse the self-hosted app as an API backend.
+
+### Google Calendar / Tasks
+
+Cloud Google integration will use Worker secrets:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `APP_SECRET`
+
+The production OAuth callback should be registered as:
+
+```text
+https://questlog.mattmoonie.ca/api/google/callback
+```
+
+These credentials and tokens belong to the cloud deployment only.
+
+### Navi / OpenAI
+
+Cloud Navi will use:
+
+- `OPENAI_API_KEY`
+- optional `OPENAI_MODEL`
+
+The default model target is:
+
+```text
+gpt-5.6-luna
+```
+
+The OpenAI key is stored as a Worker secret and is never sent to the browser.
+
+### Markets
+
+Cloud Markets uses:
+
+- `ALPHA_VANTAGE_API_KEY`
+
+as a Worker secret.
+
+### Weather
+
+Cloud weather is fetched directly from Open-Meteo by the Worker and uses coordinates stored in D1.
+
+## Cloud-specific behavior
+
+Some features intentionally differ by runtime.
+
+### Updates
+
+Self-hosted Quest Log keeps the CasaOS one-click updater.
+
+Cloud Quest Log is deployed from GitHub through Cloudflare Workers Builds. The cloud API reports that updates are cloud-managed and never attempts Docker/CasaOS operations.
+
+### Persistence
+
+Self-hosted:
+
+```text
+/data/countdown-data.json
+```
+
+Cloud:
+
+```text
+Cloudflare D1 -> questlog_state
+```
+
+The two stores never synchronize automatically.
+
+### FrameOS
+
+The cloud runtime keeps an independent display token in D1. Cloud FrameOS endpoints must not depend on the self-hosted server.
 
 ## Local development
 
-The local Worker can sit in front of the local Node server just like production.
-
-1. Install dependencies:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Copy the development environment example:
-
-```bash
-cp .dev.vars.example .dev.vars
-```
-
-3. Start the existing Node app:
+Run the CasaOS/Node runtime:
 
 ```bash
 npm run dev:selfhosted
 ```
 
-4. In another terminal start Wrangler:
+For Worker development:
 
 ```bash
+cp .dev.vars.example .dev.vars
 npm run dev:cloudflare
 ```
 
-The example development configuration uses `AUTH_BYPASS=true` and an unprotected localhost origin. Those flags are development-only and must not be used in production.
+Local Worker development requires a D1 `DB` binding. Use Wrangler's local D1 support once the binding has been added to `wrangler.jsonc`.
 
-## One branch, two deployments
+`AUTH_BYPASS=true` is for local development only. Never enable it in production.
 
-Both runtime targets follow `main`.
+## Development rule
 
-- CasaOS/GHCR continues building the Node/Docker deployment from `main`.
-- Cloudflare Workers Builds should also deploy the Worker from `main`.
-- Shared UI changes remain in `public/` and are consumed by both deployments automatically.
-- Shared API behavior should keep the same route contract even as individual routes become Worker-native.
+Do not create separate product branches for cloud-only feature development.
 
-The Cloudflare Worker exposes:
+New shared features should:
 
-```text
-GET /api/runtime
-```
+1. update the shared frontend once;
+2. preserve a common API contract;
+3. implement the runtime-specific persistence/integration adapter in Node and Worker as needed;
+4. ship both deployments from the same `main` commit.
 
-and returns its Worker version metadata.
-
-The Node backend also exposes `GET /api/runtime` and reports `runtime: "self-hosted"`.
-
-## D1 migration
-
-`cloudflare/migrations/0001_state_store.sql` is the initial persistence foundation.
-
-The migration plan is:
-
-1. **Bridge** - Worker serves the shared UI and proxies the existing backend.
-2. **D1 state store** - copy the current JSON state into D1 while preserving the state shape.
-3. **Native CRUD** - move tasks, goals, countdowns and settings to Worker-native routes.
-4. **Cloud integrations** - move Google OAuth, Navi, weather and markets to Worker secrets/API calls.
-5. **Standalone cloud** - Cloudflare no longer requires CasaOS, while the Node runtime remains available as a self-hosted deployment of the same app.
-
-Do not duplicate frontend features between the two runtimes. New product features should continue to land in the shared UI and shared API contract.
+That keeps the cloud and self-hosted editions on the same product version without sharing infrastructure or data.
