@@ -1,0 +1,16 @@
+# Copy this file to .dev.vars for local Cloudflare Worker development.
+# Never commit .dev.vars.
+
+AUTH_BYPASS=true
+DEV_USER_EMAIL=local-dev@questlog.local
+
+# Start the self-hosted app on port 8080, then let Wrangler proxy API requests to it.
+ORIGIN_BASE_URL=http://127.0.0.1:8080
+ALLOW_UNPROTECTED_ORIGIN=true
+
+# Production values are configured in Cloudflare:
+# CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
+# CF_ACCESS_AUD=your-access-application-aud
+# ALLOWED_EMAILS=you@example.com
+# ORIGIN_ACCESS_CLIENT_ID=<Cloudflare Access service token client id>
+# ORIGIN_ACCESS_CLIENT_SECRET=<Cloudflare Access service token client secret>
