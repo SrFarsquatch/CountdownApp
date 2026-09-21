@@ -10,6 +10,7 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
@@ -34,8 +35,9 @@ const AGENDA_SCOPES = ['today', 'week', 'month', 'upcoming'];
 const TASK_STYLES = ['checklist', 'compact'];
 const GOAL_STYLES = ['bars', 'compact'];
 const COUNTDOWN_STYLES = ['detailed', 'compact'];
+const MARKET_STYLES = ['summary', 'compact', 'ticker'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
-const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns'];
+const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns', 'markets'];
 const DISPLAY_GRID_COLS = 24;
 const DISPLAY_GRID_ROWS = 16;
 const TASK_STATUS = ['todo', 'progress', 'done'];
@@ -68,28 +70,32 @@ function defaultSectionLayout(mode = 'dashboard') {
     weather: { x: 16, y: 0, w: 8, h: 4 },
     tasks: { x: 16, y: 4, w: 8, h: 4 },
     goals: { x: 16, y: 8, w: 8, h: 4 },
-    countdowns: { x: 16, y: 12, w: 8, h: 4 }
+    countdowns: { x: 16, y: 12, w: 8, h: 4 },
+    markets: { x: 16, y: 12, w: 8, h: 4 }
   };
   if (mode === 'monthly') return {
     agenda: { x: 0, y: 0, w: 18, h: 16 },
     weather: { x: 18, y: 0, w: 6, h: 4 },
     tasks: { x: 18, y: 4, w: 6, h: 4 },
     goals: { x: 18, y: 8, w: 6, h: 4 },
-    countdowns: { x: 18, y: 12, w: 6, h: 4 }
+    countdowns: { x: 18, y: 12, w: 6, h: 4 },
+    markets: { x: 18, y: 12, w: 6, h: 4 }
   };
   if (mode === 'countdowns') return {
     agenda: { x: 0, y: 0, w: 12, h: 8 },
     weather: { x: 12, y: 0, w: 12, h: 4 },
     tasks: { x: 12, y: 4, w: 12, h: 4 },
     goals: { x: 0, y: 8, w: 12, h: 8 },
-    countdowns: { x: 0, y: 0, w: 24, h: 16 }
+    countdowns: { x: 0, y: 0, w: 24, h: 16 },
+    markets: { x: 12, y: 8, w: 12, h: 8 }
   };
   return {
     agenda: { x: 0, y: 0, w: 14, h: 8 },
     weather: { x: 14, y: 0, w: 10, h: 4 },
     tasks: { x: 14, y: 4, w: 10, h: 4 },
-    goals: { x: 0, y: 8, w: 12, h: 8 },
-    countdowns: { x: 12, y: 8, w: 12, h: 8 }
+    goals: { x: 0, y: 8, w: 8, h: 8 },
+    countdowns: { x: 8, y: 8, w: 8, h: 8 },
+    markets: { x: 16, y: 8, w: 8, h: 8 }
   };
 }
 function normalizeSectionLayout(input, mode = 'dashboard') {
@@ -134,7 +140,8 @@ function defaultSectionSettings(mode = 'dashboard') {
     weather: { enabled: !countdownOnly, style: 'forecast', limit: 5 },
     tasks: { enabled: !countdownOnly, style: 'checklist', limit: 4 },
     goals: { enabled: !countdownOnly, style: 'bars', limit: 2 },
-    countdowns: { enabled: true, style: 'detailed', limit: countdownOnly ? 8 : 3 }
+    countdowns: { enabled: true, style: 'detailed', limit: countdownOnly ? 8 : 3 },
+    markets: { enabled: mode === 'dashboard', style: 'summary', limit: 4 }
   };
 }
 function normalizeSectionSettings(input, mode = 'dashboard') {
@@ -145,7 +152,8 @@ function normalizeSectionSettings(input, mode = 'dashboard') {
     weather: WEATHER_STYLES,
     tasks: TASK_STYLES,
     goals: GOAL_STYLES,
-    countdowns: COUNTDOWN_STYLES
+    countdowns: COUNTDOWN_STYLES,
+    markets: MARKET_STYLES
   };
   const out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
@@ -184,10 +192,11 @@ function normalizeModeSections(input, legacyDisplay = {}) {
       weather: { ...base.weather, enabled: legacyDisplay.showWeather !== false, style: en(legacyDisplay.weatherStyle, WEATHER_STYLES, base.weather.style) },
       tasks: { ...base.tasks, enabled: legacyDisplay.showTasks !== false, limit: clamp(num(legacyDisplay.maxTasks, base.tasks.limit), 1, 20) },
       goals: { ...base.goals, enabled: legacyDisplay.showGoals !== false, limit: clamp(num(legacyDisplay.maxGoals, base.goals.limit), 1, 20) },
-      countdowns: { ...base.countdowns, enabled: legacyDisplay.showCountdowns !== false, limit: clamp(num(legacyDisplay.maxCountdowns, base.countdowns.limit), 1, 20) }
+      countdowns: { ...base.countdowns, enabled: legacyDisplay.showCountdowns !== false, limit: clamp(num(legacyDisplay.maxCountdowns, base.countdowns.limit), 1, 20) },
+      markets: { ...base.markets }
     };
     if (mode === 'countdowns' && !source[mode]) {
-      legacy.agenda.enabled = false; legacy.weather.enabled = false; legacy.tasks.enabled = false; legacy.goals.enabled = false; legacy.countdowns.enabled = true;
+      legacy.agenda.enabled = false; legacy.weather.enabled = false; legacy.tasks.enabled = false; legacy.goals.enabled = false; legacy.markets.enabled = false; legacy.countdowns.enabled = true;
     }
     out[mode] = normalizeSectionSettings(source[mode] || legacy, mode);
   }
@@ -219,6 +228,7 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
+    markets: { symbols: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -314,6 +324,22 @@ function normalizeWeather(x = {}) {
   };
 }
 
+function normalizeMarkets(x = {}) {
+  const raw = Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'];
+  const seen = new Set();
+  const symbols = [];
+  for (const value of raw) {
+    const symbol = cleanText(value, 32).toUpperCase();
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol); symbols.push(symbol);
+    if (symbols.length >= 8) break;
+  }
+  return {
+    symbols: symbols.length ? symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'],
+    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 15, 180)
+  };
+}
+
 function load() {
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -339,6 +365,7 @@ function load() {
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
       weather: normalizeWeather(parsed.weather || base.weather),
+      markets: normalizeMarkets(parsed.markets || base.markets),
       display: (() => {
         const legacyDisplay = parsed.display || {};
         const legacyVersion = num(legacyDisplay.plannerLayoutVersion, 0);
@@ -1210,6 +1237,75 @@ async function weatherLocationSearch(query) {
   }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
 }
 
+let marketCache = { key: '', expiresAt: 0, data: null };
+function marketConfigured() { return Boolean(TWELVE_DATA_API_KEY); }
+function marketNumber(value) {
+  const n = Number(value); return Number.isFinite(n) ? n : null;
+}
+function normalizeMarketQuote(raw = {}, fallbackSymbol = '') {
+  const close = marketNumber(raw.close ?? raw.price);
+  const change = marketNumber(raw.change);
+  const percentChange = marketNumber(raw.percent_change);
+  return {
+    symbol: cleanText(raw.symbol || fallbackSymbol, 32).toUpperCase(),
+    name: cleanText(raw.name || raw.instrument_name || '', 120),
+    exchange: cleanText(raw.exchange || '', 50),
+    currency: cleanText(raw.currency || '', 12),
+    datetime: cleanText(raw.datetime || '', 50),
+    close, open: marketNumber(raw.open), high: marketNumber(raw.high), low: marketNumber(raw.low),
+    previousClose: marketNumber(raw.previous_close), change, percentChange,
+    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open)
+  };
+}
+async function twelveDataFetch(pathname, params = {}) {
+  if (!marketConfigured()) throw new Error('Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.');
+  const query = new URLSearchParams(params);
+  const response = await fetch('https://api.twelvedata.com' + pathname + '?' + query, {
+    headers: { Authorization: 'apikey ' + TWELVE_DATA_API_KEY }
+  });
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok || raw.status === 'error' || raw.code >= 400) throw new Error(cleanText(raw.message || 'Twelve Data request failed (' + response.status + ').', 220));
+  return { raw, headers: response.headers };
+}
+async function marketData() {
+  const config = normalizeMarkets(db.markets);
+  const key = config.symbols.join(',');
+  if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
+  const { raw, headers } = await twelveDataFetch('/quote', { symbol: key });
+  let quotes = [];
+  if (raw && typeof raw === 'object' && raw.symbol) quotes = [normalizeMarketQuote(raw, config.symbols[0])];
+  else if (raw && typeof raw === 'object') {
+    quotes = config.symbols.map(symbol => {
+      const item = raw[symbol] || raw[symbol.toUpperCase()] || raw[symbol.replace('/', '')];
+      return item && item.status !== 'error' ? normalizeMarketQuote(item, symbol) : null;
+    }).filter(Boolean);
+  }
+  const data = {
+    provider: 'Twelve Data',
+    quotes,
+    symbols: config.symbols,
+    updatedAt: new Date().toISOString(),
+    creditsUsed: headers.get('api-credits-used') || '',
+    creditsLeft: headers.get('api-credits-left') || ''
+  };
+  marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
+  return data;
+}
+async function marketSearch(query) {
+  const q = cleanText(query, 80).trim();
+  if (q.length < 1) return [];
+  const { raw } = await twelveDataFetch('/symbol_search', { symbol: q, outputsize: '10', show_plan: 'true' });
+  return (raw.data || []).map(item => ({
+    symbol: cleanText(item.symbol, 32).toUpperCase(),
+    name: cleanText(item.instrument_name, 120),
+    exchange: cleanText(item.exchange, 50),
+    type: cleanText(item.instrument_type, 60),
+    country: cleanText(item.country, 60),
+    currency: cleanText(item.currency, 12),
+    access: cleanText(item.access?.plan || item.access?.global || '', 30)
+  })).filter(item => item.symbol);
+}
+
 function agendaRange(scope, now = new Date()) {
   const startOfDay = value => { const d = new Date(value); d.setHours(0, 0, 0, 0); return d; };
   if (scope === 'today') {
@@ -1230,7 +1326,7 @@ function agendaRange(scope, now = new Date()) {
 }
 
 async function feed() {
-  let ev = [], calendarError = null, weather = null, weatherError = null;
+  let ev = [], calendarError = null, weather = null, weatherError = null, markets = null, marketError = null;
   const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
   const modeSections = normalizeSectionSettings(db.display.modeSections?.[mode], mode);
   const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
@@ -1247,6 +1343,12 @@ async function feed() {
       catch (error) { weatherError = error.message; }
     } else weatherError = 'Choose a weather location in Settings.';
   }
+  if (modeSections.markets.enabled) {
+    if (marketConfigured()) {
+      try { markets = await marketData(); }
+      catch (error) { marketError = error.message; }
+    } else marketError = 'Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.';
+  }
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
     .slice(0, clamp(num(db.display.maxCountdowns, 3), 1, 20)).map(c => countdownView(c, now));
@@ -1255,7 +1357,7 @@ async function feed() {
     .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
     .slice(0, clamp(num(db.display.maxGoals, 3), 1, 20)).map(g => ({ ...g, progress: goalProgress(g) }));
   return {
-    generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather,
+    generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather, marketError, markets,
     nextEvent: ev.find(event => new Date(event.end || event.start).getTime() >= now) || null,
     events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
     calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
@@ -1602,11 +1704,12 @@ function renderSvg(data, w, h) {
     weather: data.weather ? [data.weather] : [],
     tasks: data.tasks || [],
     goals: data.goals || [],
-    countdowns: data.countdowns || []
+    countdowns: data.countdowns || [],
+    markets: data.markets?.quotes || []
   };
 
   function drawEmptySection(kind, x, y, width) {
-    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS', markets: 'MARKETS' }[kind];
     svg += sectionTitle(label, x, y + 11);
     svg += '<text x="' + x + '" y="' + (y + 37) + '" font-size="12" class="muted">Nothing to show.</text>';
   }
@@ -1615,7 +1718,7 @@ function renderSvg(data, w, h) {
     const clipId = options.clipId || '';
     if (clipId) svg += '<g clip-path="url(#' + clipId + ')">';
     let cursor = y;
-    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS' }[kind];
+    const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS', markets: 'MARKETS' }[kind];
     const items = sectionData[kind] || [];
     svg += sectionTitle(label, x, cursor + 11);
     cursor += 22;
@@ -1750,6 +1853,25 @@ function renderSvg(data, w, h) {
         cursor += activeSections.countdowns.style==='detailed'?38:25;
       }
     }
+    if (kind === 'markets') {
+      const style = activeSections.markets.style;
+      const visible = items.slice(0, activeSections.markets.limit);
+      for (const quote of visible) {
+        const compact = style === 'compact';
+        const rowH = compact ? 22 : 31;
+        if (cursor + rowH > y + maxHeight) break;
+        const pct = Number(quote.percentChange);
+        const change = Number.isFinite(pct) ? pct : 0;
+        const accent = palette === 'mono' ? black : (change > 0 ? HEX.green : change < 0 ? HEX.red : black);
+        const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '•';
+        svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
+        svg += '<text x="' + x + '" y="' + (cursor + (compact?15:18)) + '" font-size="' + (compact?10.5:12.5) + '" font-weight="800">' + esc(quote.symbol) + '</text>';
+        if (style === 'ticker' && quote.name) svg += '<text x="' + (x+58) + '" y="' + (cursor+18) + '" font-size="9" class="muted">' + esc(truncateForWidth(quote.name,Math.max(50,width-150),9)) + '</text>';
+        svg += '<text x="' + (x + width - 58) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?10.5:12) + '" font-weight="700">' + esc(quote.close==null?'—':Number(quote.close).toFixed(2)) + '</text>';
+        svg += '<text x="' + (x + width) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?9.5:11) + '" font-weight="800" fill="' + accent + '">' + arrow + ' ' + esc((Math.abs(change)).toFixed(2)) + '%</text>';
+        cursor += rowH;
+      }
+    }
     if (clipId) svg += '</g>';
     return cursor - y;
   }
@@ -1849,6 +1971,7 @@ function state() {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
+    markets: { ...normalizeMarkets(db.markets), configured: marketConfigured(), provider: 'Twelve Data' },
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
@@ -2126,6 +2249,18 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { results: await weatherLocationSearch(q) });
     }
 
+    if (p === '/api/markets' && req.method === 'GET') {
+      if (!marketConfigured()) return json(res, 200, { markets: null, error: 'Add TWELVE_DATA_API_KEY in CasaOS to enable Markets.' });
+      try { return json(res, 200, { markets: await marketData(), error: null }); }
+      catch (error) { return json(res, 200, { markets: marketCache.data || null, error: error.message || 'Market data is unavailable.' }); }
+    }
+    if (p === '/api/markets/search' && req.method === 'GET') {
+      const q = url.searchParams.get('q') || '';
+      if (!marketConfigured()) return json(res, 400, { error: 'TWELVE_DATA_API_KEY is not configured.' });
+      if (!cleanText(q, 80).trim()) return json(res, 200, { results: [] });
+      return json(res, 200, { results: await marketSearch(q) });
+    }
+
     if (p === '/api/settings' && req.method === 'PUT') {
       const incoming = await body(req);
       if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
@@ -2152,6 +2287,14 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
       if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
+      if (incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
+        db.markets = normalizeMarkets({
+          ...db.markets,
+          symbols: incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.symbols,
+          refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : db.markets.refreshMinutes
+        });
+        marketCache = { key: '', expiresAt: 0, data: null };
+      }
       if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherUnits !== undefined) {
         db.weather = normalizeWeather({
           ...db.weather,
