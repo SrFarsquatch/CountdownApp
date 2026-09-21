@@ -1,0 +1,16 @@
+{
+  "name": "quest-log",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Quest Log planner - shared self-hosted and Cloudflare deployment",
+  "scripts": {
+    "start": "node server.js",
+    "dev:selfhosted": "node server.js",
+    "dev:cloudflare": "wrangler dev",
+    "deploy:cloudflare": "wrangler deploy",
+    "cloudflare:types": "wrangler types"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
