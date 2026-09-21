@@ -1471,7 +1471,12 @@ $('updateNow').onclick=async()=>{
 function loadAgentHistory(){try{const parsed=JSON.parse(localStorage.getItem('questlog-agent-chat')||'[]');agentMessages=Array.isArray(parsed)?parsed.slice(-40).filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'):[]}catch{agentMessages=[]}}
 function saveAgentHistory(){try{localStorage.setItem('questlog-agent-chat',JSON.stringify(agentMessages.slice(-40)))}catch{}}
 function agentProviderLabel(value){return({hermes:'Hermes Agent',openclaw:'OpenClaw','openai-compatible':'OpenAI-compatible'})[value]||'Agent'}
-function agentConfigured(){return Boolean(state?.agent?.enabled&&state?.agent?.baseUrl&&state?.agent?.model)}
+function agentConfigured(){
+ const cfg=state?.agent||{};
+ if(!cfg.enabled||!cfg.model)return false;
+ if(runtimeInfo?.runtime==='cloudflare')return cfg.provider==='local'?Boolean(cfg.baseUrl):Boolean(cfg.hasApiKey);
+ return Boolean(cfg.baseUrl);
+}
 function renderAgent(){
  if(!agentMessages.length)loadAgentHistory();
  const cfg=state?.agent||{},configured=agentConfigured();
@@ -1528,18 +1533,29 @@ async function applyAgentActions(index){
 function renderAgentSettings(){
  const cfg=state?.agent||{},cloud=runtimeInfo?.runtime==='cloudflare';
  $('agentEnabled').checked=Boolean(cfg.enabled);
- $('agentProvider').value=cfg.provider||'hermes';
  $('agentBaseUrl').value=cfg.baseUrl||'';
  $('agentModel').value=cfg.model||'';
  $('agentContextDays').value=String(cfg.contextDays||14);
  $('agentApiKey').value='';
  if(cloud){
-   $('agentProviderRow').style.display='none';
-   $('agentBaseUrlField').style.display='none';
+   $('agentProviderRow').style.display='';
+   $('agentProvider').innerHTML='<option value="openai">OpenAI</option><option value="local">Local model (HTTPS)</option>';
+   $('agentProvider').value=cfg.provider==='local'?'local':'openai';
    $('agentApiKeyField').style.display='none';
-   $('agentSettingsIntro').textContent='Cloud Navi uses OpenAI through Worker runtime secrets. The API key is never exposed to the browser.';
-   $('agentKeyStatus').textContent=cfg.hasApiKey?'OPENAI_API_KEY is configured in Cloudflare.':'Add OPENAI_API_KEY as a Cloudflare Worker secret.';
+   const local=$('agentProvider').value==='local';
+   $('agentBaseUrlField').style.display=local?'':'none';
+   $('agentSettingsIntro').textContent=local
+     ?'Cloud Navi can securely call your own OpenAI-compatible model through an HTTPS endpoint, such as a Cloudflare Tunnel.'
+     :'Cloud Navi uses OpenAI through Worker runtime secrets. The API key is never exposed to the browser.';
+   $('agentEndpointHint').textContent=local
+     ?'Use an HTTPS OpenAI-compatible /v1 endpoint reachable from Cloudflare. A Cloudflare Tunnel can expose your local model without exposing Quest Log itself.'
+     :'OpenAI endpoint is managed by the cloud runtime.';
+   $('agentKeyStatus').textContent=cfg.hasApiKey
+     ?(local?'Local model authentication is configured in Cloudflare.':'OPENAI_API_KEY is configured in Cloudflare.')
+     :(local?'Add LOCAL_AGENT_API_KEY or a Cloudflare Access service token to Worker secrets if your endpoint requires authentication.':'Add OPENAI_API_KEY as a Cloudflare Worker secret.');
  }else{
+   $('agentProvider').innerHTML='<option value="hermes">Hermes Agent</option><option value="openclaw">OpenClaw</option><option value="openai-compatible">OpenAI-compatible</option>';
+   $('agentProvider').value=cfg.provider||'hermes';
    $('agentProviderRow').style.display='';
    $('agentBaseUrlField').style.display='';
    $('agentApiKeyField').style.display='';
@@ -1563,8 +1579,20 @@ function applyAgentProviderDefaults(force=false){
    if(hint)hint.textContent='Enter the provider\'s OpenAI-compatible /v1 base URL. Credentials stay server-side in Quest Log.';
  }
 }
-$('agentProvider').onchange=()=>applyAgentProviderDefaults(true);
-$('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const cloud=runtimeInfo?.runtime==='cloudflare';const payload={agentEnabled:$('agentEnabled').checked,agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if(!cloud){payload.agentProvider=$('agentProvider').value;payload.agentBaseUrl=$('agentBaseUrl').value.trim();if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim()}await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Navi settings saved.'}catch(error){status.textContent=error.message}};
+$('agentProvider').onchange=()=>{
+ if(runtimeInfo?.runtime==='cloudflare'){
+   const local=$('agentProvider').value==='local';
+   $('agentBaseUrlField').style.display=local?'':'none';
+   $('agentSettingsIntro').textContent=local
+     ?'Cloud Navi can securely call your own OpenAI-compatible model through an HTTPS endpoint, such as a Cloudflare Tunnel.'
+     :'Cloud Navi uses OpenAI through Worker runtime secrets. The API key is never exposed to the browser.';
+   $('agentEndpointHint').textContent=local
+     ?'Use an HTTPS OpenAI-compatible /v1 endpoint reachable from Cloudflare.'
+     :'OpenAI endpoint is managed by the cloud runtime.';
+   if(!local&&!$('agentModel').value.trim())$('agentModel').value='gpt-5.6-luna';
+ }else applyAgentProviderDefaults(true);
+};
+$('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const cloud=runtimeInfo?.runtime==='cloudflare';const payload={agentEnabled:$('agentEnabled').checked,agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if(cloud){payload.agentProvider=$('agentProvider').value;payload.agentBaseUrl=$('agentProvider').value==='local'?$('agentBaseUrl').value.trim():''}else{payload.agentProvider=$('agentProvider').value;payload.agentBaseUrl=$('agentBaseUrl').value.trim();if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim()}await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Navi settings saved.'}catch(error){status.textContent=error.message}};
 $('testAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Testing saved connection…';try{const result=await api('/api/agent/test',{method:'POST'});const models=result.models||[];status.textContent='Connection successful'+(models.length?' · '+models.slice(0,5).join(', '):'.')}catch(error){status.textContent=error.message}};
 $('agentSend').onclick=()=>sendAgentMessage();
 $('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMessage()}};
