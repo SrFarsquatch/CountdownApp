@@ -1402,7 +1402,7 @@ async function environmentCanadaWeather(units) {
       temperature: temp === null ? null : Math.round(convertEcccTemp(temp, units)),
       temperatureClass: eccText(item.temperatures?.temperature?.class),
       precipitationProbability: (() => {
-        const value = eccNumber(item.abbreviated_forecast?.pop) ?? eccNumber(item.precipitation?.probability);
+        const value = eccNumber(item.abbreviatedForecast?.pop) ?? eccNumber(item.abbreviated_forecast?.pop) ?? eccNumber(item.precipitation?.probability);
         return value === null ? null : clamp(value, 0, 100);
       })()
     };
