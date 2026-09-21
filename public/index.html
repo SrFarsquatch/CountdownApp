@@ -302,8 +302,8 @@
     <div class="today-greeting"><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
     <form class="today-agent-bar" id="todayAgentForm">
       <span class="today-agent-icon" aria-hidden="true">✦</span>
-      <input id="todayAgentInput" autocomplete="off" placeholder="Ask Quest Log about your day…">
-      <button type="submit" id="todayAgentSend" aria-label="Ask Quest Log">↑</button>
+      <input id="todayAgentInput" autocomplete="off" placeholder="Ask Navi about your day…">
+      <button type="submit" id="todayAgentSend" aria-label="Ask Navi">↑</button>
     </form>
     <div class="today-hero-side">
       <div class="header-weather" id="todayWeather"><div class="header-weather-empty">Loading weather…</div></div>
@@ -424,8 +424,8 @@
       <div class="modal-actions"><button class="btn primary" id="saveAppearance" type="button">Save appearance</button></div>
     </div>
     <div class="card setting-card">
-      <div class="eyebrow">Agent</div><h3>AI connection</h3>
-      <p class="meta">Connect Quest Log to Hermes Agent, OpenClaw, or another OpenAI-compatible endpoint. Local and cloud endpoints use the same connector.</p>
+      <div class="eyebrow">Navi</div><h3>AI connection</h3>
+      <p class="meta">Connect Navi to ChatGPT, Hermes Agent, OpenClaw, or another OpenAI-compatible endpoint. Local and cloud endpoints use the same connector.</p>
       <label class="setting-row"><span>Enabled</span><input id="agentEnabled" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Provider</span><select id="agentProvider"><option value="hermes">Hermes Agent</option><option value="openclaw">OpenClaw</option><option value="openai-compatible">OpenAI-compatible</option></select></div>
       <div class="field"><label>API base URL</label><input id="agentBaseUrl" placeholder="http://192.168.1.50:8642/v1"><div class="meta" id="agentEndpointHint">Use an address reachable from the Quest Log server/container. For an agent on another LAN machine, use that machine's LAN IP.</div></div>
@@ -433,7 +433,7 @@
       <div class="field"><label>Bearer token / API key</label><input id="agentApiKey" type="password" autocomplete="new-password" placeholder="Leave blank to keep the saved key"></div>
       <label class="setting-row"><span>Planner context</span><select id="agentContextDays"><option value="7">7 days</option><option value="14">14 days</option><option value="21">21 days</option><option value="30">30 days</option></select></label>
       <div class="meta" id="agentKeyStatus" style="margin-top:6px"></div>
-      <div class="modal-actions"><button class="btn" id="testAgent" type="button">Test connection</button><button class="btn primary" id="saveAgent" type="button">Save agent</button></div>
+      <div class="modal-actions"><button class="btn" id="testAgent" type="button">Test connection</button><button class="btn primary" id="saveAgent" type="button">Save Navi</button></div>
       <div class="notice" id="agentSettingsStatus" style="display:none;margin-top:10px"></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
@@ -466,15 +466,15 @@
 </div>
 
 <div class="agent-drawer-backdrop" id="agentDrawerBackdrop"></div>
-<aside class="agent-drawer" id="agentDrawer" aria-hidden="true" aria-label="Quest Log Agent">
+<aside class="agent-drawer" id="agentDrawer" aria-hidden="true" aria-label="Navi">
   <div class="agent-chat-head agent-drawer-head">
     <div>
-      <div style="display:flex;align-items:center;gap:8px"><strong id="agentChatTitle">Quest Log Agent</strong><span class="pill" id="agentStatusPill">Not configured</span></div>
-      <div class="meta" id="agentChatMeta">Connect an agent in Settings to begin.</div>
+      <div style="display:flex;align-items:center;gap:8px"><strong id="agentChatTitle">Navi</strong><span class="pill" id="agentStatusPill">Not configured</span></div>
+      <div class="meta" id="agentChatMeta">Your Quest Log companion</div>
     </div>
     <div class="agent-drawer-actions">
       <button class="btn tiny ghost" id="agentClearChat" type="button">Clear</button>
-      <button class="agent-close" id="agentDrawerClose" type="button" aria-label="Close agent">×</button>
+      <button class="agent-close" id="agentDrawerClose" type="button" aria-label="Close Navi">×</button>
     </div>
   </div>
   <div class="agent-messages" id="agentMessages"></div>
@@ -484,7 +484,7 @@
   </div>
   <div class="meta agent-help">Planner changes are shown for approval before Quest Log applies them.</div>
 </aside>
-<button class="agent-fab" id="agentFab" type="button" aria-label="Open Quest Log Agent" title="Ask Quest Log">✦</button>
+<button class="agent-fab" id="agentFab" type="button" aria-label="Open Navi" title="Ask Navi">✦</button>
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
 <nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
 
@@ -1464,13 +1464,13 @@ function renderAgent(){
  if(!agentMessages.length)loadAgentHistory();
  const cfg=state?.agent||{},configured=agentConfigured();
  $('agentStatusPill').textContent=!cfg.enabled?'Disabled':configured?'Ready':'Needs setup';
- $('agentChatTitle').textContent=agentProviderLabel(cfg.provider||'hermes');
- $('agentChatMeta').textContent=configured?(cfg.model+' · '+cfg.baseUrl):'Connect an agent in Settings to begin.';
+ $('agentChatTitle').textContent='Navi';
+ $('agentChatMeta').textContent=configured?('Your Quest Log companion · '+agentProviderLabel(cfg.provider||'hermes')+' · '+cfg.model):'Your Quest Log companion';
  $('agentInput').disabled=!configured||agentSending;$('agentSend').disabled=!configured||agentSending;$('agentSend').textContent=agentSending?'Thinking…':'Send';
- if($('todayAgentInput')){$('todayAgentInput').disabled=agentSending;$('todayAgentInput').placeholder=configured?'Ask Quest Log about your day…':'Set up the Agent in Settings…'}
+ if($('todayAgentInput')){$('todayAgentInput').disabled=agentSending;$('todayAgentInput').placeholder=configured?'Ask Navi about your day…':'Set up Navi in Settings…'}
  if($('todayAgentSend'))$('todayAgentSend').disabled=agentSending;
  const root=$('agentMessages');
- if(!agentMessages.length){root.innerHTML=configured?'<div class="empty">Ask your Quest Log agent about your schedule, tasks, goals, or countdowns.</div>':'<div class="empty"><strong>Agent not connected</strong><div class="meta" style="margin-top:5px">Open Settings → AI connection to connect ChatGPT, Hermes, OpenClaw, or another compatible provider.</div><button class="btn tiny" id="agentOpenSettings" type="button" style="margin-top:12px">Open Settings</button></div>';if($('agentOpenSettings'))$('agentOpenSettings').onclick=()=>{closeAgentDrawer();setView('settings')};return}
+ if(!agentMessages.length){root.innerHTML=configured?'<div class="empty">Ask Navi about your schedule, tasks, goals, or countdowns.</div>':'<div class="empty"><strong>Navi is not connected</strong><div class="meta" style="margin-top:5px">Open Settings → AI connection to connect ChatGPT, Hermes, OpenClaw, or another compatible provider.</div><button class="btn tiny" id="agentOpenSettings" type="button" style="margin-top:12px">Open Settings</button></div>';if($('agentOpenSettings'))$('agentOpenSettings').onclick=()=>{closeAgentDrawer();setView('settings')};return}
  root.innerHTML=agentMessages.map((m,index)=>{
    const role=m.role==='user'?'user':'assistant';
    let html='<div class="agent-message '+role+'">'+esc(m.content)+(m.error?'<div class="meta">'+esc(m.error)+'</div>':'')+'</div>';
@@ -1530,7 +1530,7 @@ function applyAgentProviderDefaults(force=false){
  }
 }
 $('agentProvider').onchange=()=>applyAgentProviderDefaults(true);
-$('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const payload={agentEnabled:$('agentEnabled').checked,agentProvider:$('agentProvider').value,agentBaseUrl:$('agentBaseUrl').value.trim(),agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Agent settings saved.'}catch(error){status.textContent=error.message}};
+$('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const payload={agentEnabled:$('agentEnabled').checked,agentProvider:$('agentProvider').value,agentBaseUrl:$('agentBaseUrl').value.trim(),agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Navi settings saved.'}catch(error){status.textContent=error.message}};
 $('testAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Testing saved connection…';try{const result=await api('/api/agent/test',{method:'POST'});const models=result.models||[];status.textContent='Connection successful'+(models.length?' · '+models.slice(0,5).join(', '):'.')}catch(error){status.textContent=error.message}};
 $('agentSend').onclick=()=>sendAgentMessage();
 $('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMessage()}};
