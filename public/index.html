@@ -59,8 +59,6 @@
 .weather-search{display:grid;gap:8px}.weather-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}.weather-search-results{display:grid;gap:5px;max-height:200px;overflow:auto}
 .weather-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.weather-result:hover{border-color:var(--text)}
 .weather-selected{padding:8px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font-size:12px}
-.today-hero{align-items:center;min-height:78px}
-.today-hero-side{margin-left:auto;display:grid;gap:7px;justify-items:end;min-width:280px}
 .header-weather{display:flex;align-items:center;gap:11px;min-height:50px;padding:5px 7px;border-radius:12px}
 .header-weather-icon{width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto}
 .header-weather-icon svg{width:44px;height:44px}
@@ -80,14 +78,16 @@
 @media(max-width:900px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.market-grid{grid-template-columns:1fr}}
 .list{display:grid;gap:8px}.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}.item:first-child{border-top:0}.check{width:20px;height:20px;border-radius:7px;border:1.5px solid var(--line);background:transparent;display:grid;place-items:center}.check.done{background:var(--text);border-color:var(--text);color:var(--panel)}.title{font-weight:760}.meta{color:var(--muted);font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:var(--panel2);border:1px solid var(--line)}.pill.high,.pill.urgent{color:var(--danger)}.pill.medium{color:var(--orange)}.pill.low{color:var(--green)}.progress{height:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--accent)}.count-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.count-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel2)}.count-card strong{display:block;font-size:28px;letter-spacing:-.05em;margin:6px 0}.count-card strong.dense{font-size:20px;letter-spacing:-.025em;line-height:1.25}.count-options{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px}.count-options label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:750;color:var(--muted)}.count-options input{width:16px;height:16px;min-height:0;padding:0}.count-card small{color:var(--muted)}.calendar-shell{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px}.mini{padding:15px}.mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;text-align:center}.mini-grid span{padding:6px 2px;border-radius:7px}.mini-grid .today{background:var(--text);color:var(--panel)}.week{overflow:auto;padding:0}.week-head{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));border-bottom:1px solid var(--line)}.week-head div{padding:12px;border-left:1px solid var(--line);font-weight:760}.week-body{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));min-height:620px;background:linear-gradient(to bottom,transparent 49px,var(--line) 50px,transparent 51px);background-size:100% 50px}.time-col{border-right:1px solid var(--line)}.time-col div{height:50px;padding:2px 8px;color:var(--muted);font-size:11px}.day-col{position:relative;border-right:1px solid var(--line);min-height:620px;padding:6px}.event-block{position:relative;margin:4px 0;padding:8px 9px;border-radius:10px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));font-size:12px}.event-block b{display:block}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}.seg button{border:0;background:transparent;border-radius:7px;padding:7px 10px;font-weight:750;color:var(--muted)}.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;font-weight:800;color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 11px;outline:none}textarea{min-height:90px;resize:vertical}.field.full{grid-column:1/-1}.modal-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(5px);z-index:100;padding:22px;align-items:center;justify-content:center}.modal-wrap.open{display:flex}.modal{width:min(640px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.25)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 18px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0}.modal-body{padding:18px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.empty{padding:28px;text-align:center;color:var(--muted)}.goal-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.goal-card h3{margin:4px 0 10px}.goal-number{font-size:28px;font-weight:850;letter-spacing:-.04em}.goal-actions,.row-actions{display:flex;gap:8px;margin-top:12px}.tiny{padding:6px 9px;font-size:12px}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.setting-card h3{margin:4px 0 12px}.account-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px;background:var(--panel2)}.account-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.account-title{font-weight:820;overflow-wrap:anywhere}.calendar-list{display:grid;gap:8px;margin-top:10px}.calendar-list label{display:flex;align-items:center;gap:8px}.calendar-list input{width:16px;height:16px;min-height:0;padding:0}.setting-row{display:grid;grid-template-columns:1fr minmax(150px,240px);gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.setting-row:first-of-type{border-top:0}.preview{padding:12px;background:#d7d6d1;border-radius:14px}.preview img{width:100%;display:block;background:white;border:1px solid #aaa;border-radius:8px}.quick{position:fixed;right:24px;bottom:24px;width:54px;height:54px;border:0;border-radius:18px;background:var(--accent);color:var(--accent-contrast);font-size:26px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:40}.mobile-nav{display:none}
 .calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.calendar-nav{display:flex;align-items:center;gap:7px}.calendar-title{min-width:170px;text-align:center;font-weight:820}.calendar-stage{overflow:auto;padding:0}.day-view{min-width:560px}.day-row{display:grid;grid-template-columns:80px 1fr;min-height:54px;border-top:1px solid var(--line)}.day-row:first-child{border-top:0}.day-time{padding:10px;color:var(--muted);font-size:12px;border-right:1px solid var(--line)}.day-events{padding:6px 8px}.month-head,.month-grid{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));min-width:770px}.month-head div{padding:10px 8px;text-align:center;font-size:11px;font-weight:800;color:var(--muted);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.month-cell{min-height:118px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}.month-cell.muted-day{opacity:.42}.month-cell.today-cell{box-shadow:inset 0 0 0 2px var(--text)}.month-date{font-size:12px;font-weight:800;margin-bottom:6px}.month-chip{display:block;padding:4px 6px;border-radius:7px;margin:3px 0;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,var(--line));font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.month-chip.task{background:var(--panel2)}.connection-box{margin-top:14px}.connection-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.connection-row:first-child{border-top:0}.connection-url{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px;overflow-wrap:anywhere}
-.agent-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);gap:14px}.agent-chat-card{padding:0;overflow:hidden}.agent-chat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 17px;border-bottom:1px solid var(--line)}.agent-messages{height:min(62vh,620px);min-height:420px;overflow:auto;padding:18px;display:grid;align-content:start;gap:12px;background:color-mix(in srgb,var(--panel2) 45%,var(--panel))}.agent-message{max-width:min(82%,760px);padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);white-space:pre-wrap;overflow-wrap:anywhere}.agent-message.user{justify-self:end;background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}.agent-message.assistant{justify-self:start}.agent-message .meta{margin-top:6px}.agent-action-box{justify-self:start;width:min(88%,780px);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:var(--accent-soft);border-radius:14px;padding:12px}.agent-action-list{display:grid;gap:7px;margin-top:9px}.agent-action{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px}.agent-action-controls{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.agent-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:14px 16px;border-top:1px solid var(--line);align-items:end}.agent-compose textarea{min-height:48px;max-height:160px;resize:vertical}.agent-help{padding:0 16px 14px}.agent-context-card h3{margin:4px 0 12px}.agent-prompts{display:grid;gap:8px}.agent-prompts .btn{text-align:left;white-space:normal}.notice{padding:11px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--muted);font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
-@media(max-width:1050px){.span-8,.span-4,.span-6,.span-12{grid-column:span 12}.calendar-shell{grid-template-columns:1fr}.mini{display:none}.goal-grid{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}.agent-layout{grid-template-columns:1fr}.weather-main{grid-template-columns:1fr}.forecast-strip{grid-template-columns:repeat(4,minmax(72px,1fr))}}
-@media(max-width:760px){.app{display:block}.side{display:none}.top{height:62px;padding:0 16px}.content{padding:18px 14px 96px}.top h1{font-size:19px}.top-actions .btn:not(.primary){display:none}.hero{align-items:flex-start}.hero h2{font-size:29px}.stat-row{grid-template-columns:1fr 1fr}.count-grid,.goal-grid{grid-template-columns:1fr}.calendar-shell{display:block}.week-head{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.week-body{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.mobile-nav{position:fixed;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:5px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(18px);z-index:50}.mobile-nav button{border:0;background:transparent;padding:8px 2px;border-radius:10px;font-size:11px;font-weight:760;color:var(--muted)}.mobile-nav button.on{background:var(--accent);color:var(--accent-contrast)}.quick{right:18px;bottom:78px}}
+.today-hero{display:grid;grid-template-columns:minmax(235px,.75fr) minmax(320px,1.15fr) auto;gap:24px;align-items:center;min-height:78px}.today-greeting{min-width:0}.today-agent-bar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;max-width:620px;width:100%;justify-self:center;padding:7px 8px 7px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}.today-agent-bar:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 12%,transparent)}.today-agent-icon{font-size:17px;color:var(--accent);line-height:1}.today-agent-bar input{border:0!important;background:transparent!important;min-height:34px!important;padding:5px 2px!important;outline:0;box-shadow:none!important;width:100%}.today-agent-bar button{width:34px;height:34px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-contrast);font-size:18px;font-weight:850;display:grid;place-items:center}.today-hero-side{margin-left:0;display:grid;gap:7px;justify-items:end;min-width:280px}
+.agent-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:69}.agent-drawer-backdrop.open{opacity:1;pointer-events:auto}.agent-drawer{position:fixed;right:24px;bottom:24px;width:min(430px,calc(100vw - 32px));height:min(650px,calc(100vh - 110px));display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.24);overflow:hidden;z-index:70;opacity:0;transform:translateY(18px) scale(.975);pointer-events:none;transition:opacity .2s ease,transform .2s ease}.agent-drawer.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}.agent-drawer-head{padding:15px 16px;background:color-mix(in srgb,var(--panel) 94%,var(--bg));backdrop-filter:blur(18px)}.agent-drawer-actions{display:flex;align-items:center;gap:4px}.agent-close{width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:22px;line-height:1;display:grid;place-items:center}.agent-close:hover{background:var(--panel2);color:var(--text)}.agent-chat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line)}.agent-messages{min-height:0;overflow:auto;padding:16px;display:grid;align-content:start;gap:11px;background:color-mix(in srgb,var(--panel2) 45%,var(--panel))}.agent-message{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);white-space:pre-wrap;overflow-wrap:anywhere}.agent-message.user{justify-self:end;background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}.agent-message.assistant{justify-self:start}.agent-message .meta{margin-top:6px}.agent-action-box{justify-self:stretch;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:var(--accent-soft);border-radius:14px;padding:12px}.agent-action-list{display:grid;gap:7px;margin-top:9px}.agent-action{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px}.agent-action-controls{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.agent-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px 14px;border-top:1px solid var(--line);align-items:end;background:var(--panel)}.agent-compose textarea{min-height:44px;max-height:130px;resize:none}.agent-help{padding:0 14px 12px}.agent-fab{position:fixed;right:26px;bottom:88px;width:48px;height:48px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:16px;background:var(--panel);color:var(--accent);font-size:21px;box-shadow:0 12px 28px rgba(0,0,0,.15);z-index:42;display:grid;place-items:center;transition:transform .16s ease,background .16s ease}.agent-fab:hover{transform:translateY(-2px);background:var(--accent-soft)}body.agent-open .agent-fab{opacity:0;pointer-events:none}body.agent-open .quick{opacity:0;pointer-events:none}.notice{padding:11px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--muted);font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:1050px){.span-8,.span-4,.span-6,.span-12{grid-column:span 12}.calendar-shell{grid-template-columns:1fr}.mini{display:none}.goal-grid{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}.today-hero{grid-template-columns:minmax(220px,1fr) auto;gap:16px}.today-agent-bar{grid-column:1/-1;grid-row:2;max-width:none;justify-self:stretch}.weather-main{grid-template-columns:1fr}.forecast-strip{grid-template-columns:repeat(4,minmax(72px,1fr))}}
+@media(max-width:760px){.app{display:block}.side{display:none}.top{height:62px;padding:0 16px}.content{padding:18px 14px 96px}.top h1{font-size:19px}.top-actions .btn:not(.primary){display:none}.hero{align-items:flex-start}.hero h2{font-size:29px}.stat-row{grid-template-columns:1fr 1fr}.count-grid,.goal-grid{grid-template-columns:1fr}.calendar-shell{display:block}.week-head{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.week-body{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.mobile-nav{position:fixed;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:5px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(18px);z-index:50}.mobile-nav button{border:0;background:transparent;padding:8px 2px;border-radius:10px;font-size:11px;font-weight:760;color:var(--muted)}.mobile-nav button.on{background:var(--accent);color:var(--accent-contrast)}.quick{right:18px;bottom:78px}}
 /* mobile portrait hardening */
 
 @media(max-width:760px){
   .content{padding:18px 14px calc(104px + env(safe-area-inset-bottom))}
-  .today-hero{display:grid;grid-template-columns:1fr;align-items:start}
+  .today-hero{display:grid;grid-template-columns:1fr;align-items:start;gap:12px}
+  .today-agent-bar{grid-column:1;grid-row:auto;max-width:none;width:100%}
   .today-hero-side{margin-left:0;width:100%;min-width:0;justify-items:start}
   .header-weather{width:100%;padding:9px 10px;background:var(--panel2);border:1px solid var(--line)}
   .header-weather-main{min-width:0}
@@ -122,6 +122,9 @@
   .month-date{font-size:11px;margin-bottom:4px}
   .month-chip{font-size:9px;padding:3px 4px}
   .quick{right:16px;bottom:calc(82px + env(safe-area-inset-bottom))}
+  .agent-fab{right:18px;bottom:calc(146px + env(safe-area-inset-bottom))}
+  .agent-drawer{left:10px;right:10px;bottom:calc(78px + env(safe-area-inset-bottom));width:auto;height:min(72vh,650px);border-radius:18px}
+  .agent-drawer-backdrop{bottom:calc(68px + env(safe-area-inset-bottom))}
   .mobile-nav{bottom:max(8px,env(safe-area-inset-bottom));}
 }
 @media(max-width:420px){
@@ -282,7 +285,6 @@
     <button class="on" data-view="today">Today</button>
     <button data-view="planner">Planner</button>
     <button data-view="tasks">Tasks</button>
-    <button data-view="agent">Agent</button>
     <button data-view="goals">Goals</button>
     <button data-view="markets">Markets</button>
     <button data-view="countdowns">Countdowns</button>
@@ -297,7 +299,12 @@
 <div class="content">
 <section class="view on" id="view-today">
   <div class="hero today-hero">
-    <div><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
+    <div class="today-greeting"><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
+    <form class="today-agent-bar" id="todayAgentForm">
+      <span class="today-agent-icon" aria-hidden="true">✦</span>
+      <input id="todayAgentInput" autocomplete="off" placeholder="Ask Quest Log about your day…">
+      <button type="submit" id="todayAgentSend" aria-label="Ask Quest Log">↑</button>
+    </form>
     <div class="today-hero-side">
       <div class="header-weather" id="todayWeather"><div class="header-weather-empty">Loading weather…</div></div>
     </div>
@@ -332,28 +339,6 @@
 <section class="view" id="view-tasks">
   <div class="hero"><div><h2>Tasks</h2><p>Plan, prioritize and finish what matters.</p></div><button class="btn primary" data-create="task">New task</button></div>
   <div class="card"><div class="toolbar"><div class="seg" id="taskFilters"><button class="on" data-filter="open">Open</button><button data-filter="all">All</button><button data-filter="done">Completed</button></div><span class="meta" id="taskCount"></span></div><div id="taskList" class="list"></div></div>
-</section>
-
-<section class="view" id="view-agent">
-  <div class="hero"><div><h2>Agent</h2><p>Chat with your local or cloud agent and let it help organize Quest Log.</p></div><span class="pill" id="agentStatusPill">Not configured</span></div>
-  <div class="agent-layout">
-    <div class="card agent-chat-card">
-      <div class="agent-chat-head"><div><strong id="agentChatTitle">Quest Log Agent</strong><div class="meta" id="agentChatMeta">Connect an agent in Settings to begin.</div></div><button class="btn tiny ghost" id="agentClearChat" type="button">Clear chat</button></div>
-      <div class="agent-messages" id="agentMessages"></div>
-      <div class="agent-compose"><textarea id="agentInput" rows="2" placeholder="Ask about your day, plan tasks, create an event…"></textarea><button class="btn primary" id="agentSend" type="button">Send</button></div>
-      <div class="meta agent-help">Planner changes are shown for approval before Quest Log applies them.</div>
-    </div>
-    <div class="card agent-context-card">
-      <div class="eyebrow">Examples</div><h3>Try asking</h3>
-      <div class="agent-prompts">
-        <button class="btn ghost" data-agent-prompt="What does my day look like today?">Summarize today</button>
-        <button class="btn ghost" data-agent-prompt="Help me prioritize my open tasks for this week.">Prioritize my week</button>
-        <button class="btn ghost" data-agent-prompt="Find a free hour in my schedule this week and suggest where I could work on my highest priority task.">Find focus time</button>
-        <button class="btn ghost" data-agent-prompt="Create a task for me to review my weekly goals tomorrow at 4 PM.">Create a task</button>
-      </div>
-      <div class="notice" style="margin-top:14px">The agent receives a bounded snapshot of your tasks, goals, countdowns and upcoming selected-calendar events. It cannot delete planner items through this integration.</div>
-    </div>
-  </div>
 </section>
 
 <section class="view" id="view-goals">
@@ -480,8 +465,28 @@
 </main>
 </div>
 
+<div class="agent-drawer-backdrop" id="agentDrawerBackdrop"></div>
+<aside class="agent-drawer" id="agentDrawer" aria-hidden="true" aria-label="Quest Log Agent">
+  <div class="agent-chat-head agent-drawer-head">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px"><strong id="agentChatTitle">Quest Log Agent</strong><span class="pill" id="agentStatusPill">Not configured</span></div>
+      <div class="meta" id="agentChatMeta">Connect an agent in Settings to begin.</div>
+    </div>
+    <div class="agent-drawer-actions">
+      <button class="btn tiny ghost" id="agentClearChat" type="button">Clear</button>
+      <button class="agent-close" id="agentDrawerClose" type="button" aria-label="Close agent">×</button>
+    </div>
+  </div>
+  <div class="agent-messages" id="agentMessages"></div>
+  <div class="agent-compose">
+    <textarea id="agentInput" rows="2" placeholder="Ask about your day, plan tasks, create an event…"></textarea>
+    <button class="btn primary" id="agentSend" type="button">Send</button>
+  </div>
+  <div class="meta agent-help">Planner changes are shown for approval before Quest Log applies them.</div>
+</aside>
+<button class="agent-fab" id="agentFab" type="button" aria-label="Open Quest Log Agent" title="Ask Quest Log">✦</button>
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
-<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="agent">Agent</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
+<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -545,7 +550,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',agent:'Agent',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='agent')renderAgent();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
+function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
@@ -1462,8 +1467,10 @@ function renderAgent(){
  $('agentChatTitle').textContent=agentProviderLabel(cfg.provider||'hermes');
  $('agentChatMeta').textContent=configured?(cfg.model+' · '+cfg.baseUrl):'Connect an agent in Settings to begin.';
  $('agentInput').disabled=!configured||agentSending;$('agentSend').disabled=!configured||agentSending;$('agentSend').textContent=agentSending?'Thinking…':'Send';
+ if($('todayAgentInput')){$('todayAgentInput').disabled=agentSending;$('todayAgentInput').placeholder=configured?'Ask Quest Log about your day…':'Set up the Agent in Settings…'}
+ if($('todayAgentSend'))$('todayAgentSend').disabled=agentSending;
  const root=$('agentMessages');
- if(!agentMessages.length){root.innerHTML='<div class="empty">Ask your Quest Log agent about your schedule, tasks, goals, or countdowns.</div>';return}
+ if(!agentMessages.length){root.innerHTML=configured?'<div class="empty">Ask your Quest Log agent about your schedule, tasks, goals, or countdowns.</div>':'<div class="empty"><strong>Agent not connected</strong><div class="meta" style="margin-top:5px">Open Settings → AI connection to connect ChatGPT, Hermes, OpenClaw, or another compatible provider.</div><button class="btn tiny" id="agentOpenSettings" type="button" style="margin-top:12px">Open Settings</button></div>';if($('agentOpenSettings'))$('agentOpenSettings').onclick=()=>{closeAgentDrawer();setView('settings')};return}
  root.innerHTML=agentMessages.map((m,index)=>{
    const role=m.role==='user'?'user':'assistant';
    let html='<div class="agent-message '+role+'">'+esc(m.content)+(m.error?'<div class="meta">'+esc(m.error)+'</div>':'')+'</div>';
@@ -1473,6 +1480,24 @@ function renderAgent(){
    return html;
  }).join('');
  root.querySelectorAll('[data-agent-apply]').forEach(btn=>btn.onclick=()=>applyAgentActions(Number(btn.dataset.agentApply)));root.scrollTop=root.scrollHeight;
+}
+function openAgentDrawer(focus=true){
+ document.body.classList.add('agent-open');
+ $('agentDrawer').classList.add('open');$('agentDrawerBackdrop').classList.add('open');$('agentDrawer').setAttribute('aria-hidden','false');
+ renderAgent();
+ if(focus&&!$('agentInput').disabled)setTimeout(()=>$('agentInput').focus(),80);
+}
+function closeAgentDrawer(){
+ document.body.classList.remove('agent-open');
+ $('agentDrawer').classList.remove('open');$('agentDrawerBackdrop').classList.remove('open');$('agentDrawer').setAttribute('aria-hidden','true');
+}
+function submitTodayAgent(){
+ const text=$('todayAgentInput').value.trim();
+ openAgentDrawer(false);
+ if(!agentConfigured())return;
+ if(!text){if(!$('agentInput').disabled)$('agentInput').focus();return}
+ $('todayAgentInput').value='';
+ sendAgentMessage(text);
 }
 async function sendAgentMessage(prefill=''){
  if(agentSending||!agentConfigured())return;
@@ -1507,7 +1532,14 @@ function applyAgentProviderDefaults(force=false){
 $('agentProvider').onchange=()=>applyAgentProviderDefaults(true);
 $('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const payload={agentEnabled:$('agentEnabled').checked,agentProvider:$('agentProvider').value,agentBaseUrl:$('agentBaseUrl').value.trim(),agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Agent settings saved.'}catch(error){status.textContent=error.message}};
 $('testAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Testing saved connection…';try{const result=await api('/api/agent/test',{method:'POST'});const models=result.models||[];status.textContent='Connection successful'+(models.length?' · '+models.slice(0,5).join(', '):'.')}catch(error){status.textContent=error.message}};
-$('agentSend').onclick=()=>sendAgentMessage();$('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMessage()}};$('agentClearChat').onclick=()=>{agentMessages=[];saveAgentHistory();renderAgent()};document.querySelectorAll('[data-agent-prompt]').forEach(btn=>btn.onclick=()=>sendAgentMessage(btn.dataset.agentPrompt||''));
+$('agentSend').onclick=()=>sendAgentMessage();
+$('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMessage()}};
+$('agentClearChat').onclick=()=>{agentMessages=[];saveAgentHistory();renderAgent()};
+$('agentFab').onclick=()=>openAgentDrawer();
+$('agentDrawerClose').onclick=closeAgentDrawer;
+$('agentDrawerBackdrop').onclick=closeAgentDrawer;
+$('todayAgentForm').onsubmit=e=>{e.preventDefault();submitTodayAgent()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('agentDrawer').classList.contains('open'))closeAgentDrawer()});
 
 async function loadCalendarEvents(){if(!state.google.connected){calEvents=[];return}const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+30);try{calEvents=(await api('/api/google/events?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString()))).events||[]}catch(e){calEvents=[]}}
 async function loadWeather(){
@@ -1531,9 +1563,9 @@ async function loadAll(force=false){
  await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
- if(current==='planner')renderPlanner();if(current==='agent')renderAgent();if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
+ if(current==='planner')renderPlanner();if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
 }
-const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>{setView(initial);refreshUpdateStatus()});setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
+const initialRaw=new URLSearchParams(location.search).get('view')||'today',initial=initialRaw==='agent'?'today':initialRaw;loadAll().then(()=>{setView(initial);if(initialRaw==='agent')openAgentDrawer();refreshUpdateStatus()});setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
 </body>
 </html>
