@@ -14,6 +14,7 @@ services:
       TZ: "America/Vancouver"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      TWELVE_DATA_API_KEY: "${TWELVE_DATA_API_KEY:-}"
       APP_BASE_URL: "${APP_BASE_URL:-}"
       APP_SECRET: "${APP_SECRET:-}"
       DOCKER_SOCKET: "/var/run/docker.sock"
