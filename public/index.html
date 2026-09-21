@@ -1249,16 +1249,15 @@ async function checkForUpdatesUI(auto=false){
 }
 $('checkUpdates').onclick=()=>{updateAutoCheckAttempted=true;checkForUpdatesUI(false)};
 $('updateNow').onclick=async()=>{
- if(!confirm('Install the available Planner update? The app will restart briefly, but your saved data will be kept.'))return;
+ if(!confirm('Prepare the newest Planner image now? After it downloads, CasaOS will still need to Apply/Update the app so it can recreate its managed container safely.'))return;
  try{
-   updateStartedInPage=true;updateReloadScheduled=false;
+   updateStartedInPage=false;updateReloadScheduled=false;
    $('updateNow').disabled=true;$('checkUpdates').disabled=true;
-   renderUpdateStatus({...await api('/api/update/status'),phase:'queued',progress:2,message:'Starting update…'});
-   await api('/api/update/start',{method:'POST',headers:{'X-Countdown-Action':'update'}});
-   scheduleUpdatePoll(500);
+   renderUpdateStatus({...await api('/api/update/status'),phase:'pulling',progress:15,message:'Preparing update image…'});
+   const prepared=await api('/api/update/start',{method:'POST',headers:{'X-Countdown-Action':'update'}});
+   renderUpdateStatus({...await api('/api/update/status'),...prepared});
  }catch(error){
-   updateStartedInPage=false;
-   $('updateStatus').textContent='Could not start update';$('updateDetail').textContent=error.message;
+   $('updateStatus').textContent='Could not prepare update';$('updateDetail').textContent=error.message;
    await refreshUpdateStatus();
  }
 };
