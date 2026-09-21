@@ -1374,15 +1374,54 @@ function unavailableMarketQuote(item, message = 'No quote returned for this watc
     datetime: '', available: false, error: cleanText(message, 220)
   };
 }
-async function alphaVantageFetch(params = {}) {
-  if (!marketConfigured()) throw new Error('Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.');
-  const query = new URLSearchParams({ ...params, apikey: ALPHA_VANTAGE_API_KEY });
-  const response = await fetch('https://www.alphavantage.co/query?' + query);
-  const raw = await response.json().catch(() => ({}));
-  const apiMessage = raw['Error Message'] || raw.Note || raw.Information;
-  if (!response.ok || apiMessage) throw new Error(cleanText(apiMessage || 'Alpha Vantage request failed (' + response.status + ').', 260));
-  return raw;
+let alphaRequestChain = Promise.resolve();
+let alphaLastRequestAt = 0;
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function alphaProviderError(raw = {}, status = 0) {
+  const message = cleanText(raw['Error Message'] || raw.Note || raw.Information || '', 260);
+  if (/1 request per second|spread.*sparsely|call frequency/i.test(message)) {
+    return { kind: 'burst', message: 'Alpha Vantage rate limit hit. Planner will retry automatically.' };
+  }
+  if (/25 requests per day|daily.*limit|standard api call frequency/i.test(message)) {
+    return { kind: 'daily', message: 'Alpha Vantage daily free API limit reached. Cached market data will be used until the allowance resets.' };
+  }
+  return { kind: 'api', message: message || 'Alpha Vantage request failed (' + status + ').' };
 }
+
+async function alphaVantageRequest(params = {}) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const wait = Math.max(0, 1150 - (Date.now() - alphaLastRequestAt));
+    if (wait) await sleep(wait);
+    alphaLastRequestAt = Date.now();
+
+    const query = new URLSearchParams({ ...params, apikey: ALPHA_VANTAGE_API_KEY });
+    const response = await fetch('https://www.alphavantage.co/query?' + query);
+    const raw = await response.json().catch(() => ({}));
+    const providerError = alphaProviderError(raw, response.status);
+
+    if (response.ok && !raw['Error Message'] && !raw.Note && !raw.Information) return raw;
+
+    if (providerError.kind === 'burst' && attempt === 0) {
+      await sleep(1250);
+      continue;
+    }
+    const error = new Error(providerError.message);
+    error.kind = providerError.kind;
+    throw error;
+  }
+  const error = new Error('Alpha Vantage rate limit hit. Try again shortly.');
+  error.kind = 'burst';
+  throw error;
+}
+
+function alphaVantageFetch(params = {}) {
+  if (!marketConfigured()) return Promise.reject(new Error('Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.'));
+  const run = alphaRequestChain.then(() => alphaVantageRequest(params));
+  alphaRequestChain = run.catch(() => {});
+  return run;
+}
+
 async function marketData() {
   const config = normalizeMarkets(db.markets);
   const effectiveRefreshMinutes = alphaEffectiveRefreshMinutes(config);
@@ -1400,12 +1439,21 @@ async function marketData() {
       const quote = raw['Global Quote'] || {};
       quotes.push(Object.keys(quote).length ? normalizeMarketQuote(quote, item) : unavailableMarketQuote(item, 'Alpha Vantage returned no quote for this symbol.'));
     } catch (error) {
-      quotes.push(unavailableMarketQuote(item, error.message || 'Quote unavailable.'));
-      if (/frequency|limit|25 requests|rate|standard api call/i.test(String(error.message || ''))) break;
+      const stale = marketCache.data?.quotes?.find(q => q.providerSymbol === item.providerSymbol || q.symbol === item.symbol);
+      if (stale?.close != null) {
+        quotes.push({ ...stale, stale: true, error: error.message || 'Using cached quote.' });
+      } else {
+        quotes.push(unavailableMarketQuote(item, error.message || 'Quote unavailable.'));
+      }
+      if (error.kind === 'daily') break;
     }
   }
   while (quotes.length < config.watchlist.length) {
-    quotes.push(unavailableMarketQuote(config.watchlist[quotes.length], 'Skipped because the Alpha Vantage API quota was reached.'));
+    const item = config.watchlist[quotes.length];
+    const stale = marketCache.data?.quotes?.find(q => q.providerSymbol === item.providerSymbol || q.symbol === item.symbol);
+    quotes.push(stale?.close != null
+      ? { ...stale, stale: true, error: 'Using cached quote because the Alpha Vantage daily free API limit was reached.' }
+      : unavailableMarketQuote(item, 'Skipped because the Alpha Vantage daily free API limit was reached.'));
   }
 
   const data = {
