@@ -47,7 +47,7 @@ const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 const GOAL_TYPES = ['number', 'checklist', 'deadline'];
 const GOAL_STATUS = ['active', 'complete', 'paused'];
 const APPEARANCE_MODES = ['system', 'light', 'dark'];
-const UI_THEMES = ['quest', 'moss', 'ember', 'arcane', 'slate'];
+const UI_THEMES = ['classic', 'quest', 'moss', 'ember', 'arcane', 'slate'];
 const UI_DENSITIES = ['comfortable', 'compact'];
 const HEX = {
   black: '#111111', red: '#d62828', blue: '#1769aa', green: '#2f7d32',

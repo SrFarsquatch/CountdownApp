@@ -10,7 +10,7 @@
 (()=>{try{
   const cached=JSON.parse(localStorage.getItem('questlog-appearance')||'{}');
   const mode=['system','light','dark'].includes(cached.mode)?cached.mode:'system';
-  const theme=['quest','moss','ember','arcane','slate'].includes(cached.theme)?cached.theme:'quest';
+  const theme=['classic','quest','moss','ember','arcane','slate'].includes(cached.theme)?cached.theme:'quest';
   const density=['comfortable','compact'].includes(cached.density)?cached.density:'comfortable';
   const resolved=mode==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):mode;
   document.documentElement.dataset.appearanceMode=mode;
@@ -33,6 +33,8 @@
   --accent:#d1c9ba;--accent-soft:#302f2a;--accent-contrast:#171714;
   --danger:#ff8a80;--green:#69c89b;--orange:#f0ad63;--shadow:none
 }
+:root[data-theme="classic"][data-color-mode="light"]{--bg:#f3f2ef;--panel:#fff;--panel2:#f8f7f4;--text:#171717;--muted:#77756f;--line:#dfddd7;--accent:#6c5ce7;--accent-soft:#eeeafd;--accent-contrast:#fff;--danger:#b42318;--green:#2f8f63;--orange:#dd8a2f;--shadow:0 12px 36px rgba(20,20,20,.06)}
+:root[data-theme="classic"][data-color-mode="dark"]{--bg:#121212;--panel:#1b1b1b;--panel2:#222;--text:#f5f3ef;--muted:#aaa69d;--line:#353535;--accent:#9c8cff;--accent-soft:#2a2546;--accent-contrast:#171717;--danger:#ff8a80;--green:#69c89b;--orange:#f0ad63;--shadow:none}
 :root[data-theme="moss"][data-color-mode="light"]{--accent:#536b47;--accent-soft:#e8eee3;--accent-contrast:#fff}
 :root[data-theme="moss"][data-color-mode="dark"]{--accent:#a7c293;--accent-soft:#283126;--accent-contrast:#152013}
 :root[data-theme="ember"][data-color-mode="light"]{--accent:#a5572c;--accent-soft:#f4e7dd;--accent-contrast:#fff}
@@ -211,12 +213,12 @@
 .mobile-update-dot{position:absolute;top:7px;right:calc(50% - 24px);width:7px;height:7px;border-radius:50%;background:#d28b00;border:1px solid var(--panel)}
 
 /* Appearance */
-.appearance-theme-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:10px 0 4px}
+.appearance-theme-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:10px 0 4px}
 .appearance-theme{border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:9px 6px;display:grid;gap:6px;justify-items:center;font-size:10px;font-weight:800;color:var(--muted)}
 .appearance-theme:hover{border-color:var(--accent)}
 .appearance-theme.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--text);background:var(--accent-soft)}
 .theme-swatch{width:28px;height:18px;border-radius:999px;border:1px solid color-mix(in srgb,var(--text) 14%,transparent)}
-.theme-swatch.quest{background:#5f5a52}.theme-swatch.moss{background:#536b47}.theme-swatch.ember{background:#a5572c}.theme-swatch.arcane{background:#6754a8}.theme-swatch.slate{background:#516b7a}
+.theme-swatch.classic{background:#6c5ce7}.theme-swatch.quest{background:#5f5a52}.theme-swatch.moss{background:#536b47}.theme-swatch.ember{background:#a5572c}.theme-swatch.arcane{background:#6754a8}.theme-swatch.slate{background:#516b7a}
 :root[data-density="compact"] .content{padding-top:20px}
 :root[data-density="compact"] .card{padding:13px;border-radius:13px}
 :root[data-density="compact"] .grid,:root[data-density="compact"] .settings-grid{gap:10px}
@@ -380,6 +382,7 @@
       <div class="setting-row"><span>Mode</span><select id="appearanceMode"><option value="system">Follow system</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
       <div class="setting-row"><span>Density</span><select id="appearanceDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
       <div class="field"><label>Theme</label><div class="appearance-theme-grid" id="appearanceThemes">
+        <button type="button" class="appearance-theme" data-theme-choice="classic"><span class="theme-swatch classic"></span><span>Classic</span></button>
         <button type="button" class="appearance-theme" data-theme-choice="quest"><span class="theme-swatch quest"></span><span>Quest</span></button>
         <button type="button" class="appearance-theme" data-theme-choice="moss"><span class="theme-swatch moss"></span><span>Moss</span></button>
         <button type="button" class="appearance-theme" data-theme-choice="ember"><span class="theme-swatch ember"></span><span>Ember</span></button>
@@ -440,7 +443,7 @@ const eventKey=e=>[e.accountId||'',e.calendarId||'',e.id||'',e.start||''].join('
 const dateKeyLocal=d=>{const x=new Date(d);return [x.getFullYear(),String(x.getMonth()+1).padStart(2,'0'),String(x.getDate()).padStart(2,'0')].join('-')};
 const parseDateKey=v=>{const [y,m,d]=String(v||'').split('-').map(Number);return new Date(y,m-1,d)};
 const addDateKey=(v,days)=>{const d=parseDateKey(v);d.setDate(d.getDate()+days);return dateKeyLocal(d)};
-const APPEARANCE_MODES=['system','light','dark'],APPEARANCE_THEMES=['quest','moss','ember','arcane','slate'],APPEARANCE_DENSITIES=['comfortable','compact'];
+const APPEARANCE_MODES=['system','light','dark'],APPEARANCE_THEMES=['classic','quest','moss','ember','arcane','slate'],APPEARANCE_DENSITIES=['comfortable','compact'];
 let appearanceDraft=null;
 const systemDarkQuery=window.matchMedia('(prefers-color-scheme: dark)');
 function normalizedAppearance(value={}){
