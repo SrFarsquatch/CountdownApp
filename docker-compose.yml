@@ -49,14 +49,14 @@ services:
       volumes:
         - container: /data
           description:
-            en_US: Persistent CountdownApp data
+            en_US: Persistent Quest Log data
         - container: /var/run/docker.sock
           description:
             en_US: Docker access used only when Update now is selected
       ports:
         - container: "8080"
           description:
-            en_US: Planner web interface and FrameOS API
+            en_US: Quest Log web interface and FrameOS API
 
 x-casaos:
   id: countdownapp
@@ -69,13 +69,13 @@ x-casaos:
   developer: SrFarsquatch
   author: SrFarsquatch
   tagline:
-    en_US: Self-hosted calendar, tasks, goals, countdowns and e-ink planner
+    en_US: Quest Log — self-hosted calendar, tasks, goals, countdowns and e-ink dashboard
   description:
-    en_US: Plan your day with Google Calendar, tasks, goals, countdowns and flexible e-ink displays from a single CasaOS container.
+    en_US: Quest Log brings Google Calendar, tasks, goals, countdowns and flexible e-ink displays together in one self-hosted app.
   scheme: http
   port_map: "8088"
   index: /
   title:
-    custom: Planner
-    en_US: Countdown
+    custom: Quest Log
+    en_US: Quest Log
   version: "edge"
