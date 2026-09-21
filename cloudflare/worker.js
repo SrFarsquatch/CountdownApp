@@ -12,6 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketSearch } from './markets.js';
+import { testAgent, chat as agentChat, applyActions as applyAgentActions } from './agent.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -238,8 +239,15 @@ async function handleApi(request,env,identity){
     if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
     }
-    if(incoming.agentEnabled!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined){
-      state.agent={...state.agent,enabled:incoming.agentEnabled??state.agent.enabled,provider:'openai',model:cleanText(incoming.agentModel||state.agent.model,120),contextDays:clamp(Math.round(num(incoming.agentContextDays,state.agent.contextDays||14)),1,30)};
+    if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined){
+      const provider=['openai','local'].includes(String(incoming.agentProvider||state.agent.provider))?String(incoming.agentProvider||state.agent.provider):'openai';
+      let baseUrl=cleanText(incoming.agentBaseUrl??state.agent.baseUrl,500).replace(/\/+$/,'');
+      if(provider==='local'&&baseUrl){
+        let parsed;try{parsed=new URL(baseUrl)}catch{const e=new Error('Local model endpoint is invalid.');e.status=400;throw e}
+        if(parsed.protocol!=='https:'){const e=new Error('Cloud local-model endpoints must use HTTPS.');e.status=400;throw e}
+      }
+      if(provider==='openai')baseUrl='';
+      state.agent={...state.agent,enabled:incoming.agentEnabled??state.agent.enabled,provider,baseUrl,model:cleanText(incoming.agentModel||state.agent.model,160),contextDays:clamp(Math.round(num(incoming.agentContextDays,state.agent.contextDays||14)),1,30)};
     }
     await saveState(env,state);return json({ok:true});
   }
@@ -300,9 +308,18 @@ async function handleApi(request,env,identity){
     return json({error:'Unsupported event operation.'},405);
   }
 
-  if(p==='/api/agent/test'&&method==='POST')return json({ok:Boolean(env.OPENAI_API_KEY),models:env.OPENAI_API_KEY?[env.OPENAI_MODEL||'gpt-5.6-luna']:[],error:env.OPENAI_API_KEY?null:'OPENAI_API_KEY is not configured as a Worker secret.'},env.OPENAI_API_KEY?200:400);
-  if(p==='/api/agent/chat'&&method==='POST')return json({error:'Navi cloud chat will be enabled after the standalone D1 cutover.'},501);
-  if(p==='/api/agent/actions'&&method==='POST')return json({error:'Navi cloud actions will be enabled after the standalone D1 cutover.'},501);
+  if(p==='/api/agent/test'&&method==='POST'){
+    try{return json(await testAgent(state,env))}catch(error){return json({ok:false,error:error.message||'Agent connection failed.'},400)}
+  }
+  if(p==='/api/agent/chat'&&method==='POST'){
+    const incoming=await body(request);
+    if(state.agent?.enabled===false)return json({error:'Enable Navi in Settings first.'},400);
+    return json(await agentChat(state,env,incoming.messages||[]));
+  }
+  if(p==='/api/agent/actions'&&method==='POST'){
+    const incoming=await body(request);
+    return json({ok:true,results:await applyAgentActions(state,env,incoming.actions||[])});
+  }
 
   if(p==='/api/display/rotate-token'&&method==='POST'){
     state.display.token=crypto.randomUUID().replaceAll('-')+crypto.randomUUID().replaceAll('-').slice(0,16);await saveState(env,state);
