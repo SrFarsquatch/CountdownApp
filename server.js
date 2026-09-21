@@ -549,9 +549,12 @@ function decrypt(value) {
   } catch { return null; }
 }
 function base(req) {
-  if (APP_BASE_URL) return APP_BASE_URL;
+  const bridged = req.headers['x-questlog-runtime'] === 'cloudflare-bridge';
+  if (!bridged && APP_BASE_URL) return APP_BASE_URL;
   const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
   const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (bridged && host) return proto + '://' + host;
+  if (APP_BASE_URL) return APP_BASE_URL;
   return proto + '://' + host;
 }
 const googleConfigured = () => Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && APP_SECRET);
@@ -2891,6 +2894,13 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   try {
     if (p === '/healthz') return text(res, 200, 'ok');
+    if (p === '/api/runtime' && req.method === 'GET') return json(res, 200, {
+      runtime: 'self-hosted',
+      bridged: req.headers['x-questlog-runtime'] === 'cloudflare-bridge',
+      cloudUser: cleanText(req.headers['x-questlog-cloud-user'], 320) || null,
+      revision: cleanText(process.env.APP_REVISION || process.env.GITHUB_SHA, 80) || null,
+      version: cleanText(process.env.APP_VERSION, 80) || 'edge'
+    });
     if (p === '/api/state' && req.method === 'GET') return json(res, 200, state());
 
     if (p === '/api/countdowns' && req.method === 'POST') {
