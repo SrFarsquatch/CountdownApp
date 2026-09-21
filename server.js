@@ -1579,6 +1579,18 @@ function agendaRange(scope, now = new Date()) {
   return { start: new Date(now), end: new Date(now.getTime() + clamp(num(db.google.countdownWindowDays, 30), 1, 365) * 86400000) };
 }
 
+function agendaTasksForRange(scope, range, now = new Date()) {
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  return sortedTasks().filter(task => {
+    if (task.status === 'done' || task.displayEnabled === false) return false;
+    if (!task.due) return scope === 'today' || scope === 'upcoming';
+    const due = new Date(task.due);
+    if (Number.isNaN(due.getTime())) return false;
+    if (due < todayStart) return true;
+    return due >= range.start && due < range.end;
+  });
+}
+
 async function feed() {
   let ev = [], calendarError = null, weather = null, weatherError = null, markets = null, marketError = null;
   const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
@@ -1586,9 +1598,10 @@ async function feed() {
   const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
   const nowDate = new Date();
   const now = nowDate.getTime();
-  if (modeSections.agenda.enabled && googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
-    const range = agendaRange(modeSections.agenda.scope, nowDate);
-    try { ev = await eventsBetween(range.start.toISOString(), range.end.toISOString()); }
+  const agendaWindow = modeSections.agenda.enabled ? agendaRange(modeSections.agenda.scope, nowDate) : null;
+  const agendaTasks = agendaWindow ? agendaTasksForRange(modeSections.agenda.scope, agendaWindow, nowDate) : [];
+  if (agendaWindow && googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
+    try { ev = await eventsBetween(agendaWindow.start.toISOString(), agendaWindow.end.toISOString()); }
     catch (error) { calendarError = error.message; }
   }
   if (modeSections.weather.enabled) {
@@ -1615,8 +1628,11 @@ async function feed() {
     nextEvent: ev.find(event => new Date(event.end || event.start).getTime() >= now) || null,
     events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
     calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
+    agendaTasks: modeSections.agenda.enabled ? agendaTasks.slice(0, 250) : [],
     tasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, modeSections.tasks.limit) : [],
-    plannerTasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, 100) : [],
+    plannerTasks: (modeSections.agenda.enabled || modeSections.tasks.enabled)
+      ? sortedTasks().filter(task => task.status !== 'done' && task.displayEnabled !== false).slice(0, 250)
+      : [],
     goals: modeSections.goals.enabled ? db.goals.filter(g => g.status === 'active' && g.displayEnabled !== false)
       .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
       .slice(0, modeSections.goals.limit).map(g => ({ ...g, progress: goalProgress(g) })) : [],
@@ -1685,6 +1701,32 @@ function plannerEventsForDay(data, day) {
 function plannerTasksForDay(data, day) {
   const key = plannerDateKey(day);
   return (data.plannerTasks || data.tasks || []).filter(task => task.due && plannerDateKey(task.due) === key && task.status !== 'done');
+}
+
+function plannerAgendaTasksForDay(data, day) {
+  const key = plannerDateKey(day);
+  const todayKey = plannerDateKey(new Date());
+  const todayStart = plannerStartOfDay(new Date());
+  return (data.agendaTasks || data.plannerTasks || data.tasks || []).filter(task => {
+    if (task.status === 'done' || task.displayEnabled === false) return false;
+    if (!task.due) return key === todayKey;
+    const due = new Date(task.due);
+    if (Number.isNaN(due.getTime())) return false;
+    if (plannerDateKey(due) === key) return true;
+    return key === todayKey && due < todayStart;
+  });
+}
+function plannerAgendaEntries(data) {
+  const todayStart = plannerStartOfDay(new Date()).getTime();
+  return [
+    ...(data.calendarEvents || data.events || []).map(event => ({ kind:'event', when:new Date(event.start).getTime(), event })),
+    ...(data.agendaTasks || []).map(task => ({ kind:'task', when:task.due ? new Date(task.due).getTime() : Number.MAX_SAFE_INTEGER, task }))
+  ].sort((a,b) => {
+    const ao = a.kind === 'task' && Number.isFinite(a.when) && a.when < todayStart;
+    const bo = b.kind === 'task' && Number.isFinite(b.when) && b.when < todayStart;
+    if (ao !== bo) return ao ? -1 : 1;
+    return a.when - b.when;
+  });
 }
 function plannerWeatherForDay(data, day) {
   const key = plannerDateKey(day);
@@ -1954,7 +1996,7 @@ function renderSvg(data, w, h) {
   const availableKinds = DISPLAY_SECTION_KEYS.filter(kind => activeSections[kind]?.enabled);
 
   const sectionData = {
-    agenda: data.events || [],
+    agenda: plannerAgendaEntries(data),
     weather: data.weather ? [data.weather] : [],
     tasks: data.tasks || [],
     goals: data.goals || [],
