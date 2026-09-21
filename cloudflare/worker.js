@@ -13,6 +13,7 @@ import {
 } from './google.js';
 import { marketData, marketSearch } from './markets.js';
 import { testAgent, chat, applyActions } from './agent.js';
+import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -327,9 +328,26 @@ async function handleApi(request,env,identity){
   }
   if(p==='/api/frameos/feed'&&method==='GET'){
     if(url.searchParams.get('token')!==state.display.token)return json({error:'Invalid display token'},401);
-    return json({runtime:'cloudflare',display:state.display,tasks:state.tasks.filter(t=>t.status!=='done'),goals:state.goals,countdowns:state.countdowns,weather:await weatherData(state).catch(()=>null),events:[]});
+    const range=displayRange(state);
+    let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
+    if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
+    if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
+    if(env.ALPHA_VANTAGE_API_KEY){try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}}
+    else marketError='ALPHA_VANTAGE_API_KEY is not configured.';
+    return json(buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError}));
   }
-  if(p==='/api/frameos/svg'&&method==='GET')return text('Cloud FrameOS SVG rendering is not enabled yet.',501);
+  if(p==='/api/frameos/svg'&&method==='GET'){
+    if(url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
+    const range=displayRange(state);
+    let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
+    if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
+    if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
+    if(env.ALPHA_VANTAGE_API_KEY){try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}}
+    else marketError='ALPHA_VANTAGE_API_KEY is not configured.';
+    const feed=buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError});
+    const width=clamp(num(url.searchParams.get('w'),800),300,2000),height=clamp(num(url.searchParams.get('h'),480),300,2000);
+    return text(renderDisplaySvg(feed,width,height),200,'image/svg+xml; charset=utf-8',{'cache-control':'no-store, max-age=0'});
+  }
 
   return json({error:'Not found'},404);
 }
@@ -338,15 +356,21 @@ export default{
   async fetch(request,env){
     const url=new URL(request.url);
     if(url.pathname==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
+    const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/svg';
+    if(machineDisplay){
+      try{
+        const state=await loadState(env);
+        if(url.searchParams.get('token')!==state.display.token)return url.pathname==='/frame'?text('Invalid display token',401):json({error:'Invalid display token'},401);
+        if(url.pathname==='/frame')return env.ASSETS.fetch(new Request(new URL('/frame.html',url),request));
+        return await handleApi(request,env,{email:null,sub:'display-token',bypass:true});
+      }catch(error){
+        return url.pathname==='/frame'?text(error.message||'Display unavailable.',500):json({error:error.message||'Display unavailable.'},500);
+      }
+    }
     let identity;
     try{identity=await authenticate(request,env)}catch(error){return json({error:error.message||'Authentication failed.'},Number(error.status)||503)}
     if(url.pathname.startsWith('/api/')){
       try{return await handleApi(request,env,identity)}catch(error){return json({error:error.message||'Unexpected cloud runtime error.'},Number(error.status)||500)}
-    }
-    if(url.pathname==='/frame'){
-      const state=await loadState(env);
-      if(url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
-      return env.ASSETS.fetch(new Request(new URL('/frame.html',url),request));
     }
     return env.ASSETS.fetch(request);
   }
