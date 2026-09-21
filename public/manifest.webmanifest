@@ -1,6 +1,6 @@
 {
-  "name": "Planner",
-  "short_name": "Planner",
+  "name": "Quest Log",
+  "short_name": "Quest Log",
   "description": "Self-hosted calendar, tasks, goals, countdowns and e-ink dashboard",
   "start_url": "/?view=today",
   "display": "standalone",

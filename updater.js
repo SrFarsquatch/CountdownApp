@@ -292,7 +292,7 @@ async function runUpdate() {
     if (current.Image === latestImage.Id) {
       persistState({
         phase: "complete", step: "complete", progress: 100,
-        message: "Planner is already up to date",
+        message: "Quest Log is already up to date",
         available: false,
         currentImageId: latestMeta.imageId, latestImageId: latestMeta.imageId,
         currentRevision: latestMeta.revision, latestRevision: latestMeta.revision,
@@ -323,7 +323,7 @@ async function runUpdate() {
       createConfig(current)
     );
 
-    persistState({ phase: "restarting", step: "restart", progress: 74, message: "Restarting Planner" });
+    persistState({ phase: "restarting", step: "restart", progress: 74, message: "Restarting Quest Log" });
 
     try { await docker("POST", "/containers/" + encodeURIComponent(TARGET_CONTAINER) + "/stop?t=10"); } catch {}
     persistState({ phase: "restarting", step: "restart", progress: 79, message: "Switching to the new version" });
@@ -332,11 +332,11 @@ async function runUpdate() {
     await docker("POST", "/containers/" + encodeURIComponent(replacementName) + "/rename?name=" + encodeURIComponent(TARGET_CONTAINER));
     await docker("POST", "/containers/" + encodeURIComponent(TARGET_CONTAINER) + "/start");
 
-    persistState({ phase: "verifying", step: "verify", progress: 90, message: "Checking that Planner started correctly" });
+    persistState({ phase: "verifying", step: "verify", progress: 90, message: "Checking that Quest Log started correctly" });
     const healthy = await waitForHealthy(TARGET_CONTAINER, 75000, (progress, health) => {
       persistState({
         phase: "verifying", step: "verify", progress,
-        message: health === "healthy" ? "Planner is healthy" : "Waiting for Planner to become healthy"
+        message: health === "healthy" ? "Quest Log is healthy" : "Waiting for Quest Log to become healthy"
       });
     });
     if (!healthy) {
@@ -402,6 +402,6 @@ if (process.argv.includes("--once") || process.env.RUN_ONCE === "1") {
   });
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`CountdownApp updater listening on :${PORT}`);
+    console.log(`Quest Log updater listening on :${PORT}`);
   });
 }

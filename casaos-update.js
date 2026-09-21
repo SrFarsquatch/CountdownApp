@@ -115,12 +115,19 @@ async function applyThroughCasaOS() {
 
   if (!composeYAML.trim()) throw new Error('CasaOS returned an empty compose configuration.');
 
+  // Preserve the existing CasaOS-managed compose and only migrate old product-facing labels.
+  const brandedComposeYAML = composeYAML
+    .replace(/custom:\s*Planner\b/g, 'custom: Quest Log')
+    .replace(/en_US:\s*Countdown\b/g, 'en_US: Quest Log')
+    .replace(/Persistent CountdownApp data/g, 'Persistent Quest Log data')
+    .replace(/Planner web interface and FrameOS API/g, 'Quest Log web interface and FrameOS API');
+
   await casaOSRequest(
     'PUT',
     appPath + '?dry_run=false&check_port_conflict=false',
     {
       headers: { 'Content-Type': 'application/yaml' },
-      body: composeYAML
+      body: brandedComposeYAML
     }
   );
 
@@ -128,7 +135,7 @@ async function applyThroughCasaOS() {
     phase: 'restarting',
     step: 'restart',
     progress: 78,
-    message: 'CasaOS is restarting Planner…',
+    message: 'CasaOS is restarting Quest Log…',
     pullStatus: 'Waiting for the updated CasaOS-managed container'
   });
 }
@@ -161,7 +168,7 @@ async function waitForReplacement() {
         progress: 100,
         available: false,
         message: 'Update installed successfully',
-        pullStatus: 'CasaOS applied the new Planner image',
+        pullStatus: 'CasaOS applied the new Quest Log image',
         currentImageId: container.Image || '',
         latestImageId: container.Image || '',
         finishedAt: new Date().toISOString(),
@@ -177,12 +184,12 @@ async function waitForReplacement() {
       phase: 'verifying',
       step: 'verify',
       progress: sawTransition ? 94 : 86,
-      message: sawTransition ? 'Checking the updated Planner…' : 'Waiting for CasaOS to recreate Planner…'
+      message: sawTransition ? 'Checking the updated Quest Log…' : 'Waiting for CasaOS to recreate Quest Log…'
     });
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
-  throw new Error('CasaOS accepted the update, but Planner did not come back on the new image within 3 minutes.');
+  throw new Error('CasaOS accepted the update, but Quest Log did not come back on the new image within 3 minutes.');
 }
 
 async function run() {
