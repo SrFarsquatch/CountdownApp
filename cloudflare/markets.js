@@ -60,7 +60,7 @@ export async function marketData(state,env){
     if(i<config.watchlist.length-1)await sleep(1150);
   }
   const data={provider:'Alpha Vantage',quotes,watchlist:config.watchlist,symbols:config.watchlist.map(x=>x.symbol),updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:refresh,freeDailyRequestLimit:25};
-  state.marketCache={key,expiresAt:Date.now()+refresh*60000,data};await saveState(env,state);return data;
+  state.marketCache={key,expiresAt:Date.now()+refresh*60000,data};if(env.DB)await saveState(env,state);return data;
 }
 export async function marketSearch(query,env){
   const q=cleanText(query,80).trim();if(!q)return[];
