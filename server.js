@@ -719,6 +719,7 @@ async function launchCasaOSManagedUpdater(version, currentContainer) {
     ],
     HostConfig: {
       AutoRemove: true,
+      NetworkMode: 'host',
       Binds: [
         '/var/run/docker.sock:/var/run/docker.sock',
         '/var/run/casaos:/var/run/casaos:ro',
