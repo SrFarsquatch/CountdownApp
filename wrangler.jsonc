@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "quest-log",
+  "name": "questlog",
   "main": "./cloudflare/worker.js",
   "compatibility_date": "2026-09-21",
   "workers_dev": false,
