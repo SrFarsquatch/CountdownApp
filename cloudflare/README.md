@@ -120,20 +120,36 @@ https://questlog.mattmoonie.ca/api/google/callback
 
 These credentials and tokens belong to the cloud deployment only.
 
-### Navi / OpenAI
+### Navi / AI models
 
-Cloud Navi will use:
+Cloud Navi can use either OpenAI or a local OpenAI-compatible model.
 
-- `OPENAI_API_KEY`
+OpenAI uses:
+
+- `OPENAI_API_KEY` (Worker secret)
 - optional `OPENAI_MODEL`
 
-The default model target is:
+For a local model, configure Navi in the cloud UI with provider **Local model (HTTPS)** and an HTTPS OpenAI-compatible `/v1` endpoint. A typical setup is:
 
 ```text
-gpt-5.6-luna
+Cloud Worker
+  -> HTTPS
+  -> Cloudflare Tunnel / Access
+  -> local Hermes, OpenClaw, Ollama gateway, vLLM, etc.
 ```
 
-The OpenAI key is stored as a Worker secret and is never sent to the browser.
+The local model connection is separate from the self-hosted Quest Log runtime and does not share Quest Log data or persistence.
+
+Optional Worker secrets/variables for local model authentication:
+
+- `LOCAL_AGENT_BASE_URL` - optional fallback endpoint if one is not saved in D1
+- `LOCAL_AGENT_MODEL` - optional default model
+- `LOCAL_AGENT_API_KEY` - optional bearer token
+- `LOCAL_AGENT_ACCESS_CLIENT_ID` - optional Cloudflare Access service-token client ID
+- `LOCAL_AGENT_ACCESS_CLIENT_SECRET` - optional Cloudflare Access service-token client secret
+
+When both Access service-token values are present, the Worker sends the standard `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers to the local model endpoint.
+
 
 ### Markets
 
