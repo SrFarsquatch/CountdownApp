@@ -559,14 +559,14 @@ async function taskModal(item){
    if(!linked&&select.value){
      const parts=select.value.split('|||');b.googleAccountId=parts[0]||'';b.googleTaskListId=parts[1]||'';
    }
-   $('taskFormStatus').textContent=linked?'Saving to Planner and Google Tasks…':'Saving task…';
+   $('taskFormStatus').textContent=linked?'Saving to Quest Log and Google Tasks…':'Saving task…';
    try{
      await api(item?'/api/tasks/'+encodeURIComponent(item.id):'/api/tasks',{method:item?'PUT':'POST',body:JSON.stringify(b)});
      closeModal();await loadAll();
    }catch(error){$('taskFormStatus').textContent=error.message}
  };
  if(item)$('deleteEntity').onclick=async()=>{
-   if(!confirm(linked?'Delete this task from Planner and Google Tasks?':'Delete this task?'))return;
+   if(!confirm(linked?'Delete this task from Quest Log and Google Tasks?':'Delete this task?'))return;
    try{await api('/api/tasks/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}
    catch(error){$('taskFormStatus').textContent=error.message}
  };
@@ -1089,7 +1089,7 @@ async function renderSettings(){
  }
  box.innerHTML=html+accounts.map(a=>{
    const needsReconnect=!a.canWrite||!a.canTasks;
-   return '<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google account')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Calendar editing enabled':'Calendar reconnect needed')+'</span><span class="write-state '+(a.canTasks?'ok':'warn')+'">'+(a.canTasks?'Task sync enabled':'Task reconnect needed')+'</span></div></div><div class="account-actions">'+(needsReconnect?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="integration-section"><div class="integration-head"><strong>Calendars</strong><span class="meta">Shown in Planner</span></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div><div class="integration-section"><div class="integration-head"><strong>Google Tasks</strong><span class="meta">Two-way sync</span></div><div class="tasklist-list" data-tasklist-list="'+esc(a.id)+'"><div class="meta">'+(a.canTasks?'Loading task lists…':'Reconnect this account to grant Google Tasks access.')+'</div></div></div></div>';
+   return '<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google account')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Calendar editing enabled':'Calendar reconnect needed')+'</span><span class="write-state '+(a.canTasks?'ok':'warn')+'">'+(a.canTasks?'Task sync enabled':'Task reconnect needed')+'</span></div></div><div class="account-actions">'+(needsReconnect?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="integration-section"><div class="integration-head"><strong>Calendars</strong><span class="meta">Shown in Quest Log</span></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div><div class="integration-section"><div class="integration-head"><strong>Google Tasks</strong><span class="meta">Two-way sync</span></div><div class="tasklist-list" data-tasklist-list="'+esc(a.id)+'"><div class="meta">'+(a.canTasks?'Loading task lists…':'Reconnect this account to grant Google Tasks access.')+'</div></div></div></div>';
  }).join('');
  $('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
  box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
