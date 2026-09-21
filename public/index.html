@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f4f1">
-<title>Planner</title>
+<title>Quest Log</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <style>
 :root{color-scheme:light;--bg:#f3f2ef;--panel:#fff;--panel2:#f8f7f4;--text:#171717;--muted:#77756f;--line:#dfddd7;--accent:#6c5ce7;--accent-soft:#eeeafd;--danger:#b42318;--green:#2f8f63;--orange:#dd8a2f;--shadow:0 12px 36px rgba(20,20,20,.06)}
@@ -204,7 +204,7 @@
 <body>
 <div class="app">
 <aside class="side">
-  <div class="brand"><div class="logo">P</div><span>Planner</span></div>
+  <div class="brand"><div class="logo">Q</div><span>Quest Log</span></div>
   <nav class="nav">
     <button class="on" data-view="today">Today</button>
     <button data-view="planner">Planner</button>
@@ -266,7 +266,7 @@
   <div id="marketStatus" class="notice" style="display:none"></div>
   <div id="marketGrid" class="market-grid"></div>
   <div class="settings-grid" style="margin-top:14px">
-    <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Planner to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
+    <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Quest Log to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
     <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Alpha Vantage</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
   </div>
 </section>
@@ -312,7 +312,7 @@
 
   <div class="card connection-box">
     <div class="eyebrow">FrameOS connection</div><h3 style="margin:4px 0 4px">Private display sources</h3>
-    <p class="meta">Use the rendered SVG for the exact Planner layout, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
+    <p class="meta">Use the rendered SVG for the exact Quest Log layout, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
     <div class="connection-row"><strong>Rendered SVG</strong><div class="connection-url" id="svgUrl"></div><button class="btn tiny" data-copy="svgUrl">Copy</button></div>
     <div class="connection-row"><strong>JSON feed</strong><div class="connection-url" id="feedUrl"></div><button class="btn tiny" data-copy="feedUrl">Copy</button></div>
     <div class="connection-row"><strong>Browser preview</strong><div class="connection-url" id="viewUrl"></div><button class="btn tiny" data-copy="viewUrl">Copy</button></div>
@@ -323,7 +323,7 @@
 <section class="view" id="view-settings">
   <div class="hero"><div><h2>Settings</h2><p>Integrations, calendars and app maintenance.</p></div></div>
   <div class="settings-grid">
-    <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Planner.</p><div id="googleSettings"></div></div>
+    <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" style="margin-top:8px">Provider: Open-Meteo · no API key required.</div></div>
     <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Alpha Vantage</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="720">12 hours</option><option value="1440">Once daily — recommended</option></select></div><div class="modal-actions"><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="meta" style="margin-top:8px">API key stays server-side in <code>ALPHA_VANTAGE_API_KEY</code>.</div></div>
     <div class="card setting-card update-card">
@@ -418,7 +418,7 @@ async function eventModal(item=null,preset={}){
  const writable=allAccounts.filter(a=>a.canWrite);
  if(!item&&!writable.length){
    const connected=allAccounts.length>0;
-   openModal('New event','<div class="notice">'+(connected?'Your Google account is still using the old read-only token. Reconnect it once to grant Planner event editing access.':'Connect a Google account before creating calendar events.')+'</div><div class="modal-actions"><button class="btn primary" id="eventConnectGoogle">'+(connected?'Reconnect Google':'Open Google settings')+'</button></div>');
+   openModal('New event','<div class="notice">'+(connected?'Your Google account is still using the old read-only token. Reconnect it once to grant Quest Log event editing access.':'Connect a Google account before creating calendar events.')+'</div><div class="modal-actions"><button class="btn primary" id="eventConnectGoogle">'+(connected?'Reconnect Google':'Open Google settings')+'</button></div>');
    $('eventConnectGoogle').onclick=()=>connected?location.href='/api/google/auth':setView('settings');
    return;
  }
@@ -437,7 +437,7 @@ async function eventModal(item=null,preset={}){
  const accountOptions=accountsForForm.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label||a.googleId||'Google account')+'</option>').join('');
  const repeatField=editing?'':'<div class="field"><label>Repeat</label><select id="fEventRepeat"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>';
  const recurringNotice=item?.recurringEventId?'<div class="notice event-form-note">This is one occurrence of a recurring event. Editing or deleting here applies to this occurrence.</div>':'';
- const permissionNotice=!canWrite?'<div class="notice event-form-note">This account or calendar is read-only in Planner. Reconnect the Google account if you expect write access.</div>':'';
+ const permissionNotice=!canWrite?'<div class="notice event-form-note">This account or calendar is read-only in Quest Log. Reconnect the Google account if you expect write access.</div>':'';
  let form='<form id="eventForm">'+recurringNotice+permissionNotice+'<div class="form-grid">';
  form+='<div class="field full"><label>Title</label><input id="fEventTitle" required value="'+esc(item?.title||'')+'" placeholder="Event title"></div>';
  form+='<div class="field"><label>Google account</label><select id="fEventAccount" '+(editing?'disabled':'')+'>'+accountOptions+'</select></div>';
@@ -524,7 +524,7 @@ async function taskModal(item){
  form+='<div class="field"><label>Status</label><select id="fStatus"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Complete</option></select></div>';
  form+='<div class="field"><label>Project / list</label><input id="fProject" value="'+esc(item?.project||'')+'" placeholder="Personal"></div>';
  form+='<div class="field full"><label>Linked goal</label><select id="fGoal"><option value="">None</option>'+goals+'</select></div>';
- form+='<div class="field full"><label>Google Tasks sync</label><select id="fGoogleTaskList" '+(linked?'disabled':'')+'><option value="">Planner only</option></select><div class="meta task-sync-note">'+(linked?'Linked to '+esc(item.googleTaskListTitle||'Google Tasks')+'. Changes and completion status sync both ways.':'Choose a Google Task list to sync this task both ways. Google Tasks stores due dates but not due times; Planner keeps the local time.')+'</div></div>';
+ form+='<div class="field full"><label>Google Tasks sync</label><select id="fGoogleTaskList" '+(linked?'disabled':'')+'><option value="">Quest Log only</option></select><div class="meta task-sync-note">'+(linked?'Linked to '+esc(item.googleTaskListTitle||'Google Tasks')+'. Changes and completion status sync both ways.':'Choose a Google Task list to sync this task both ways. Google Tasks stores due dates but not due times; Quest Log keeps the local time.')+'</div></div>';
  form+='</div><div id="taskFormStatus" class="meta" style="margin-top:8px"></div><div class="modal-actions">'+(item?'<button type="button" class="btn" id="deleteEntity">Delete</button>':'')+'<button class="btn primary">Save task</button></div></form>';
  openModal(item?'Edit task':'New task',form);
  $('fPriority').value=item?.priority||'medium';$('fStatus').value=item?.status||'todo';
@@ -546,7 +546,7 @@ async function taskModal(item){
        });
      }catch(error){console.warn(error)}
    }
-   select.innerHTML='<option value="">Planner only</option>'+options.map(x=>'<option value="'+esc(x.value)+'">'+esc(x.label)+'</option>').join('');
+   select.innerHTML='<option value="">Quest Log only</option>'+options.map(x=>'<option value="'+esc(x.value)+'">'+esc(x.label)+'</option>').join('');
    if(preferred)select.value=preferred;
  }
  $('entityForm').onsubmit=async e=>{
@@ -792,7 +792,7 @@ function calendarEventModal(e){
  body+='<div class="event-detail-row"><strong>Calendar</strong><div><span class="cal-dot" style="background:'+eventColorFor(e)+'"></span> '+esc(e.calendarName||'Google Calendar')+'<div class="meta">'+esc(e.accountLabel||'')+'</div></div></div>';
  if(e.location)body+='<div class="event-detail-row"><strong>Location</strong><div>'+esc(e.location)+'</div></div>';
  if(e.description)body+='<div class="event-detail-row"><strong>Notes</strong><div>'+esc(e.description).replace(/\n/g,'<br>')+'</div></div>';
- if(calendarWritable&&!account?.canWrite)body+='<div class="notice">Reconnect this Google account once to let Planner edit events.</div>';
+ if(calendarWritable&&!account?.canWrite)body+='<div class="notice">Reconnect this Google account once to let Quest Log edit events.</div>';
  body+='<div class="modal-actions">'+(canEdit?'<button class="btn primary" id="editGoogleEvent">Edit</button>':'')+(link?'<button class="btn" id="openGoogleEvent">Open in Google Calendar</button>':'')+'</div>';
  body+='</div>';openModal(e.title,body);
  if(canEdit&&$('editGoogleEvent'))$('editGoogleEvent').onclick=()=>eventModal(e);
@@ -1080,7 +1080,7 @@ async function renderSettings(){
  renderWeatherSettings();renderMarketSettings();
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
- let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect accounts, choose calendars, and choose which Google Task lists Planner should sync.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
+ let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect accounts, choose calendars, and choose which Google Task lists Quest Log should sync.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
  if(!accounts.length){
    html+='<div class="empty">No Google accounts connected yet.</div>';
    box.innerHTML=html;
@@ -1095,7 +1095,7 @@ async function renderSettings(){
  box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
  box.querySelectorAll('[data-disconnect-account]').forEach(btn=>btn.onclick=async()=>{
    const account=accounts.find(a=>a.id===btn.dataset.disconnectAccount);
-   if(!confirm('Disconnect '+(account?.label||'this Google account')+'? Linked Google Tasks will remain in Planner as local tasks.'))return;
+   if(!confirm('Disconnect '+(account?.label||'this Google account')+'? Linked Google Tasks will remain in Quest Log as local tasks.'))return;
    await api('/api/google/accounts/'+encodeURIComponent(btn.dataset.disconnectAccount)+'/disconnect',{method:'POST'});
    calendarCache={};taskListCache={};await loadAll();
  });
@@ -1148,7 +1148,7 @@ function updateBuildLabel(s,prefix){
  return revision?revision.slice(0,8):(version&&version!=='edge'?version:(shortImageId(image)||'Unknown'));
 }
 function updatePhaseLabel(phase){
- return({queued:'Starting update',pulling:'Downloading update',preparing:'Preparing new version',restarting:'Restarting Planner',verifying:'Verifying new version',complete:'Update complete',error:'Update failed'})[phase]||'Ready';
+ return({queued:'Starting update',pulling:'Downloading update',preparing:'Preparing new version',restarting:'Restarting Quest Log',verifying:'Verifying new version',complete:'Update complete',error:'Update failed'})[phase]||'Ready';
 }
 function formatChecked(value){
  if(!value)return'Not checked yet';
@@ -1175,11 +1175,11 @@ function renderUpdateStatus(s){
  if(mobileDot)mobileDot.hidden=s.available!==true;
  $('updateStatus').textContent=!s.configured?'Updater not configured':(s.message||(s.available?'Update available':'Ready to check for updates'));
  const details=[];
- if(!s.configured)details.push('Re-import the latest CasaOS compose once so Planner can access the Docker socket.');
+ if(!s.configured)details.push('Re-import the latest CasaOS compose once so Quest Log can access the Docker socket.');
  if(s.error)details.push(s.error);
  else if(s.checkError)details.push(s.checkError);
- else if(s.available===true)details.push('A newer Planner container is ready to install.');
- else if(s.available===false)details.push('You are running the newest published Planner image.');
+ else if(s.available===true)details.push('A newer Quest Log container is ready to install.');
+ else if(s.available===false)details.push('You are running the newest published Quest Log image.');
  else if(s.configured&&!checking)details.push('Check GitHub Container Registry for a newer published image.');
  $('updateDetail').textContent=details.join(' ');
 
@@ -1204,7 +1204,7 @@ function renderUpdateStatus(s){
 
  if(s.phase==='complete'&&updateStartedInPage&&!updateReloadScheduled){
    updateReloadScheduled=true;
-   $('updateProgressDetail').textContent='Update complete. Reloading Planner…';
+   $('updateProgressDetail').textContent='Update complete. Reloading Quest Log…';
    setTimeout(()=>location.reload(),1600);
  }
 }
@@ -1222,10 +1222,10 @@ async function refreshUpdateStatus(){
  }catch(error){
    if(updateStartedInPage){
      $('updateBadge').className='update-badge updating';$('updateBadge').innerHTML='<span class="update-checking-dot"></span>Restarting';
-     $('updateStatus').textContent='Planner is restarting…';
+     $('updateStatus').textContent='Quest Log is restarting…';
      $('updateDetail').textContent='The web server may be unavailable briefly while the new container starts.';
      $('updateProgress').hidden=false;
-     $('updateStep').textContent='Restarting Planner';
+     $('updateStep').textContent='Restarting Quest Log';
      $('updateProgressDetail').textContent='Waiting for the updated server to come back online…';
      scheduleUpdatePoll(1000);
    }else{
@@ -1240,7 +1240,7 @@ async function checkForUpdatesUI(auto=false){
    $('checkUpdates').disabled=true;$('checkUpdates').textContent='Checking…';
    $('updateBadge').className='update-badge updating';$('updateBadge').innerHTML='<span class="update-checking-dot"></span>Checking';
    $('updateStatus').textContent='Checking for updates…';
-   $('updateDetail').textContent='Planner is comparing the running container with the newest published image.';
+   $('updateDetail').textContent='Quest Log is comparing the running container with the newest published image.';
    await api('/api/update/check',{method:'POST',headers:{'X-Countdown-Action':'update-check'}});
  }catch(error){
    if(!auto){$('updateStatus').textContent='Could not check for updates';$('updateDetail').textContent=error.message}
