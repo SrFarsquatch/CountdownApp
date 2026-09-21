@@ -632,8 +632,12 @@ function renderWeather(){
 }
 function marketMoney(value,currency=''){const n=Number(value);if(!Number.isFinite(n))return '—';return (currency?currency+' ':'')+n.toLocaleString([],{minimumFractionDigits:2,maximumFractionDigits:2})}
 function marketCard(q){
- const pct=Number(q.percentChange),up=Number.isFinite(pct)&&pct>0,down=Number.isFinite(pct)&&pct<0,cls=up?'up':down?'down':'',arrow=up?'▲':down?'▼':'•';
- return '<div class="market-card"><div class="market-symbol">'+esc(q.symbol||'')+'</div><div class="market-name">'+esc(q.name||q.exchange||'')+'</div><div class="market-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-change '+cls+'">'+arrow+' '+esc(Number.isFinite(pct)?Math.abs(pct).toFixed(2)+'%':'—')+'</div><div class="market-meta">'+esc(q.exchange||'')+(q.datetime?' · '+esc(q.datetime):'')+'</div></div>'
+ const pct=Number(q.percentChange),chg=Number(q.change),up=Number.isFinite(pct)&&pct>0,down=Number.isFinite(pct)&&pct<0,cls=up?'up':down?'down':'',arrow=up?'▲':down?'▼':'•';
+ const venue=[q.exchange,q.currency].filter(Boolean).join(' · ');
+ if(q.available===false||q.close==null){
+   return '<div class="market-card"><div class="market-symbol">'+esc(q.symbol||'')+'</div><div class="market-name">'+esc(q.name||venue||'')+'</div><div class="market-price">Unavailable</div><div class="market-change">'+esc(q.error||'No quote returned')+'</div><div class="market-meta">'+esc(venue)+'</div></div>'
+ }
+ return '<div class="market-card"><div class="market-symbol">'+esc(q.symbol||'')+'</div><div class="market-name">'+esc(q.name||venue||'')+'</div><div class="market-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-change '+cls+'">'+arrow+' '+esc(Number.isFinite(pct)?Math.abs(pct).toFixed(2)+'%':'—')+(Number.isFinite(chg)?' · '+(chg>=0?'+':'')+chg.toFixed(2):'')+'</div><div class="market-meta">'+esc(venue)+'</div><div class="market-meta">O '+esc(q.open==null?'—':Number(q.open).toFixed(2))+' · H '+esc(q.high==null?'—':Number(q.high).toFixed(2))+' · L '+esc(q.low==null?'—':Number(q.low).toFixed(2))+'</div><div class="market-meta">Prev '+esc(q.previousClose==null?'—':Number(q.previousClose).toFixed(2))+(q.volume!=null?' · Vol '+Number(q.volume).toLocaleString():'')+(q.datetime?' · '+esc(q.datetime):'')+'</div></div>'
 }
 function renderMarketSummary(rootId){
  const root=$(rootId);if(!root)return;
@@ -999,8 +1003,8 @@ $('saveDisplay').onclick=async()=>{
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const el=$(b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent);const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200)}catch{prompt('Copy this URL:',el.textContent)}});
 $('rotateDisplayToken').onclick=async()=>{if(!confirm('Rotate the private display token? Existing FrameOS URLs will stop working.'))return;await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');renderDisplay()};
 
-async function saveMarketSymbols(symbols){
- await api('/api/settings',{method:'PUT',body:JSON.stringify({marketSymbols:symbols})});
+async function saveMarketWatchlist(watchlist){
+ await api('/api/settings',{method:'PUT',body:JSON.stringify({marketWatchlist:watchlist})});
  state=await api('/api/state');await loadMarkets();renderMarkets();renderToday();
 }
 async function searchMarkets(){
@@ -1010,20 +1014,25 @@ async function searchMarkets(){
   const results=(await api('/api/markets/search?q='+encodeURIComponent(q))).results||[];
   root.innerHTML=results.length?results.map((r,i)=>'<button class="market-search-result" type="button" data-market-result="'+i+'"><strong>'+esc(r.symbol)+'</strong> · '+esc(r.name||r.type||'')+'<div class="meta">'+esc([r.exchange,r.country,r.currency,r.access].filter(Boolean).join(' · '))+'</div></button>').join(''):'<div class="meta">No matching symbols.</div>';
   root.querySelectorAll('[data-market-result]').forEach(btn=>btn.onclick=async()=>{
-   const r=results[Number(btn.dataset.marketResult)],symbols=[...(state.markets?.symbols||[])];if(!r||symbols.includes(r.symbol))return;
-   if(symbols.length>=8){alert('The watchlist is capped at 8 symbols to protect the Twelve Data free-tier quota.');return}
-   await saveMarketSymbols([...symbols,r.symbol]);root.innerHTML='';$('marketSearchInput').value='';
+   const r=results[Number(btn.dataset.marketResult)],watchlist=[...(state.markets?.watchlist||[])];if(!r)return;
+   if(watchlist.some(item=>item.symbol===r.symbol&&String(item.exchange||'')===String(r.exchange||'')))return;
+   if(watchlist.length>=8){alert('The watchlist is capped at 8 symbols to protect the Twelve Data free-tier quota.');return}
+   await saveMarketWatchlist([...watchlist,{symbol:r.symbol,name:r.name,exchange:r.exchange,micCode:r.micCode,type:r.type,country:r.country,currency:r.currency,access:r.access}]);root.innerHTML='';$('marketSearchInput').value='';
   });
  }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
 }
 function renderMarkets(){
  const configured=state.markets?.configured;
  $('marketProviderStatus').textContent=configured?'Twelve Data connected':'Twelve Data not configured';
- const status=$('marketStatus');status.style.display=marketError?'block':'none';status.textContent=marketError||'';
+ const status=$('marketStatus'),unavailable=(marketData?.quotes||[]).filter(q=>q.available===false);const statusText=marketError||(unavailable.length?unavailable.length+' watchlist symbol'+(unavailable.length===1?' is':'s are')+' unavailable from your current Twelve Data access.':'');status.style.display=statusText?'block':'none';status.textContent=statusText;
  renderMarketSummary('marketGrid');
- const symbols=state.markets?.symbols||[];
- $('marketWatchlist').innerHTML=symbols.length?symbols.map(symbol=>'<div class="market-watch-row"><div><strong>'+esc(symbol)+'</strong><div class="meta">Updates automatically</div></div><button class="btn tiny ghost" data-remove-market="'+esc(symbol)+'">Remove</button></div>').join(''):'<div class="empty">No symbols selected.</div>';
- $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketSymbols(symbols.filter(s=>s!==btn.dataset.removeMarket)));
+ const watchlist=state.markets?.watchlist||[],quotes=marketData?.quotes||[];
+ $('marketWatchlist').innerHTML=watchlist.length?watchlist.map((item,index)=>{
+   const q=quotes.find(q=>q.symbol===item.symbol&&(!item.exchange||q.exchange===item.exchange))||quotes.find(q=>q.symbol===item.symbol);
+   const stat=q&&q.close!=null?marketMoney(q.close,q.currency)+' · '+(Number(q.percentChange)>=0?'▲ ':'▼ ')+Math.abs(Number(q.percentChange)||0).toFixed(2)+'%':(q?.error||'Quote unavailable');
+   return '<div class="market-watch-row"><div><strong>'+esc(item.symbol)+'</strong><div class="meta">'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div><div class="meta">'+esc(stat)+'</div></div><button class="btn tiny ghost" data-remove-market="'+index+'">Remove</button></div>'
+ }).join(''):'<div class="empty">No symbols selected.</div>';
+ $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketWatchlist(watchlist.filter((_,i)=>i!==Number(btn.dataset.removeMarket))));
  $('marketSearchInput').disabled=!configured;$('marketSearchButton').disabled=!configured;
  if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Add TWELVE_DATA_API_KEY in Settings/CasaOS first.</div>';
 }
