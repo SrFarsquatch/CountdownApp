@@ -46,6 +46,12 @@ Quest Log keeps the one-click **Install update** experience without renaming or 
 
 If an older build previously left CasaOS pointing at a deleted container, back up `/DATA/AppData/countdownapp/data`, remove/recreate only the app container once, and re-import the current CasaOS compose without deleting that data directory.
 
+## Appearance
+
+Quest Log supports **System**, **Light**, and **Dark** appearance modes plus five interface themes: **Quest**, **Moss**, **Ember**, **Arcane**, and **Slate**. Appearance settings are stored server-side so they follow the user across devices, while a small local cache applies the last theme before the app finishes loading to avoid a flash of the wrong theme. **Comfortable** and **Compact** interface density options are also available.
+
+Website appearance is independent from the e-ink display palette, so changing the Quest Log theme does not alter Spectra 6 or monochrome FrameOS output.
+
 ## CasaOS deployment
 
 GitHub Actions builds the application image from `main` and publishes:

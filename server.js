@@ -46,6 +46,9 @@ const TASK_STATUS = ['todo', 'progress', 'done'];
 const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 const GOAL_TYPES = ['number', 'checklist', 'deadline'];
 const GOAL_STATUS = ['active', 'complete', 'paused'];
+const APPEARANCE_MODES = ['system', 'light', 'dark'];
+const UI_THEMES = ['quest', 'moss', 'ember', 'arcane', 'slate'];
+const UI_DENSITIES = ['comfortable', 'compact'];
 const HEX = {
   black: '#111111', red: '#d62828', blue: '#1769aa', green: '#2f7d32',
   yellow: '#e0a800', purple: '#6d4aff'
@@ -230,6 +233,7 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
+    appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
     markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 1440 },
     marketCache: null,
     display: {
@@ -327,6 +331,14 @@ function normalizeWeather(x = {}) {
   };
 }
 
+function normalizeAppearance(x = {}) {
+  return {
+    mode: en(x.mode, APPEARANCE_MODES, 'system'),
+    theme: en(x.theme, UI_THEMES, 'quest'),
+    density: en(x.density, UI_DENSITIES, 'comfortable')
+  };
+}
+
 function alphaProviderSymbol(source = {}) {
   const raw = cleanText(source.providerSymbol || source.alphaSymbol || source.symbol, 32).toUpperCase();
   if (!raw) return '';
@@ -411,6 +423,7 @@ function load() {
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
       weather: normalizeWeather(parsed.weather || base.weather),
+      appearance: normalizeAppearance(parsed.appearance || base.appearance),
       markets: normalizeMarkets(parsed.markets || base.markets),
       display: (() => {
         const legacyDisplay = parsed.display || {};
@@ -2296,6 +2309,7 @@ function state() {
   return {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
+    appearance: normalizeAppearance(db.appearance),
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
     markets: (() => { const config = normalizeMarkets(db.markets); return { ...config, configured: marketConfigured(), provider: 'Alpha Vantage', effectiveRefreshMinutes: alphaEffectiveRefreshMinutes(config), freeDailyRequestLimit: 25 }; })(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
@@ -2591,6 +2605,14 @@ const server = http.createServer(async (req, res) => {
       const incoming = await body(req);
       if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
       if (incoming.countdownWindowDays !== undefined) db.google.countdownWindowDays = clamp(num(incoming.countdownWindowDays, 30), 1, 365);
+      if (incoming.appearanceMode !== undefined || incoming.appearanceTheme !== undefined || incoming.appearanceDensity !== undefined) {
+        db.appearance = normalizeAppearance({
+          ...db.appearance,
+          mode: incoming.appearanceMode !== undefined ? incoming.appearanceMode : db.appearance?.mode,
+          theme: incoming.appearanceTheme !== undefined ? incoming.appearanceTheme : db.appearance?.theme,
+          density: incoming.appearanceDensity !== undefined ? incoming.appearanceDensity : db.appearance?.density
+        });
+      }
       if (incoming.displayTitle !== undefined) db.display.title = cleanText(incoming.displayTitle || 'Today', 80);
       if (incoming.maxEvents !== undefined) db.display.maxEvents = clamp(num(incoming.maxEvents, 5), 1, 20);
       if (incoming.maxCountdowns !== undefined) db.display.maxCountdowns = clamp(num(incoming.maxCountdowns, 3), 1, 20);
