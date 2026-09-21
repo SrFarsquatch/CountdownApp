@@ -147,6 +147,24 @@ as a Worker secret.
 
 Cloud weather is fetched directly from Open-Meteo by the Worker and uses coordinates stored in D1.
 
+No weather API key is required for the current cloud implementation. The self-hosted runtime keeps its Environment Canada + Open-Meteo hybrid behavior; the cloud runtime currently uses Open-Meteo only.
+
+## Cloud login and logout
+
+The cloud application is protected by Cloudflare Access.
+
+When a user visits the protected Quest Log hostname without a valid Access session, Cloudflare presents the configured Google sign-in flow before the Worker or frontend is loaded.
+
+When authenticated, Quest Log calls `/api/runtime` to display the signed-in Access email in the sidebar.
+
+The cloud sidebar logout action points to:
+
+```text
+/cdn-cgi/access/logout
+```
+
+Cloudflare handles clearing the Access authorization session. This login/logout behavior is cloud-only; the self-hosted runtime remains unchanged.
+
 ## Cloud-specific behavior
 
 Some features intentionally differ by runtime.
