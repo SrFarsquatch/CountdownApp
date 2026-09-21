@@ -1579,6 +1579,18 @@ function agendaRange(scope, now = new Date()) {
   return { start: new Date(now), end: new Date(now.getTime() + clamp(num(db.google.countdownWindowDays, 30), 1, 365) * 86400000) };
 }
 
+function agendaTasksForRange(scope, range, now = new Date()) {
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  return sortedTasks().filter(task => {
+    if (task.status === 'done' || task.displayEnabled === false) return false;
+    if (!task.due) return scope === 'today' || scope === 'upcoming';
+    const due = new Date(task.due);
+    if (Number.isNaN(due.getTime())) return false;
+    if (due < todayStart) return true;
+    return due >= range.start && due < range.end;
+  });
+}
+
 async function feed() {
   let ev = [], calendarError = null, weather = null, weatherError = null, markets = null, marketError = null;
   const mode = en(db.display.mode, DISPLAY_MODES, 'daily');
@@ -1586,9 +1598,10 @@ async function feed() {
   const modeLayout = normalizeSectionLayout(db.display.modeLayouts?.[mode], mode);
   const nowDate = new Date();
   const now = nowDate.getTime();
-  if (modeSections.agenda.enabled && googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
-    const range = agendaRange(modeSections.agenda.scope, nowDate);
-    try { ev = await eventsBetween(range.start.toISOString(), range.end.toISOString()); }
+  const agendaWindow = modeSections.agenda.enabled ? agendaRange(modeSections.agenda.scope, nowDate) : null;
+  const agendaTasks = agendaWindow ? agendaTasksForRange(modeSections.agenda.scope, agendaWindow, nowDate) : [];
+  if (agendaWindow && googleAccounts().some(account => account.token && account.selectedCalendarIds.length)) {
+    try { ev = await eventsBetween(agendaWindow.start.toISOString(), agendaWindow.end.toISOString()); }
     catch (error) { calendarError = error.message; }
   }
   if (modeSections.weather.enabled) {
@@ -1615,8 +1628,11 @@ async function feed() {
     nextEvent: ev.find(event => new Date(event.end || event.start).getTime() >= now) || null,
     events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
     calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
+    agendaTasks: modeSections.agenda.enabled ? agendaTasks.slice(0, 250) : [],
     tasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, modeSections.tasks.limit) : [],
-    plannerTasks: modeSections.tasks.enabled ? sortedTasks().filter(dueForDisplay).slice(0, 100) : [],
+    plannerTasks: (modeSections.agenda.enabled || modeSections.tasks.enabled)
+      ? sortedTasks().filter(task => task.status !== 'done' && task.displayEnabled !== false).slice(0, 250)
+      : [],
     goals: modeSections.goals.enabled ? db.goals.filter(g => g.status === 'active' && g.displayEnabled !== false)
       .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
       .slice(0, modeSections.goals.limit).map(g => ({ ...g, progress: goalProgress(g) })) : [],
@@ -1685,6 +1701,32 @@ function plannerEventsForDay(data, day) {
 function plannerTasksForDay(data, day) {
   const key = plannerDateKey(day);
   return (data.plannerTasks || data.tasks || []).filter(task => task.due && plannerDateKey(task.due) === key && task.status !== 'done');
+}
+
+function plannerAgendaTasksForDay(data, day) {
+  const key = plannerDateKey(day);
+  const todayKey = plannerDateKey(new Date());
+  const todayStart = plannerStartOfDay(new Date());
+  return (data.agendaTasks || data.plannerTasks || data.tasks || []).filter(task => {
+    if (task.status === 'done' || task.displayEnabled === false) return false;
+    if (!task.due) return key === todayKey;
+    const due = new Date(task.due);
+    if (Number.isNaN(due.getTime())) return false;
+    if (plannerDateKey(due) === key) return true;
+    return key === todayKey && due < todayStart;
+  });
+}
+function plannerAgendaEntries(data) {
+  const todayStart = plannerStartOfDay(new Date()).getTime();
+  return [
+    ...(data.calendarEvents || data.events || []).map(event => ({ kind:'event', when:new Date(event.start).getTime(), event })),
+    ...(data.agendaTasks || []).map(task => ({ kind:'task', when:task.due ? new Date(task.due).getTime() : Number.MAX_SAFE_INTEGER, task }))
+  ].sort((a,b) => {
+    const ao = a.kind === 'task' && Number.isFinite(a.when) && a.when < todayStart;
+    const bo = b.kind === 'task' && Number.isFinite(b.when) && b.when < todayStart;
+    if (ao !== bo) return ao ? -1 : 1;
+    return a.when - b.when;
+  });
 }
 function plannerWeatherForDay(data, day) {
   const key = plannerDateKey(day);
@@ -1954,7 +1996,7 @@ function renderSvg(data, w, h) {
   const availableKinds = DISPLAY_SECTION_KEYS.filter(kind => activeSections[kind]?.enabled);
 
   const sectionData = {
-    agenda: data.events || [],
+    agenda: plannerAgendaEntries(data),
     weather: data.weather ? [data.weather] : [],
     tasks: data.tasks || [],
     goals: data.goals || [],
@@ -1990,14 +2032,22 @@ function renderSvg(data, w, h) {
         const rowH = Math.max(22, Math.min(42, (maxHeight-24)/7));
         for (let i=0;i<7 && cursor+rowH<=y+maxHeight;i++) {
           const day=new Date(monday);day.setDate(day.getDate()+i);
-          const dayEvents=plannerEventsForDay(data,day).slice(0,2);
+          const dayEntries=[
+            ...plannerEventsForDay(data,day).map(event=>({kind:'event',event})),
+            ...plannerAgendaTasksForDay(data,day).map(task=>({kind:'task',task}))
+          ].slice(0,2);
           svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x+width) + '" y2="' + cursor + '" class="line"/>';
           svg += '<text x="' + x + '" y="' + (cursor+15) + '" font-size="9" font-weight="800">' + esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()+' '+day.getDate()) + '</text>';
           let tx=x+58;
-          for (const event of dayEvents) {
-            const accent=plannerEventAccent(event,palette);
-            svg += '<circle cx="' + tx + '" cy="' + (cursor+11) + '" r="3" fill="' + accent + '"/>';
-            svg += '<text x="' + (tx+7) + '" y="' + (cursor+15) + '" font-size="9.5">' + esc(truncateForWidth(event.title,Math.max(50,width-(tx-x)-8),9.5)) + '</text>';
+          for (const entry of dayEntries) {
+            if(entry.kind==='task'){
+              svg += '<rect x="' + (tx-3) + '" y="' + (cursor+7) + '" width="7" height="7" rx="1" fill="#fff" stroke="' + black + '"/>';
+              svg += '<text x="' + (tx+8) + '" y="' + (cursor+15) + '" font-size="9.5">' + esc(truncateForWidth(entry.task.title,Math.max(50,width-(tx-x)-8),9.5)) + '</text>';
+            }else{
+              const accent=plannerEventAccent(entry.event,palette);
+              svg += '<circle cx="' + tx + '" cy="' + (cursor+11) + '" r="3" fill="' + accent + '"/>';
+              svg += '<text x="' + (tx+7) + '" y="' + (cursor+15) + '" font-size="9.5">' + esc(truncateForWidth(entry.event.title,Math.max(50,width-(tx-x)-8),9.5)) + '</text>';
+            }
             tx += Math.max(90,width*.4);
           }
           cursor += rowH;
@@ -2011,25 +2061,46 @@ function renderSvg(data, w, h) {
           const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,cy=cursor+row*cellH;
           svg += '<rect x="' + cx + '" y="' + cy + '" width="' + cellW + '" height="' + cellH + '" fill="none" stroke="' + rule + '"/>';
           svg += '<text x="' + (cx+4) + '" y="' + (cy+11) + '" font-size="8">' + day.getDate() + '</text>';
-          plannerEventsForDay(data,day).slice(0,3).forEach((event,j)=>svg += '<circle cx="' + (cx+6+j*8) + '" cy="' + (cy+cellH-6) + '" r="2.5" fill="' + plannerEventAccent(event,palette) + '"/>');
+          const dayEvents=plannerEventsForDay(data,day).slice(0,2);
+          const dayTasks=plannerAgendaTasksForDay(data,day).slice(0,Math.max(0,3-dayEvents.length));
+          dayEvents.forEach((event,j)=>svg += '<circle cx="' + (cx+6+j*8) + '" cy="' + (cy+cellH-6) + '" r="2.5" fill="' + plannerEventAccent(event,palette) + '"/>');
+          dayTasks.forEach((task,j)=>{const px=cx+6+(dayEvents.length+j)*8;svg += '<rect x="' + (px-2.5) + '" y="' + (cy+cellH-8.5) + '" width="5" height="5" fill="#fff" stroke="' + black + '"/>';});
         }
         cursor += cellH*6;
       } else {
         const timeline = agendaStyle === 'timeline';
-        for (const event of items.slice(0,activeSections.agenda.limit)) {
+        for (const entry of items.slice(0,activeSections.agenda.limit)) {
           if (cursor + 34 > y + maxHeight) break;
-          const d = new Date(event.start);
-          const when = event.allDay ? 'All day' : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-          const accent = plannerEventAccent(event,palette);
           svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
-          if (timeline) {
-            svg += '<text x="' + x + '" y="' + (cursor+20) + '" font-size="10" class="muted">' + esc(when) + '</text>';
-            svg += '<circle cx="' + (x+61) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
-            svg += '<text x="' + (x+72) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-72,13)) + '</text>';
+          if (entry.kind === 'task') {
+            const task = entry.task;
+            const due = task.due ? new Date(task.due) : null;
+            const overdue = due && due < plannerStartOfDay(new Date());
+            const when = overdue ? 'Overdue' : (due ? due.toLocaleDateString('en-CA',{month:'short',day:'numeric'}) : 'Anytime');
+            if (timeline) {
+              svg += '<text x="' + x + '" y="' + (cursor+20) + '" font-size="9" font-weight="800">TASK</text>';
+              svg += '<rect x="' + (x+57) + '" y="' + (cursor+11) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
+              svg += '<text x="' + (x+75) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(task.title,width-75,13,72)) + '</text>';
+              svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="9.5" class="muted">' + esc(when) + '</text>';
+            } else {
+              svg += '<rect x="' + x + '" y="' + (cursor+11) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
+              svg += '<text x="' + (x+18) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(task.title,width-18,13,72)) + '</text>';
+              svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" class="muted">' + esc(when) + '</text>';
+            }
           } else {
-            svg += '<circle cx="' + (x+4) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
-            svg += '<text x="' + (x+14) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-14,13,80)) + '</text>';
-            svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" class="muted">' + esc(when) + '</text>';
+            const event = entry.event;
+            const d = new Date(event.start);
+            const when = event.allDay ? 'All day' : d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+            const accent = plannerEventAccent(event, palette);
+            if (timeline) {
+              svg += '<text x="' + x + '" y="' + (cursor+20) + '" font-size="10" class="muted">' + esc(when) + '</text>';
+              svg += '<circle cx="' + (x+61) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
+              svg += '<text x="' + (x+72) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-72,13)) + '</text>';
+            } else {
+              svg += '<circle cx="' + (x+4) + '" cy="' + (cursor+16) + '" r="4" fill="' + accent + '"/>';
+              svg += '<text x="' + (x+14) + '" y="' + (cursor+20) + '" font-size="13" font-weight="700">' + esc(truncateForWidth(event.title,width-14,13,80)) + '</text>';
+              svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" class="muted">' + esc(when) + '</text>';
+            }
           }
           cursor += 32;
         }
