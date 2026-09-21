@@ -1,9 +1,9 @@
--- Quest Log Cloudflare persistence foundation.
--- Bridge mode continues using the self-hosted JSON database.
--- A later migration stage will move this shared state shape into D1.
+-- Quest Log standalone Cloudflare state store.
+-- Cloud and self-hosted deployments use separate persistence.
+-- The Cloudflare runtime stores its workspace in D1; CasaOS continues using /data/countdown-data.json.
 
 CREATE TABLE IF NOT EXISTS questlog_state (
-  user_id TEXT PRIMARY KEY,
+  workspace_id TEXT PRIMARY KEY,
   state_json TEXT NOT NULL,
   schema_version INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
