@@ -355,7 +355,7 @@ function normalizeMarkets(x = {}) {
   return {
     watchlist: normalized,
     symbols: normalized.map(item => item.symbol),
-    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 15, 180)
+    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 30, 180)
   };
 }
 
@@ -1302,44 +1302,59 @@ async function twelveDataFetch(pathname, params = {}) {
   if (!response.ok || raw.status === 'error' || raw.code >= 400) throw new Error(cleanText(raw.message || 'Twelve Data request failed (' + response.status + ').', 220));
   return { raw, headers: response.headers };
 }
+async function resolveMarketInstrument(item) {
+  const normalized = normalizeMarketInstrument(item);
+  if (normalized.exchange || normalized.symbol.includes('/')) return normalized;
+  try {
+    const results = await marketSearch(normalized.symbol);
+    const exact = results.find(result => result.symbol === normalized.symbol) || results[0];
+    return exact ? normalizeMarketInstrument(exact) : normalized;
+  } catch {
+    return normalized;
+  }
+}
+
 async function marketData() {
-  const config = normalizeMarkets(db.markets);
-  const identifiers = config.watchlist.map(item => item.exchange ? item.symbol + ':' + item.exchange : item.symbol);
-  const key = identifiers.join(',');
+  let config = normalizeMarkets(db.markets);
+  let enriched = false;
+  const resolved = [];
+  for (const item of config.watchlist) {
+    const next = await resolveMarketInstrument(item);
+    resolved.push(next);
+    if ((!item.exchange && next.exchange) || (!item.name && next.name) || (!item.currency && next.currency)) enriched = true;
+  }
+  if (enriched) {
+    db.markets = normalizeMarkets({ ...db.markets, watchlist: resolved });
+    save(db);
+    config = normalizeMarkets(db.markets);
+  }
+
+  const key = config.watchlist.map(item => [item.symbol,item.exchange,item.micCode].join('|')).join(',');
   if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
 
-  const { raw, headers } = await twelveDataFetch('/quote', { symbol: identifiers.join(',') });
-  const values = raw && typeof raw === 'object' ? Object.values(raw) : [];
-
-  const quotes = config.watchlist.map((item, index) => {
-    const identifier = identifiers[index];
-    let payload = null;
-
-    if (config.watchlist.length === 1 && raw && typeof raw === 'object' && raw.symbol) payload = raw;
-    if (!payload && raw && typeof raw === 'object') {
-      payload = raw[identifier] || raw[item.symbol] || raw[item.symbol.toUpperCase()] || raw[item.symbol.replace('/', '')] || null;
+  const results = await Promise.all(config.watchlist.map(async item => {
+    try {
+      const params = { symbol: item.symbol };
+      if (item.exchange) params.exchange = item.exchange;
+      if (item.micCode) params.mic_code = item.micCode;
+      const { raw, headers } = await twelveDataFetch('/quote', params);
+      if (raw.status === 'error' || raw.code >= 400) return { quote: unavailableMarketQuote(item, raw.message), headers };
+      return { quote: normalizeMarketQuote(raw, item), headers };
+    } catch (error) {
+      return { quote: unavailableMarketQuote(item, error.message || 'Quote unavailable.'), headers: null };
     }
-    if (!payload && values.length) {
-      payload = values.find(value => value && typeof value === 'object' &&
-        cleanText(value.symbol, 32).toUpperCase() === item.symbol &&
-        (!item.exchange || cleanText(value.exchange, 50).toUpperCase() === item.exchange)) || null;
-    }
+  }));
 
-    if (!payload) return unavailableMarketQuote(item);
-    if (payload.status === 'error' || payload.code >= 400) {
-      return unavailableMarketQuote(item, payload.message || 'Twelve Data could not return this symbol.');
-    }
-    return normalizeMarketQuote(payload, item);
-  });
-
+  const quotes = results.map(result => result.quote);
+  const creditValues = results.map(result => Number(result.headers?.get('api-credits-used') || result.headers?.get('api-credits-request') || 0)).filter(Number.isFinite);
   const data = {
     provider: 'Twelve Data',
     quotes,
     watchlist: config.watchlist,
     symbols: config.symbols,
     updatedAt: new Date().toISOString(),
-    creditsUsed: headers.get('api-credits-used') || headers.get('api-credits-request') || '',
-    creditsLeft: headers.get('api-credits-left') || ''
+    creditsUsed: creditValues.length ? String(creditValues.reduce((sum, value) => sum + value, 0)) : '',
+    creditsLeft: results.map(result => result.headers?.get('api-credits-left')).find(Boolean) || ''
   };
   marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
   return data;
