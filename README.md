@@ -29,6 +29,14 @@ Quest Log is a self-hosted personal planning app for CasaOS that combines Google
 - Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
 
 
+## Hybrid weather
+
+Quest Log uses a hybrid weather pipeline. **Open-Meteo** remains the global forecast source and fallback. For Canadian locations, Quest Log also queries Environment and Climate Change Canada's experimental **City Page Weather** GeoMet collection and uses the nearest official city page when it is close enough to the selected location.
+
+When Environment Canada data is available, current temperature, humidity, wind, gusts, condition, station details, official forecast text, and active city-page warnings can be surfaced from ECCC. The multi-day forecast tiles continue to use Open-Meteo so the dashboard and e-ink layouts retain a consistent 10-day forecast. If ECCC is unavailable, Quest Log falls back to Open-Meteo automatically instead of breaking the weather widget.
+
+The web dashboard uses custom inline SVG weather icons instead of platform-dependent emoji. The e-ink renderer continues to use its own e-ink-safe SVG weather symbols and palette.
+
 ## Alpha Vantage market setup
 
 Quest Log can show an automatic market watchlist on the Today dashboard, a dedicated Markets page, and a configurable e-ink Markets widget. Market prices are fetched server-side from Alpha Vantage and cached aggressively to protect the free API quota.
