@@ -228,7 +228,8 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
-    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 480 },
+    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 1440 },
+    marketCache: null,
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -379,7 +380,7 @@ function normalizeMarkets(x = {}) {
   return {
     watchlist: normalized,
     symbols: normalized.map(item => item.symbol),
-    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 480)), 240, 1440)
+    refreshMinutes: (() => { const requested = Math.round(num(x.refreshMinutes, 1440)); return requested < 720 ? 1440 : clamp(requested, 720, 1440); })()
   };
 }
 
@@ -1335,7 +1336,27 @@ async function weatherLocationSearch(query) {
   }).filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
 }
 
-let marketCache = { key: '', expiresAt: 0, data: null };
+function loadPersistedMarketCache() {
+  const cached = db.marketCache;
+  if (!cached || typeof cached !== 'object' || !cached.data || typeof cached.data !== 'object') {
+    return { key: '', expiresAt: 0, data: null };
+  }
+  const expiresAt = Number(cached.expiresAt);
+  return {
+    key: cleanText(cached.key, 500),
+    expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+    data: cached.data
+  };
+}
+let marketCache = loadPersistedMarketCache();
+function persistMarketCache() {
+  db.marketCache = marketCache.data ? {
+    key: marketCache.key,
+    expiresAt: marketCache.expiresAt,
+    data: marketCache.data
+  } : null;
+  save(db);
+}
 function marketConfigured() { return Boolean(ALPHA_VANTAGE_API_KEY); }
 function marketNumber(value) {
   const n = Number(String(value ?? '').replace('%','')); return Number.isFinite(n) ? n : null;
@@ -1467,6 +1488,7 @@ async function marketData() {
     freeDailyRequestLimit: 25
   };
   marketCache = { key, expiresAt: Date.now() + effectiveRefreshMinutes * 60000, data };
+  persistMarketCache();
   return data;
 }
 async function marketSearch(query) {
@@ -2480,6 +2502,7 @@ const server = http.createServer(async (req, res) => {
           refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : db.markets.refreshMinutes
         });
         marketCache = { key: '', expiresAt: 0, data: null };
+        db.marketCache = null;
       }
       if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherUnits !== undefined) {
         db.weather = normalizeWeather({
