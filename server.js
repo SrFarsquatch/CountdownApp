@@ -1930,14 +1930,15 @@ function renderSvg(data, w, h) {
         const rowH = compact ? 22 : 31;
         if (cursor + rowH > y + maxHeight) break;
         const pct = Number(quote.percentChange);
-        const change = Number.isFinite(pct) ? pct : 0;
+        const available = quote.available !== false && quote.close != null;
+        const change = available && Number.isFinite(pct) ? pct : null;
         const accent = palette === 'mono' ? black : (change > 0 ? HEX.green : change < 0 ? HEX.red : black);
         const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '•';
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
         svg += '<text x="' + x + '" y="' + (cursor + (compact?15:18)) + '" font-size="' + (compact?10.5:12.5) + '" font-weight="800">' + esc(quote.symbol) + '</text>';
         if (style === 'ticker' && quote.name) svg += '<text x="' + (x+58) + '" y="' + (cursor+18) + '" font-size="9" class="muted">' + esc(truncateForWidth(quote.name,Math.max(50,width-150),9)) + '</text>';
-        svg += '<text x="' + (x + width - 58) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?10.5:12) + '" font-weight="700">' + esc(quote.close==null?'—':Number(quote.close).toFixed(2)) + '</text>';
-        svg += '<text x="' + (x + width) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?9.5:11) + '" font-weight="800" fill="' + accent + '">' + arrow + ' ' + esc((Math.abs(change)).toFixed(2)) + '%</text>';
+        svg += '<text x="' + (x + width - 58) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?10.5:12) + '" font-weight="700">' + esc(available?Number(quote.close).toFixed(2):'N/A') + '</text>';
+        svg += '<text x="' + (x + width) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?9.5:11) + '" font-weight="800" fill="' + accent + '">' + (available ? arrow + ' ' + esc(Math.abs(change||0).toFixed(2)) + '%' : 'Unavailable') + '</text>';
         cursor += rowH;
       }
     }
