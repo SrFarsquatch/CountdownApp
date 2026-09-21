@@ -228,7 +228,7 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
-    markets: { symbols: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
+    markets: { watchlist: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -324,18 +324,37 @@ function normalizeWeather(x = {}) {
   };
 }
 
-function normalizeMarkets(x = {}) {
-  const raw = Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'];
-  const seen = new Set();
-  const symbols = [];
-  for (const value of raw) {
-    const symbol = cleanText(value, 32).toUpperCase();
-    if (!symbol || seen.has(symbol)) continue;
-    seen.add(symbol); symbols.push(symbol);
-    if (symbols.length >= 8) break;
-  }
+function normalizeMarketInstrument(value = {}) {
+  const source = typeof value === 'string' ? { symbol: value } : (value && typeof value === 'object' ? value : {});
+  const symbol = cleanText(source.symbol, 32).toUpperCase();
   return {
-    symbols: symbols.length ? symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'],
+    symbol,
+    name: cleanText(source.name || source.instrumentName, 120),
+    exchange: cleanText(source.exchange, 50).toUpperCase(),
+    micCode: cleanText(source.micCode || source.mic_code, 16).toUpperCase(),
+    type: cleanText(source.type || source.instrumentType, 60),
+    country: cleanText(source.country, 60),
+    currency: cleanText(source.currency, 12).toUpperCase(),
+    access: cleanText(source.access, 30)
+  };
+}
+function normalizeMarkets(x = {}) {
+  const raw = Array.isArray(x.watchlist) ? x.watchlist : (Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD']);
+  const seen = new Set();
+  const watchlist = [];
+  for (const value of raw) {
+    const item = normalizeMarketInstrument(value);
+    if (!item.symbol) continue;
+    const key = item.symbol + '|' + item.exchange + '|' + item.micCode;
+    if (seen.has(key)) continue;
+    seen.add(key); watchlist.push(item);
+    if (watchlist.length >= 8) break;
+  }
+  const fallback = ['SPY', 'QQQ', 'DIA', 'BTC/USD'].map(symbol => normalizeMarketInstrument(symbol));
+  const normalized = watchlist.length ? watchlist : fallback;
+  return {
+    watchlist: normalized,
+    symbols: normalized.map(item => item.symbol),
     refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 15, 180)
   };
 }
@@ -1242,19 +1261,35 @@ function marketConfigured() { return Boolean(TWELVE_DATA_API_KEY); }
 function marketNumber(value) {
   const n = Number(value); return Number.isFinite(n) ? n : null;
 }
-function normalizeMarketQuote(raw = {}, fallbackSymbol = '') {
+function normalizeMarketQuote(raw = {}, fallback = {}) {
+  const requested = normalizeMarketInstrument(typeof fallback === 'string' ? { symbol: fallback } : fallback);
   const close = marketNumber(raw.close ?? raw.price);
   const change = marketNumber(raw.change);
   const percentChange = marketNumber(raw.percent_change);
   return {
-    symbol: cleanText(raw.symbol || fallbackSymbol, 32).toUpperCase(),
-    name: cleanText(raw.name || raw.instrument_name || '', 120),
-    exchange: cleanText(raw.exchange || '', 50),
-    currency: cleanText(raw.currency || '', 12),
+    symbol: cleanText(raw.symbol || requested.symbol, 32).toUpperCase(),
+    name: cleanText(raw.name || raw.instrument_name || requested.name, 120),
+    exchange: cleanText(raw.exchange || requested.exchange, 50).toUpperCase(),
+    micCode: cleanText(raw.mic_code || requested.micCode, 16).toUpperCase(),
+    currency: cleanText(raw.currency || requested.currency, 12).toUpperCase(),
+    type: cleanText(raw.type || requested.type, 60),
+    country: cleanText(requested.country, 60),
+    access: cleanText(requested.access, 30),
     datetime: cleanText(raw.datetime || '', 50),
     close, open: marketNumber(raw.open), high: marketNumber(raw.high), low: marketNumber(raw.low),
     previousClose: marketNumber(raw.previous_close), change, percentChange,
-    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open)
+    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open),
+    available: close !== null,
+    error: ''
+  };
+}
+function unavailableMarketQuote(item, message = 'No quote returned for this watchlist symbol.') {
+  const requested = normalizeMarketInstrument(item);
+  return {
+    ...requested,
+    close: null, open: null, high: null, low: null, previousClose: null,
+    change: null, percentChange: null, volume: null, marketOpen: null,
+    datetime: '', available: false, error: cleanText(message, 220)
   };
 }
 async function twelveDataFetch(pathname, params = {}) {
@@ -1269,23 +1304,41 @@ async function twelveDataFetch(pathname, params = {}) {
 }
 async function marketData() {
   const config = normalizeMarkets(db.markets);
-  const key = config.symbols.join(',');
+  const identifiers = config.watchlist.map(item => item.exchange ? item.symbol + ':' + item.exchange : item.symbol);
+  const key = identifiers.join(',');
   if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
-  const { raw, headers } = await twelveDataFetch('/quote', { symbol: key });
-  let quotes = [];
-  if (raw && typeof raw === 'object' && raw.symbol) quotes = [normalizeMarketQuote(raw, config.symbols[0])];
-  else if (raw && typeof raw === 'object') {
-    quotes = config.symbols.map(symbol => {
-      const item = raw[symbol] || raw[symbol.toUpperCase()] || raw[symbol.replace('/', '')];
-      return item && item.status !== 'error' ? normalizeMarketQuote(item, symbol) : null;
-    }).filter(Boolean);
-  }
+
+  const { raw, headers } = await twelveDataFetch('/quote', { symbol: identifiers.join(',') });
+  const values = raw && typeof raw === 'object' ? Object.values(raw) : [];
+
+  const quotes = config.watchlist.map((item, index) => {
+    const identifier = identifiers[index];
+    let payload = null;
+
+    if (config.watchlist.length === 1 && raw && typeof raw === 'object' && raw.symbol) payload = raw;
+    if (!payload && raw && typeof raw === 'object') {
+      payload = raw[identifier] || raw[item.symbol] || raw[item.symbol.toUpperCase()] || raw[item.symbol.replace('/', '')] || null;
+    }
+    if (!payload && values.length) {
+      payload = values.find(value => value && typeof value === 'object' &&
+        cleanText(value.symbol, 32).toUpperCase() === item.symbol &&
+        (!item.exchange || cleanText(value.exchange, 50).toUpperCase() === item.exchange)) || null;
+    }
+
+    if (!payload) return unavailableMarketQuote(item);
+    if (payload.status === 'error' || payload.code >= 400) {
+      return unavailableMarketQuote(item, payload.message || 'Twelve Data could not return this symbol.');
+    }
+    return normalizeMarketQuote(payload, item);
+  });
+
   const data = {
     provider: 'Twelve Data',
     quotes,
+    watchlist: config.watchlist,
     symbols: config.symbols,
     updatedAt: new Date().toISOString(),
-    creditsUsed: headers.get('api-credits-used') || '',
+    creditsUsed: headers.get('api-credits-used') || headers.get('api-credits-request') || '',
     creditsLeft: headers.get('api-credits-left') || ''
   };
   marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
@@ -1298,10 +1351,11 @@ async function marketSearch(query) {
   return (raw.data || []).map(item => ({
     symbol: cleanText(item.symbol, 32).toUpperCase(),
     name: cleanText(item.instrument_name, 120),
-    exchange: cleanText(item.exchange, 50),
+    exchange: cleanText(item.exchange, 50).toUpperCase(),
+    micCode: cleanText(item.mic_code, 16).toUpperCase(),
     type: cleanText(item.instrument_type, 60),
     country: cleanText(item.country, 60),
-    currency: cleanText(item.currency, 12),
+    currency: cleanText(item.currency, 12).toUpperCase(),
     access: cleanText(item.access?.plan || item.access?.global || '', 30)
   })).filter(item => item.symbol);
 }
@@ -2287,10 +2341,10 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
       if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
-      if (incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
+      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
         db.markets = normalizeMarkets({
           ...db.markets,
-          symbols: incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.symbols,
+          watchlist: incoming.marketWatchlist !== undefined ? incoming.marketWatchlist : (incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.watchlist),
           refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : db.markets.refreshMinutes
         });
         marketCache = { key: '', expiresAt: 0, data: null };
