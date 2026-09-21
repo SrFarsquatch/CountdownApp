@@ -14,5 +14,12 @@
   },
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "quest-log",
+      "database_id": "cb69df21-6c0d-4ead-bc70-962c20924581"
+    }
+  ]
 }
