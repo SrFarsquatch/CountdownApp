@@ -49,6 +49,8 @@ const GOAL_STATUS = ['active', 'complete', 'paused'];
 const APPEARANCE_MODES = ['system', 'light', 'dark'];
 const UI_THEMES = ['classic', 'quest', 'moss', 'ember', 'arcane', 'slate'];
 const UI_DENSITIES = ['comfortable', 'compact'];
+const AGENT_PROVIDERS = ['hermes', 'openclaw', 'openai-compatible'];
+const AGENT_ACTION_TYPES = ['create_task', 'update_task', 'create_goal', 'update_goal', 'create_countdown', 'update_countdown', 'create_event', 'update_event'];
 const HEX = {
   black: '#111111', red: '#d62828', blue: '#1769aa', green: '#2f7d32',
   yellow: '#e0a800', purple: '#6d4aff'
@@ -236,6 +238,7 @@ function defaults() {
     appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
     markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 1440 },
     marketCache: null,
+    agent: { enabled: false, provider: 'hermes', baseUrl: '', model: 'hermes-agent', credential: null, requireConfirmation: true, contextDays: 14 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -339,6 +342,36 @@ function normalizeAppearance(x = {}) {
     density: en(x.density, UI_DENSITIES, 'comfortable')
   };
 }
+function normalizeAgentBaseUrl(value) {
+  const raw = cleanText(value, 500).replace(/\/+$/, '');
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return '';
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+function defaultAgentModel(provider) {
+  if (provider === 'openclaw') return 'openclaw/default';
+  if (provider === 'hermes') return 'hermes-agent';
+  return '';
+}
+function normalizeAgent(x = {}) {
+  const provider = en(x.provider, AGENT_PROVIDERS, 'hermes');
+  return {
+    enabled: Boolean(x.enabled),
+    provider,
+    baseUrl: normalizeAgentBaseUrl(x.baseUrl),
+    model: cleanText(x.model, 160) || defaultAgentModel(provider),
+    credential: typeof x.credential === 'string' ? x.credential : null,
+    requireConfirmation: true,
+    contextDays: clamp(Math.round(num(x.contextDays, 14)), 1, 30)
+  };
+}
 
 function alphaProviderSymbol(source = {}) {
   const raw = cleanText(source.providerSymbol || source.alphaSymbol || source.symbol, 32).toUpperCase();
@@ -426,6 +459,7 @@ function load() {
       weather: normalizeWeather(parsed.weather || base.weather),
       appearance: normalizeAppearance(parsed.appearance || base.appearance),
       markets: normalizeMarkets(parsed.markets || base.markets),
+      agent: normalizeAgent(parsed.agent || base.agent),
       display: (() => {
         const legacyDisplay = parsed.display || {};
         const legacyVersion = num(legacyDisplay.plannerLayoutVersion, 0);
@@ -1231,6 +1265,345 @@ async function eventsBetween(from, to) {
   return out;
 }
 async function events() { return eventsBetween(); }
+
+
+function agentPublicConfig() {
+  const config = normalizeAgent(db.agent);
+  return {
+    enabled: config.enabled,
+    provider: config.provider,
+    baseUrl: config.baseUrl,
+    model: config.model,
+    hasApiKey: Boolean(decrypt(config.credential)),
+    canStoreApiKey: Boolean(APP_SECRET),
+    requireConfirmation: true,
+    contextDays: config.contextDays
+  };
+}
+function agentApiKey(config = normalizeAgent(db.agent)) {
+  return cleanText(decrypt(config.credential) || '', 5000);
+}
+function agentEndpoint(config, resource) {
+  const baseUrl = normalizeAgentBaseUrl(config.baseUrl);
+  if (!baseUrl) throw new Error('Configure an agent endpoint in Settings first.');
+  return baseUrl + '/' + String(resource || '').replace(/^\/+/, '');
+}
+function agentHeaders(config) {
+  const apiKey = agentApiKey(config);
+  return {
+    'Content-Type': 'application/json',
+    ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {})
+  };
+}
+async function agentFetch(config, resource, options = {}, timeoutMs = 120000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(agentEndpoint(config, resource), {
+      ...options,
+      headers: { ...agentHeaders(config), ...(options.headers || {}) },
+      signal: controller.signal
+    });
+    const raw = await response.text();
+    let data = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+    if (!response.ok) {
+      const detail = data?.error?.message || data?.error || raw.slice(0, 240) || ('HTTP ' + response.status);
+      throw new Error('Agent endpoint request failed: ' + detail);
+    }
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('Agent request timed out.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function agentMessageText(data) {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content.map(part => typeof part === 'string' ? part : (part?.text || part?.content || '')).filter(Boolean).join('\n').trim();
+  }
+  if (typeof data?.output_text === 'string') return data.output_text.trim();
+  return '';
+}
+async function writableAgentCalendars() {
+  const out = [];
+  for (const account of googleAccounts()) {
+    if (!accountCanWrite(account)) continue;
+    try {
+      const items = await calendars(account.id);
+      for (const calendar of items) {
+        if (!['writer', 'owner'].includes(calendar.accessRole)) continue;
+        out.push({
+          accountId: account.id,
+          accountLabel: account.label,
+          calendarId: calendar.id,
+          calendarName: calendar.summary,
+          primary: Boolean(calendar.primary),
+          selected: (account.selectedCalendarIds || []).includes(calendar.id)
+        });
+      }
+    } catch (error) {
+      console.warn('Agent calendar context failed for ' + account.label + ':', error.message);
+    }
+  }
+  return out.slice(0, 50);
+}
+async function agentPlannerContext() {
+  const now = new Date();
+  const end = new Date(now.getTime() + normalizeAgent(db.agent).contextDays * 86400000);
+  let upcomingEvents = [];
+  try { upcomingEvents = await eventsBetween(now.toISOString(), end.toISOString()); }
+  catch (error) { console.warn('Agent event context failed:', error.message); }
+  return {
+    generatedAt: now.toISOString(),
+    timezone: process.env.TZ || 'America/Vancouver',
+    tasks: sortedTasks().slice(0, 50).map(task => ({
+      id: task.id, title: task.title, description: task.description, status: task.status, priority: task.priority,
+      due: task.due, start: task.start, project: task.project, goalId: task.goalId
+    })),
+    goals: db.goals.slice(0, 30).map(goal => ({
+      id: goal.id, title: goal.title, description: goal.description, type: goal.type, current: goal.current,
+      target: goal.target, unit: goal.unit, deadline: goal.deadline, project: goal.project, status: goal.status,
+      progress: goalProgress(goal)
+    })),
+    countdowns: sortedCountdowns().filter(item => new Date(item.end) > now).slice(0, 30).map(item => ({
+      id: item.id, name: item.name, end: item.end, pinned: item.pinned, goalId: item.goalId
+    })),
+    events: upcomingEvents.slice(0, 60).map(event => ({
+      id: event.id, accountId: event.accountId, calendarId: event.calendarId, calendarName: event.calendarName,
+      title: event.title, description: cleanText(event.description, 500), start: event.start, end: event.end,
+      allDay: event.allDay, location: event.location, accessRole: event.accessRole
+    })),
+    writableCalendars: await writableAgentCalendars()
+  };
+}
+function agentSystemPrompt() {
+  return [
+    'You are the planning assistant inside Quest Log, a self-hosted calendar/task/goal/countdown app.',
+    'Use the supplied Quest Log context as the source of truth for the user\'s current planner data.',
+    'Return ONLY one JSON object with this exact top-level shape: {"message":"your response","actions":[]}.',
+    'The message should be natural and concise. Never claim a proposed change has already happened.',
+    'When the user asks you to change planner data, add one or more actions. Quest Log will validate them and ask the user to confirm before execution.',
+    'Do not propose deletions. Do not invent IDs. For updates, use exact IDs from the supplied context.',
+    'Allowed action types and fields:',
+    'create_task: title, description?, due? ISO-8601, start? ISO-8601, priority? low|medium|high|urgent, project?, goalId?, estimatedMinutes?',
+    'update_task: id plus any create_task fields, or status? todo|progress|done',
+    'create_goal: title, description?, goalType? number|checklist|deadline, current?, target?, unit?, deadline? ISO-8601, project?, status? active|complete|paused',
+    'update_goal: id plus any create_goal fields',
+    'create_countdown: name, end ISO-8601, pinned?, goalId?, accentColor? black|red|blue|green|yellow|purple',
+    'update_countdown: id plus any create_countdown fields',
+    'create_event: accountId, calendarId, title, description?, location?, allDay?, start/end ISO-8601 for timed events, startDate/endDate YYYY-MM-DD for all-day events, repeat? none|daily|weekly|monthly|yearly',
+    'update_event: accountId, calendarId, eventId, title, description?, location?, allDay?, start/end ISO-8601 or startDate/endDate for all-day events',
+    'For calendar actions, only use an accountId/calendarId pair from writableCalendars.',
+    'If a request is ambiguous or would require guessing an important date, time, calendar, or target item, ask a follow-up question and return no actions.'
+  ].join('\n');
+}
+function cleanAgentMessages(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(-24).map(item => ({
+    role: item?.role === 'assistant' ? 'assistant' : 'user',
+    content: cleanText(item?.content, 6000)
+  })).filter(item => item.content);
+}
+function agentActionSummary(action) {
+  switch (action.type) {
+    case 'create_task': return 'Create task: ' + action.title;
+    case 'update_task': return 'Update task: ' + (db.tasks.find(item => item.id === action.id)?.title || action.id);
+    case 'create_goal': return 'Create goal: ' + action.title;
+    case 'update_goal': return 'Update goal: ' + (db.goals.find(item => item.id === action.id)?.title || action.id);
+    case 'create_countdown': return 'Create countdown: ' + action.name;
+    case 'update_countdown': return 'Update countdown: ' + (db.countdowns.find(item => item.id === action.id)?.name || action.id);
+    case 'create_event': return 'Create calendar event: ' + action.title;
+    case 'update_event': return 'Update calendar event: ' + action.title;
+    default: return 'Planner change';
+  }
+}
+function normalizeAgentAction(raw = {}) {
+  const type = en(String(raw.type || ''), AGENT_ACTION_TYPES, '');
+  if (!type) return null;
+  const out = { type };
+  const copyText = (key, max = 500) => { if (Object.prototype.hasOwnProperty.call(raw, key)) out[key] = cleanText(raw[key], max); };
+  const copyBool = key => { if (Object.prototype.hasOwnProperty.call(raw, key)) out[key] = Boolean(raw[key]); };
+  const copyNumber = key => { if (Object.prototype.hasOwnProperty.call(raw, key) && Number.isFinite(Number(raw[key]))) out[key] = Number(raw[key]); };
+  const copyIso = key => {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) return;
+    if (raw[key] === null || raw[key] === '') out[key] = null;
+    else {
+      const value = iso(raw[key]);
+      if (value) out[key] = value;
+    }
+  };
+  if (type === 'create_task' || type === 'update_task') {
+    if (type === 'update_task') { out.id = cleanText(raw.id, 120); if (!out.id) return null; }
+    copyText('title', 160); copyText('description', 2000); copyText('project', 80); copyText('goalId', 120);
+    copyIso('due'); copyIso('start'); copyNumber('estimatedMinutes');
+    if (raw.priority !== undefined) out.priority = en(raw.priority, TASK_PRIORITY, 'medium');
+    if (raw.status !== undefined) out.status = en(raw.status, TASK_STATUS, 'todo');
+    if (type === 'create_task' && !out.title) return null;
+  } else if (type === 'create_goal' || type === 'update_goal') {
+    if (type === 'update_goal') { out.id = cleanText(raw.id, 120); if (!out.id) return null; }
+    copyText('title', 160); copyText('description', 2000); copyText('unit', 30); copyText('project', 80);
+    copyIso('deadline'); copyNumber('current'); copyNumber('target');
+    if (raw.goalType !== undefined) out.goalType = en(raw.goalType, GOAL_TYPES, 'number');
+    if (raw.status !== undefined) out.status = en(raw.status, GOAL_STATUS, 'active');
+    if (raw.accentColor !== undefined) out.accentColor = en(raw.accentColor, COLORS, 'purple');
+    if (type === 'create_goal' && !out.title) return null;
+  } else if (type === 'create_countdown' || type === 'update_countdown') {
+    if (type === 'update_countdown') { out.id = cleanText(raw.id, 120); if (!out.id) return null; }
+    copyText('name', 100); copyText('goalId', 120); copyIso('end'); copyBool('pinned');
+    if (raw.accentColor !== undefined) out.accentColor = en(raw.accentColor, COLORS, 'black');
+    if (type === 'create_countdown' && (!out.name || !out.end)) return null;
+  } else if (type === 'create_event' || type === 'update_event') {
+    copyText('accountId', 160); copyText('calendarId', 500); copyText('title', 500); copyText('description', 8000); copyText('location', 1000);
+    copyBool('allDay'); copyIso('start'); copyIso('end'); copyText('startDate', 10); copyText('endDate', 10); copyText('repeat', 20);
+    if (type === 'update_event') { copyText('eventId', 500); if (!out.eventId) return null; }
+    if (!out.accountId || !out.calendarId || !out.title) return null;
+    if (out.allDay) {
+      if (!dateOnly(out.startDate) || !dateOnly(out.endDate || out.startDate)) return null;
+    } else if (!out.start || !out.end) return null;
+  }
+  out.summary = agentActionSummary(out);
+  return out;
+}
+function parseAgentEnvelope(rawText) {
+  const original = String(rawText || '').trim();
+  let candidate = original.replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/i, '').trim();
+  let parsed = null;
+  try { parsed = JSON.parse(candidate); }
+  catch {
+    const first = candidate.indexOf('{'), last = candidate.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+      try { parsed = JSON.parse(candidate.slice(first, last + 1)); } catch {}
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return { message: original || 'I could not format a response.', actions: [] };
+  const actions = Array.isArray(parsed.actions) ? parsed.actions.map(normalizeAgentAction).filter(Boolean).slice(0, 10) : [];
+  return { message: cleanText(parsed.message || parsed.reply || original, 10000), actions };
+}
+async function agentChat(messages) {
+  const config = normalizeAgent(db.agent);
+  if (!config.enabled) throw new Error('Enable the agent in Settings first.');
+  if (!config.baseUrl) throw new Error('Configure the agent endpoint in Settings first.');
+  if (!config.model) throw new Error('Configure an agent model in Settings first.');
+  const context = await agentPlannerContext();
+  const payload = {
+    model: config.model,
+    stream: false,
+    messages: [
+      { role: 'system', content: agentSystemPrompt() },
+      { role: 'system', content: 'Current Quest Log context (JSON):\n' + JSON.stringify(context) },
+      ...cleanAgentMessages(messages)
+    ]
+  };
+  const data = await agentFetch(config, 'chat/completions', { method: 'POST', body: JSON.stringify(payload) });
+  const text = agentMessageText(data);
+  if (!text) throw new Error('The agent returned an empty response.');
+  return { ...parseAgentEnvelope(text), provider: config.provider, model: config.model };
+}
+async function testAgentConnection() {
+  const config = normalizeAgent(db.agent);
+  if (!config.baseUrl) throw new Error('Configure the agent endpoint first.');
+  const data = await agentFetch(config, 'models', { method: 'GET' }, 15000);
+  const models = Array.isArray(data?.data) ? data.data.map(item => cleanText(item?.id, 160)).filter(Boolean).slice(0, 30) : [];
+  return { ok: true, models, configuredModel: config.model };
+}
+async function executeAgentAction(rawAction) {
+  const action = normalizeAgentAction(rawAction);
+  if (!action) throw new Error('Invalid or unsupported agent action.');
+  if (action.type === 'create_task') {
+    const now = new Date().toISOString();
+    const item = normalizeTask({ ...action, id: id(), created: now, updated: now });
+    db.tasks.push(item); save(db);
+    return { type: action.type, ok: true, id: item.id, label: 'Created task "' + item.title + '"' };
+  }
+  if (action.type === 'update_task') {
+    const index = db.tasks.findIndex(item => item.id === action.id);
+    if (index < 0) throw new Error('Task was not found: ' + action.id);
+    const existing = db.tasks[index];
+    const patch = { ...action };
+    delete patch.type; delete patch.summary; delete patch.id;
+    let next = normalizeTask({ ...existing, ...patch, id: existing.id, created: existing.created, updated: new Date().toISOString() });
+    if (patch.status === 'done' && !next.completedAt) next.completedAt = new Date().toISOString();
+    if (patch.status && patch.status !== 'done') next.completedAt = null;
+    if (existing.googleTaskId) {
+      next.googleAccountId = existing.googleAccountId;
+      next.googleTaskListId = existing.googleTaskListId;
+      next.googleTaskListTitle = existing.googleTaskListTitle;
+      next.googleTaskId = existing.googleTaskId;
+      next.googleParentId = existing.googleParentId;
+      next.googleUpdated = existing.googleUpdated;
+      next.googleEtag = existing.googleEtag;
+      next = await updateLinkedGoogleTask(next);
+    }
+    db.tasks[index] = next; save(db);
+    return { type: action.type, ok: true, id: next.id, label: 'Updated task "' + next.title + '"' };
+  }
+  if (action.type === 'create_goal') {
+    const now = new Date().toISOString();
+    const item = normalizeGoal({
+      ...action,
+      type: action.goalType || 'number',
+      id: id(), created: now, updated: now
+    });
+    db.goals.push(item); save(db);
+    return { type: action.type, ok: true, id: item.id, label: 'Created goal "' + item.title + '"' };
+  }
+  if (action.type === 'update_goal') {
+    const index = db.goals.findIndex(item => item.id === action.id);
+    if (index < 0) throw new Error('Goal was not found: ' + action.id);
+    const existing = db.goals[index];
+    const patch = { ...action };
+    delete patch.type; delete patch.summary; delete patch.id;
+    if (patch.goalType) { patch.type = patch.goalType; delete patch.goalType; }
+    const next = normalizeGoal({ ...existing, ...patch, id: existing.id, created: existing.created, updated: new Date().toISOString() });
+    db.goals[index] = next; save(db);
+    return { type: action.type, ok: true, id: next.id, label: 'Updated goal "' + next.title + '"' };
+  }
+  if (action.type === 'create_countdown') {
+    const item = normalizeCountdown({ ...action, id: id(), created: new Date().toISOString() });
+    db.countdowns.push(item); save(db);
+    return { type: action.type, ok: true, id: item.id, label: 'Created countdown "' + item.name + '"' };
+  }
+  if (action.type === 'update_countdown') {
+    const index = db.countdowns.findIndex(item => item.id === action.id);
+    if (index < 0) throw new Error('Countdown was not found: ' + action.id);
+    const existing = db.countdowns[index];
+    const patch = { ...action };
+    delete patch.type; delete patch.summary; delete patch.id;
+    const next = normalizeCountdown({ ...existing, ...patch, id: existing.id, created: existing.created });
+    db.countdowns[index] = next; save(db);
+    return { type: action.type, ok: true, id: next.id, label: 'Updated countdown "' + next.name + '"' };
+  }
+  if (action.type === 'create_event' || action.type === 'update_event') {
+    const account = googleAccount(action.accountId);
+    if (!account) throw new Error('Google account was not found.');
+    if (!accountCanWrite(account)) throw new Error('Reconnect the Google account to enable calendar editing.');
+    await writableCalendar(account, action.calendarId);
+    const payload = googleEventPayload(action, action.type === 'create_event');
+    if (action.type === 'create_event') {
+      const created = await googleRequest(account, '/calendars/' + encodeURIComponent(action.calendarId) + '/events?sendUpdates=all', 'POST', payload);
+      return { type: action.type, ok: true, id: created?.id || '', label: 'Created calendar event "' + action.title + '"' };
+    }
+    const updated = await googleRequest(account, '/calendars/' + encodeURIComponent(action.calendarId) + '/events/' + encodeURIComponent(action.eventId) + '?sendUpdates=all', 'PATCH', payload);
+    return { type: action.type, ok: true, id: updated?.id || action.eventId, label: 'Updated calendar event "' + action.title + '"' };
+  }
+  throw new Error('Unsupported agent action.');
+}
+async function executeAgentActions(actions) {
+  if (!Array.isArray(actions) || !actions.length) throw new Error('No agent actions were supplied.');
+  const results = [];
+  for (const raw of actions.slice(0, 10)) {
+    try { results.push(await executeAgentAction(raw)); }
+    catch (error) {
+      const action = normalizeAgentAction(raw);
+      results.push({ type: action?.type || cleanText(raw?.type, 80), ok: false, label: error.message || 'Action failed' });
+    }
+  }
+  return results;
+}
 
 function sortedCountdowns() {
   return [...db.countdowns].sort((a, b) => a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : new Date(a.end) - new Date(b.end));
@@ -2493,6 +2866,7 @@ function state() {
     appearance: normalizeAppearance(db.appearance),
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
     markets: (() => { const config = normalizeMarkets(db.markets); return { ...config, configured: marketConfigured(), provider: 'Alpha Vantage', effectiveRefreshMinutes: alphaEffectiveRefreshMinutes(config), freeDailyRequestLimit: 25 }; })(),
+    agent: agentPublicConfig(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
@@ -2758,6 +3132,21 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { events: await eventsBetween(from, to) });
     }
 
+    if (p === '/api/agent/chat' && req.method === 'POST') {
+      const incoming = await body(req);
+      const messages = cleanAgentMessages(incoming.messages);
+      if (!messages.length || messages[messages.length - 1].role !== 'user') return json(res, 400, { error: 'A user message is required.' });
+      return json(res, 200, await agentChat(messages));
+    }
+    if (p === '/api/agent/test' && req.method === 'POST') {
+      return json(res, 200, await testAgentConnection());
+    }
+    if (p === '/api/agent/actions' && req.method === 'POST') {
+      const incoming = await body(req);
+      const actions = Array.isArray(incoming.actions) ? incoming.actions : [];
+      return json(res, 200, { ok: true, results: await executeAgentActions(actions) });
+    }
+
     if (p === '/api/weather' && req.method === 'GET') {
       if (!weatherLocationReady()) return json(res, 200, { weather: null, error: 'Choose a weather location in Displays.' });
       try { return json(res, 200, { weather: await weatherData(), error: null }); }
@@ -2786,6 +3175,27 @@ const server = http.createServer(async (req, res) => {
       const incoming = await body(req);
       if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
       if (incoming.countdownWindowDays !== undefined) db.google.countdownWindowDays = clamp(num(incoming.countdownWindowDays, 30), 1, 365);
+      if (incoming.agentEnabled !== undefined || incoming.agentProvider !== undefined || incoming.agentBaseUrl !== undefined || incoming.agentModel !== undefined || incoming.agentContextDays !== undefined || incoming.agentApiKey !== undefined || incoming.agentClearApiKey !== undefined) {
+        const currentAgent = normalizeAgent(db.agent);
+        if (incoming.agentBaseUrl !== undefined && cleanText(incoming.agentBaseUrl, 500) && !normalizeAgentBaseUrl(incoming.agentBaseUrl)) {
+          return json(res, 400, { error: 'Agent endpoint must be a valid http:// or https:// URL without embedded credentials.' });
+        }
+        db.agent = normalizeAgent({
+          ...currentAgent,
+          enabled: incoming.agentEnabled !== undefined ? incoming.agentEnabled : currentAgent.enabled,
+          provider: incoming.agentProvider !== undefined ? incoming.agentProvider : currentAgent.provider,
+          baseUrl: incoming.agentBaseUrl !== undefined ? incoming.agentBaseUrl : currentAgent.baseUrl,
+          model: incoming.agentModel !== undefined ? incoming.agentModel : currentAgent.model,
+          contextDays: incoming.agentContextDays !== undefined ? incoming.agentContextDays : currentAgent.contextDays
+        });
+        if (incoming.agentClearApiKey) db.agent.credential = null;
+        if (incoming.agentApiKey !== undefined && cleanText(incoming.agentApiKey, 5000)) {
+          if (!APP_SECRET) return json(res, 400, { error: 'Set APP_SECRET before saving an agent API key.' });
+          db.agent.credential = encrypt(cleanText(incoming.agentApiKey, 5000));
+        } else if (!incoming.agentClearApiKey) {
+          db.agent.credential = currentAgent.credential;
+        }
+      }
       if (incoming.appearanceMode !== undefined || incoming.appearanceTheme !== undefined || incoming.appearanceDensity !== undefined) {
         db.appearance = normalizeAppearance({
           ...db.appearance,
