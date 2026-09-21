@@ -327,6 +327,7 @@ function normalizeWeather(x = {}) {
     latitude: Number.isFinite(rawLat) && rawLat >= -90 && rawLat <= 90 ? rawLat : null,
     longitude: Number.isFinite(rawLon) && rawLon >= -180 && rawLon <= 180 ? rawLon : null,
     locationLabel: cleanText(x.locationLabel, 100),
+    countryCode: cleanText(x.countryCode, 8).toUpperCase(),
     units: en(x.units, WEATHER_UNITS, 'metric')
   };
 }
@@ -1301,26 +1302,176 @@ function weatherCodeInfo(code) {
   if ([95, 96, 99].includes(value)) return { condition: 'THUNDERSTORM', description: value === 95 ? 'Thunderstorm' : 'Thunderstorm with hail' };
   return { condition: 'CLOUDY', description: 'Weather' };
 }
-async function weatherData() {
-  if (!weatherLocationReady()) throw new Error('Choose a weather location in Settings.');
-  const units = en(db.weather.units, WEATHER_UNITS, 'metric');
-  const key = [db.weather.latitude, db.weather.longitude, units, db.weather.locationLabel || ''].join('|');
-  if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
+function weatherTextInfo(value) {
+  const text = cleanText(value, 160);
+  const upper = text.toUpperCase();
+  if (/THUNDER|LIGHTNING|STORM/.test(upper)) return { condition: 'THUNDERSTORM', description: text || 'Thunderstorm' };
+  if (/FREEZING RAIN|ICE PELLET|SLEET/.test(upper)) return { condition: 'SLEET', description: text || 'Wintry mix' };
+  if (/SNOW|FLURR/.test(upper)) return { condition: 'SNOW', description: text || 'Snow' };
+  if (/RAIN|SHOWER/.test(upper)) return { condition: 'RAIN', description: text || 'Rain' };
+  if (/DRIZZLE/.test(upper)) return { condition: 'DRIZZLE', description: text || 'Drizzle' };
+  if (/FOG|MIST|HAZE|SMOKE/.test(upper)) return { condition: 'FOG', description: text || 'Fog' };
+  if (/PARTLY|MIX OF SUN|SUN AND CLOUD|MAINLY SUNNY|MAINLY CLEAR/.test(upper)) return { condition: 'PARTLY_CLOUDY', description: text || 'Partly cloudy' };
+  if (/CLOUD|OVERCAST/.test(upper)) return { condition: 'CLOUDY', description: text || 'Cloudy' };
+  if (/CLEAR|SUNNY/.test(upper)) return { condition: 'CLEAR', description: text || 'Clear' };
+  return { condition: 'CLOUDY', description: text || 'Weather' };
+}
+function eccText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number') return cleanText(value, 500);
+  if (Array.isArray(value)) return value.map(eccText).filter(Boolean).join(', ');
+  if (typeof value === 'object') {
+    if (value.en !== undefined) return eccText(value.en);
+    if (value.value !== undefined) return eccText(value.value);
+    if (value.textSummary !== undefined) return eccText(value.textSummary);
+    if (value.description !== undefined) return eccText(value.description);
+    if (value.fr !== undefined) return eccText(value.fr);
+  }
+  return '';
+}
+function eccNumber(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') {
+    if (value.en !== undefined) return eccNumber(value.en);
+    if (value.value !== undefined) return eccNumber(value.value);
+    if (value.fr !== undefined) return eccNumber(value.fr);
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function weatherDistanceKm(lat1, lon1, lat2, lon2) {
+  const rad = value => value * Math.PI / 180;
+  const a = Math.sin(rad(lat2-lat1)/2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2-lon1)/2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function eccArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return [value];
+  return [];
+}
+function convertEcccTemp(value, units) {
+  return value === null ? null : (units === 'imperial' ? value * 9 / 5 + 32 : value);
+}
+function convertEcccWind(value, units) {
+  return value === null ? null : (units === 'imperial' ? value * 0.621371 : value);
+}
+async function environmentCanadaWeather(units) {
+  const latitude = Number(db.weather.latitude), longitude = Number(db.weather.longitude);
+  const code = cleanText(db.weather.countryCode, 8).toUpperCase();
+  const label = cleanText(db.weather.locationLabel, 100);
+  if (code && code !== 'CA') return null;
+  if (!code && label && !/\bcanada\b/i.test(label)) {
+    // Older saved locations do not have a country code. Still try GeoMet and
+    // accept the result only when an official city is reasonably close.
+  }
+  const latSpan = 1.35, lonSpan = 1.75;
+  const params = new URLSearchParams({
+    f: 'json',
+    bbox: [longitude-lonSpan, latitude-latSpan, longitude+lonSpan, latitude+latSpan].join(','),
+    limit: '50'
+  });
+  const response = await fetch('https://api.weather.gc.ca/collections/citypageweather-realtime/items?' + params, {
+    headers: { Accept: 'application/geo+json, application/json' }
+  });
+  if (!response.ok) throw new Error('Environment Canada request failed (' + response.status + ').');
+  const raw = await response.json();
+  const features = Array.isArray(raw.features) ? raw.features : [];
+  let nearest = null;
+  for (const feature of features) {
+    const coords = feature?.geometry?.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) continue;
+    const lon = Number(coords[0]), lat = Number(coords[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const distanceKm = weatherDistanceKm(latitude, longitude, lat, lon);
+    if (!nearest || distanceKm < nearest.distanceKm) nearest = { feature, distanceKm };
+  }
+  if (!nearest || nearest.distanceKm > 120) return null;
 
+  const props = nearest.feature.properties || {};
+  const current = props.currentConditions || {};
+  const conditionText = eccText(current.condition) || eccText(current.icon);
+  const condition = weatherTextInfo(conditionText);
+  const rawForecasts = eccArray(props.forecastGroup?.forecasts);
+  const forecasts = rawForecasts.slice(0, 10).map(item => {
+    const summary = eccText(item.textSummary) || eccText(item.abbreviatedForecast?.textSummary) || eccText(item.abbreviated_forecast?.text_summary) || eccText(item.cloudPrecip);
+    const temp = eccNumber(item.temperatures?.temperature);
+    return {
+      period: eccText(item.period?.textForecastName) || eccText(item.period?.value) || eccText(item.textForecast_name),
+      summary,
+      condition: weatherTextInfo(summary).condition,
+      temperature: temp === null ? null : Math.round(convertEcccTemp(temp, units)),
+      temperatureClass: eccText(item.temperatures?.temperature?.class),
+      precipitationProbability: (() => {
+        const value = eccNumber(item.abbreviated_forecast?.pop) ?? eccNumber(item.precipitation?.probability);
+        return value === null ? null : clamp(value, 0, 100);
+      })()
+    };
+  }).filter(item => item.period || item.summary);
+
+  const warnings = eccArray(props.warnings).map(item => ({
+    type: eccText(item.type),
+    title: eccText(item.description) || eccText(item.type) || 'Weather alert',
+    priority: eccText(item.priority),
+    colourLevel: eccText(item.alertColourLevel),
+    issuedAt: eccText(item.eventIssue),
+    expiresAt: eccText(item.expiryTime),
+    url: eccText(item.url)
+  })).filter(item => item.title).slice(0, 8);
+
+  const temp = eccNumber(current.temperature);
+  const humidity = eccNumber(current.relativeHumidity);
+  const wind = eccNumber(current.wind?.speed);
+  const gust = eccNumber(current.wind?.gust);
+  return {
+    locationName: eccText(props.name),
+    region: eccText(props.region),
+    distanceKm: Math.round(nearest.distanceKm),
+    current: {
+      temperature: temp === null ? null : Math.round(convertEcccTemp(temp, units)),
+      humidity: humidity === null ? null : clamp(Math.round(humidity), 0, 100),
+      windSpeed: wind === null ? null : Math.max(0, convertEcccWind(wind, units)),
+      windGust: gust === null ? null : Math.max(0, convertEcccWind(gust, units)),
+      windDirection: eccText(current.wind?.direction?.value) || eccText(current.wind?.direction),
+      station: eccText(current.station?.value) || eccText(current.station),
+      observedAt: eccText(current.timestamp),
+      iconCode: eccNumber(current.iconCode),
+      ...condition
+    },
+    forecasts,
+    warnings,
+    updatedAt: eccText(props.lastUpdated) || eccText(props.forecastGroup?.timestamp)
+  };
+}
+async function openMeteoWeather(units) {
   const params = new URLSearchParams({
     latitude: String(db.weather.latitude),
     longitude: String(db.weather.longitude),
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code,precipitation,wind_speed_10m',
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,is_day,weather_code,precipitation,wind_speed_10m,wind_gusts_10m',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     timezone: 'auto',
     forecast_days: '10'
   });
   if (units === 'imperial') { params.set('temperature_unit', 'fahrenheit'); params.set('wind_speed_unit', 'mph'); }
-
   const response = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
   if (!response.ok) throw new Error('Open-Meteo request failed (' + response.status + ').');
   const raw = await response.json();
   if (raw.error) throw new Error(cleanText(raw.reason || 'Open-Meteo request failed.', 180));
+  return raw;
+}
+async function weatherData() {
+  if (!weatherLocationReady()) throw new Error('Choose a weather location in Settings.');
+  const units = en(db.weather.units, WEATHER_UNITS, 'metric');
+  const key = [db.weather.latitude, db.weather.longitude, units, db.weather.countryCode || '', db.weather.locationLabel || ''].join('|');
+  if (weatherCache.data && weatherCache.key === key && weatherCache.expiresAt > Date.now()) return weatherCache.data;
+
+  const shouldTryEccc = !db.weather.countryCode || String(db.weather.countryCode).toUpperCase() === 'CA';
+  const [openResult, ecccResult] = await Promise.allSettled([
+    openMeteoWeather(units),
+    shouldTryEccc ? environmentCanadaWeather(units) : Promise.resolve(null)
+  ]);
+  if (openResult.status !== 'fulfilled') throw openResult.reason;
+  const raw = openResult.value;
+  const eccc = ecccResult.status === 'fulfilled' ? ecccResult.value : null;
 
   const currentInfo = weatherCodeInfo(raw.current?.weather_code);
   const times = Array.isArray(raw.daily?.time) ? raw.daily.time : [];
@@ -1329,22 +1480,52 @@ async function weatherData() {
   const precip = Array.isArray(raw.daily?.precipitation_probability_max) ? raw.daily.precipitation_probability_max : [];
   const codes = Array.isArray(raw.daily?.weather_code) ? raw.daily.weather_code : [];
 
+  const openCurrent = {
+    temperature: Number.isFinite(Number(raw.current?.temperature_2m)) ? Math.round(Number(raw.current.temperature_2m)) : null,
+    feelsLike: Number.isFinite(Number(raw.current?.apparent_temperature)) ? Math.round(Number(raw.current.apparent_temperature)) : null,
+    humidity: clamp(num(raw.current?.relative_humidity_2m, 0), 0, 100),
+    isDaytime: Number(raw.current?.is_day) !== 0,
+    precipitation: Math.max(0, num(raw.current?.precipitation, 0)),
+    windSpeed: Math.max(0, num(raw.current?.wind_speed_10m, 0)),
+    windGust: Math.max(0, num(raw.current?.wind_gusts_10m, 0)),
+    ...currentInfo
+  };
+  const officialCurrent = eccc?.current || null;
   const data = {
-    provider: 'Open-Meteo',
-    attribution: 'Weather data by Open-Meteo',
-    locationLabel: db.weather.locationLabel || '',
+    provider: eccc ? 'Environment Canada + Open-Meteo' : 'Open-Meteo',
+    attribution: eccc ? 'Observed/official: Environment Canada · model forecast: Open-Meteo' : 'Weather data by Open-Meteo',
+    locationLabel: db.weather.locationLabel || eccc?.locationName || '',
     units,
     unitSymbol: units === 'imperial' ? '°F' : '°C',
     timeZone: cleanText(raw.timezone || '', 100),
-    current: {
-      temperature: Number.isFinite(Number(raw.current?.temperature_2m)) ? Math.round(Number(raw.current.temperature_2m)) : null,
-      feelsLike: Number.isFinite(Number(raw.current?.apparent_temperature)) ? Math.round(Number(raw.current.apparent_temperature)) : null,
-      humidity: clamp(num(raw.current?.relative_humidity_2m, 0), 0, 100),
-      isDaytime: Number(raw.current?.is_day) !== 0,
-      precipitation: Math.max(0, num(raw.current?.precipitation, 0)),
-      windSpeed: Math.max(0, num(raw.current?.wind_speed_10m, 0)),
-      ...currentInfo
+    sourceStatus: {
+      environmentCanada: Boolean(eccc),
+      openMeteo: true,
+      environmentCanadaError: ecccResult.status === 'rejected' ? cleanText(ecccResult.reason?.message || 'Environment Canada unavailable.', 180) : ''
     },
+    current: officialCurrent ? {
+      ...openCurrent,
+      temperature: officialCurrent.temperature ?? openCurrent.temperature,
+      humidity: officialCurrent.humidity ?? openCurrent.humidity,
+      windSpeed: officialCurrent.windSpeed ?? openCurrent.windSpeed,
+      windGust: officialCurrent.windGust ?? openCurrent.windGust,
+      windDirection: officialCurrent.windDirection || '',
+      station: officialCurrent.station || '',
+      observedAt: officialCurrent.observedAt || '',
+      condition: officialCurrent.condition || openCurrent.condition,
+      description: officialCurrent.description || openCurrent.description,
+      source: 'Environment Canada'
+    } : { ...openCurrent, source: 'Open-Meteo' },
+    official: eccc ? {
+      locationName: eccc.locationName,
+      region: eccc.region,
+      distanceKm: eccc.distanceKm,
+      station: eccc.current?.station || '',
+      observedAt: eccc.current?.observedAt || '',
+      updatedAt: eccc.updatedAt || '',
+      forecasts: eccc.forecasts || [],
+      warnings: eccc.warnings || []
+    } : null,
     days: times.map((date, index) => {
       const info = weatherCodeInfo(codes[index]);
       return {
@@ -2644,12 +2825,13 @@ const server = http.createServer(async (req, res) => {
         marketCache = { key: '', expiresAt: 0, data: null };
         db.marketCache = null;
       }
-      if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherUnits !== undefined) {
+      if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherCountryCode !== undefined || incoming.weatherUnits !== undefined) {
         db.weather = normalizeWeather({
           ...db.weather,
           latitude: incoming.weatherLatitude !== undefined ? incoming.weatherLatitude : db.weather.latitude,
           longitude: incoming.weatherLongitude !== undefined ? incoming.weatherLongitude : db.weather.longitude,
           locationLabel: incoming.weatherLocationLabel !== undefined ? incoming.weatherLocationLabel : db.weather.locationLabel,
+          countryCode: incoming.weatherCountryCode !== undefined ? incoming.weatherCountryCode : db.weather.countryCode,
           units: incoming.weatherUnits !== undefined ? incoming.weatherUnits : db.weather.units
         });
         weatherCache = { key: '', expiresAt: 0, data: null };
