@@ -17,6 +17,8 @@ const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const TARGET_CONTAINER = process.env.TARGET_CONTAINER || 'countdownapp';
 const TARGET_IMAGE = process.env.TARGET_IMAGE || 'ghcr.io/srfarsquatch/countdownapp:edge';
 const UPDATE_STATUS_PATH = path.join(DATA_DIR, 'update-status.json');
+const CASAOS_RUNTIME_DIR = process.env.CASAOS_RUNTIME_DIR || '/var/run/casaos';
+const CASAOS_APP_ID = process.env.CASAOS_APP_ID || 'countdownapp';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/tasks';
 
 const COLORS = ['black', 'red', 'blue', 'green', 'yellow', 'purple'];
@@ -700,53 +702,97 @@ async function checkForUpdate() {
   return updateCheckPromise;
 }
 
-let updatePreparePromise = null;
-async function prepareUpdateForCasaOS() {
+let updateInstallPromise = null;
+async function launchCasaOSManagedUpdater(version, currentContainer) {
+  const name = 'countdownapp-casaos-update-' + Date.now().toString(36);
+  const config = {
+    Image: TARGET_IMAGE,
+    Cmd: ['node', '/app/casaos-update.js'],
+    Env: [
+      'TARGET_CONTAINER=' + TARGET_CONTAINER,
+      'TARGET_IMAGE=' + TARGET_IMAGE,
+      'DATA_DIR=/data',
+      'DOCKER_SOCKET=/var/run/docker.sock',
+      'CASAOS_RUNTIME_DIR=/var/run/casaos',
+      'CASAOS_APP_ID=' + CASAOS_APP_ID,
+      'OLD_IMAGE_ID=' + String(currentContainer.Image || '')
+    ],
+    HostConfig: {
+      AutoRemove: true,
+      Binds: [
+        '/var/run/docker.sock:/var/run/docker.sock',
+        '/var/run/casaos:/var/run/casaos:ro',
+        '/DATA/AppData/countdownapp/data:/data'
+      ]
+    }
+  };
+  await dockerRaw('POST', version + '/containers/create?name=' + encodeURIComponent(name), config);
+  await dockerRaw('POST', version + '/containers/' + encodeURIComponent(name) + '/start');
+  return name;
+}
+
+async function installUpdateWithCasaOS() {
   if (!updaterConfigured()) throw new Error('Docker socket is not available. Re-import the latest CasaOS compose file.');
-  if (updatePreparePromise) return updatePreparePromise;
-  updatePreparePromise = (async () => {
-    writeUpdateState({
-      phase: 'pulling', step: 'download', progress: 15,
-      message: 'Preparing the latest image for CasaOS…',
-      startedAt: new Date().toISOString(), finishedAt: null,
-      checking: false, checkError: null, error: null, installMode: 'casaos'
-    });
+  if (updateInstallPromise) return updateInstallPromise;
+  updateInstallPromise = (async () => {
     try {
       const version = await dockerApiVersion();
       const container = await resolveCurrentContainer(version);
       const currentImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(container.Image) + '/json');
+
+      writeUpdateState({
+        phase: 'pulling', step: 'download', progress: 10,
+        message: 'Downloading update…',
+        startedAt: new Date().toISOString(), finishedAt: null,
+        checking: false, checkError: null, error: null,
+        installMode: 'casaos-managed'
+      });
+
       await pullTargetImage(version);
       const latestImage = await dockerJson(version, 'GET', '/images/' + encodeURIComponent(TARGET_IMAGE) + '/json');
       const currentMeta = dockerImageMetadata(currentImage);
       const latestMeta = dockerImageMetadata(latestImage);
-      const available = container.Image !== latestImage.Id;
-      return writeUpdateState({
-        phase: available ? 'ready' : 'complete', step: available ? 'casaos' : 'complete',
-        progress: 100, available,
-        message: available
-          ? 'Latest image downloaded. Use CasaOS Update/Apply to recreate the managed container safely.'
-          : 'Planner is already up to date',
+
+      if (container.Image === latestImage.Id) {
+        return writeUpdateState({
+          phase: 'complete', step: 'complete', progress: 100, available: false,
+          message: 'Planner is already up to date',
+          currentImageId: latestMeta.imageId, latestImageId: latestMeta.imageId,
+          currentRevision: latestMeta.revision, latestRevision: latestMeta.revision,
+          currentVersion: latestMeta.version, latestVersion: latestMeta.version,
+          latestCreatedAt: latestMeta.createdAt,
+          lastCheckedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          error: null, checkError: null, installMode: 'casaos-managed'
+        });
+      }
+
+      writeUpdateState({
+        phase: 'preparing', step: 'casaos', progress: 45,
+        message: 'Starting CasaOS-managed update…',
         currentImageId: currentMeta.imageId, latestImageId: latestMeta.imageId,
         currentRevision: currentMeta.revision, latestRevision: latestMeta.revision,
         currentVersion: currentMeta.version, latestVersion: latestMeta.version,
         latestCreatedAt: latestMeta.createdAt,
-        lastCheckedAt: new Date().toISOString(),
-        finishedAt: new Date().toISOString(),
-        containerRef: String(container.Name || '').replace(/^\//, '') || container.Id || '',
-        error: null, checkError: null, installMode: 'casaos'
+        available: true,
+        installMode: 'casaos-managed'
       });
+
+      const helper = await launchCasaOSManagedUpdater(version, container);
+      return { ok: true, helper, message: 'CasaOS-managed update started' };
     } catch (error) {
       writeUpdateState({
         phase: 'error', step: 'error', progress: 0,
-        message: 'Could not prepare update', error: error.message,
-        finishedAt: new Date().toISOString(), installMode: 'casaos'
+        message: 'Could not start CasaOS-managed update',
+        error: error.message, finishedAt: new Date().toISOString(),
+        installMode: 'casaos-managed'
       });
       throw error;
     } finally {
-      updatePreparePromise = null;
+      updateInstallPromise = null;
     }
   })();
-  return updatePreparePromise;
+  return updateInstallPromise;
 }
 
 async function exchange(code, req) {
@@ -2526,9 +2572,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/update/start' && req.method === 'POST') {
       if (req.headers['x-countdown-action'] !== 'update') return json(res, 403, { error: 'Invalid update request' });
       const status = updateStatus();
-      if (status.phase === 'pulling') return json(res, 409, { error: 'An update image is already being prepared' });
-      const prepared = await prepareUpdateForCasaOS();
-      return json(res, 200, { ok: true, message: prepared.message, ...prepared });
+      if (['pulling','preparing','restarting','verifying'].includes(status.phase)) return json(res, 409, { error: 'An update is already running' });
+      const started = await installUpdateWithCasaOS();
+      return json(res, 202, started);
     }
 
     if (p === '/api/display/rotate-token' && req.method === 'POST') {
