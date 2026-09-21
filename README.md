@@ -1,221 +1,650 @@
 # Quest Log
 
-> **Deployment model:** Quest Log uses one codebase for two independent runtimes: CasaOS/Docker with local JSON persistence, and Cloudflare Workers with D1 persistence. Shared UI/features live in `public/` and both targets follow `main`; the deployments do not share data, APIs, or network connectivity. See `cloudflare/README.md` for the standalone cloud architecture.
+Quest Log is a personal planner that brings calendars, tasks, goals, countdowns, weather, markets, AI assistance, and configurable e-ink dashboards into one application.
 
-Quest Log is a self-hosted personal planning app for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
+It is built from **one repository and one `main` branch**, but supports two deliberately independent runtimes:
 
-## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
-- Create, edit and delete Google Calendar events directly from Quest Log, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, weather, tasks, goals, countdowns and/or markets.
-- Add current conditions and forecasts from Open-Meteo, with daily, weekly and monthly e-ink planner layouts.
-- Search for a weather location by city/town, save its coordinates automatically, and show the current conditions plus a 7-day forecast on the Today dashboard.
-- Manage weather location and units in Settings, then place Weather as a resizable e-ink dashboard widget with Compact, Current conditions, or Forecast strip styles.
-- Customize Dashboard, Daily, Weekly, Monthly, and Countdowns modes independently. Each mode stores its own widget positions/sizes and per-widget visibility, style, and item limit settings.
-- The e-ink editor now uses a 24 × 16 grid for finer placement/resizing, migrates existing 12 × 8 layouts automatically, and uses a compact live date/mode/time header so more of the screen is available for widgets.
-- Keep colour e-ink and monochrome output modes; weather and calendar accents are quantized to the supported e-ink palette.
-- Build custom e-ink layouts with a drag-and-resize section editor on a resolution-independent 24 × 16 grid, including Agenda, Weather, Tasks, Goals, Countdowns, and Markets widgets.\n- Install the web app as a standalone PWA.\n
+| Runtime | App server | Persistence | Authentication | Best for |
+| --- | --- | --- | --- | --- |
+| Self-hosted | Node.js / Docker | Local JSON at `/data/countdown-data.json` | Trusted LAN / your reverse proxy | CasaOS, home servers, local AI |
+| Cloud | Cloudflare Worker | Cloudflare D1 | Cloudflare Access | Always-on hosted access without a home-server dependency |
 
-- Create and edit multiple countdowns with per-countdown accent colors.
-- Choose days-only, days + hours, days + hours + minutes, live seconds, weeks + days, or target-date countdown displays.
-- Choose short, medium, long, or numeric date formats.
-- Add solid, segmented, or thin progress bars using time elapsed or manual goals.
-- Pin important countdowns and independently hide them from e-ink.
-- Store countdowns persistently on the server instead of only in one browser.
-- Connect multiple Google accounts using OAuth and choose calendars independently from each account.
-- Sync selected Google Task lists two ways: Google-created tasks appear in Quest Log, and linked Quest Log tasks write title, notes, due date, completion, edits, and deletes back to Google.
-- Select which Google calendars are included.
-- Show an upcoming agenda from those calendars.
-- Publish a private JSON feed for FrameOS or another e-ink client.
-- Publish a rendered SVG endpoint so FrameOS can show the exact dashboard design.
-- Provide a dedicated `/frame` preview that uses that same SVG renderer.
-- Render landscape or portrait layouts with split-flap/plain date headers and six-color or monochrome palettes.
-- Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
+The cloud and self-hosted editions share the same frontend and product version, but **do not connect to each other and do not synchronize Quest Log data**. Each runtime has its own tasks, goals, countdowns, settings, tokens, secrets, and display configuration.
 
+If both runtimes are connected to the same external service, such as the same Google account, they may naturally see the same upstream Google Calendar or Google Tasks data. That is still two independent Quest Log installations talking to Google — not a Quest Log-to-Quest Log sync.
 
-## AI agent integration
+## Features
 
-Quest Log can connect to **Hermes Agent**, **OpenClaw**, or another service that exposes an OpenAI-compatible API. The connection is server-to-server: the browser talks only to Quest Log, and Quest Log forwards chat requests to the configured agent endpoint.
+### Planning
 
-The agent receives a bounded snapshot of open planner data such as tasks, goals, countdowns, upcoming selected-calendar events, and writable calendar identifiers. When it suggests a planner change, Quest Log presents that change for approval before executing it. The initial tool set can create or update tasks, goals, countdowns, and Google Calendar events. Delete operations are intentionally not exposed to the agent.
+- Responsive **Today** dashboard with calendar, tasks, goals, countdowns, weather, and Navi.
+- **Day, Week, and Month** planner views with positioned time blocks, all-day rows, overlapping event columns, and Google Calendar colors.
+- Prioritized tasks with due dates, projects/lists, goal links, and completion tracking.
+- Number, checklist, and deadline goals with progress tracking.
+- Multiple countdowns with pinning, colors, date/time formats, progress bars, and e-ink visibility controls.
+- Installable PWA for desktop and mobile.
 
-### Local Hermes Agent
+### Google Calendar and Google Tasks
 
-Run Hermes Agent's API server on a machine reachable from the Quest Log container, then open **Settings → AI connection** and use values similar to:
+- Connect multiple Google accounts.
+- Read selected calendars.
+- Create, edit, and delete events on calendars where Google reports writer/owner access.
+- Quick-create events from empty Day/Week planner time slots.
+- Two-way Google Tasks sync for selected task lists.
+- Sync task title, notes, due date, completion state, edits, and deletes.
+- Choose a default Google Task list for new linked tasks.
 
-- Provider: **Hermes Agent**
-- API base URL: `http://<agent-ip>:8642/v1`
-- Model: `hermes-agent`
-- Bearer token/API key: the Hermes API server key, if one is configured
+### Weather
 
-Do not use `127.0.0.1` or `localhost` when Hermes is running on a different machine from the Quest Log container. Use the agent machine's LAN address or another hostname that the container can resolve.
+- Location search with saved coordinates and metric/imperial units.
+- Current conditions and multi-day forecasts.
+- Self-hosted runtime uses **Environment and Climate Change Canada + Open-Meteo** for Canadian locations, with Open-Meteo as fallback/global forecast source.
+- Cloud runtime currently uses **Open-Meteo** directly.
+- No weather API key is required.
 
-### Local OpenClaw
+### Markets
 
-Enable OpenClaw's OpenAI-compatible Chat Completions endpoint in the Gateway, then use values similar to:
+- Alpha Vantage-backed stock/ETF watchlist.
+- Today dashboard summary, dedicated Markets view, and e-ink Markets widget.
+- Server-side caching and quota-aware refresh behavior.
+- Provider-qualified symbols are retained so Canadian listings can be tracked correctly.
 
-- Provider: **OpenClaw**
-- API base URL: `http://<agent-ip>:18789/v1`
-- Model: `openclaw/default`
-- Bearer token/API key: the OpenClaw Gateway token
+### Navi AI assistant
 
-Treat the OpenClaw Gateway token as a high-trust credential. Quest Log stores the configured token encrypted with `APP_SECRET` and never includes it in `/api/state` or sends it to the browser.
+Navi is the built-in planning assistant. It receives a bounded planner context and can propose changes to Quest Log.
 
-### Cloud / custom provider
+Supported actions currently include:
 
-Choose **OpenAI-compatible**, enter the provider's `/v1` base URL, model name, and API key. The same connector is used for local and cloud endpoints, so switching providers does not change the planner action layer.
+- create/update task;
+- create/update goal;
+- create/update countdown;
+- create/update Google Calendar event.
 
-The **Test connection** button checks the configured endpoint's `/v1/models` route. The agent endpoint must be reachable from the Quest Log server/container, not merely from the browser you are using.
+Navi does **not** silently execute planner changes. Proposed actions are shown to the user for approval first, and delete actions are intentionally not exposed.
 
-## Hybrid weather
+Self-hosted Navi supports:
 
-Quest Log uses a hybrid weather pipeline. **Open-Meteo** remains the global forecast source and fallback. For Canadian locations, Quest Log also queries Environment and Climate Change Canada's experimental **City Page Weather** GeoMet collection and uses the nearest official city page when it is close enough to the selected location.
+- Hermes Agent;
+- OpenClaw;
+- any OpenAI-compatible HTTP API.
 
-When Environment Canada data is available, current temperature, humidity, wind, gusts, condition, station details, official forecast text, and active city-page warnings can be surfaced from ECCC. The multi-day forecast tiles continue to use Open-Meteo so the dashboard and e-ink layouts retain a consistent 10-day forecast. If ECCC is unavailable, Quest Log falls back to Open-Meteo automatically instead of breaking the weather widget.
+Cloud Navi supports:
 
-The web dashboard uses custom inline SVG weather icons instead of platform-dependent emoji. The e-ink renderer continues to use its own e-ink-safe SVG weather symbols and palette.
+- OpenAI using a Worker secret;
+- a local/private OpenAI-compatible model exposed through a secure **HTTPS** endpoint.
 
-## Alpha Vantage market setup
+The cloud local-model connector is only an AI endpoint. It does not connect the cloud Quest Log application to the self-hosted Quest Log application or its data.
 
-Quest Log can show an automatic market watchlist on the Today dashboard, a dedicated Markets page, and a configurable e-ink Markets widget. Market prices are fetched server-side from Alpha Vantage and cached aggressively to protect the free API quota.
+### E-ink / FrameOS
 
-1. Create a Alpha Vantage account and copy the API key from the Alpha Vantage dashboard.
-2. Add this environment variable to the CasaOS app: `ALPHA_VANTAGE_API_KEY`.
-3. Recreate/restart the container after adding the variable.
-4. Open **Markets** in Quest Log and search for the stocks or ETFs you want to follow. Canadian Toronto/TSX Venture results are stored using Alpha Vantage's provider-qualified symbol.
+- Token-protected JSON feed.
+- Token-protected rendered SVG endpoint.
+- Browser preview using the same display renderer.
+- Dashboard, Daily, Weekly, Monthly, and Countdowns display modes.
+- Agenda, Weather, Tasks, Goals, Countdowns, and Markets widgets.
+- 24 × 16 drag-and-resize layout editor.
+- Landscape and portrait output.
+- Spectra-style six-color and monochrome palettes.
+- Resolution-independent rendering for displays such as 800 × 480 panels.
 
-The API key is never sent to the browser. The watchlist is capped at eight symbols. Alpha Vantage's standard free allowance is small, so Quest Log automatically enforces a quota-safe cache interval based on watchlist size (and never less than the configured 4–24 hour cache). Canadian symbols should be added through the in-app search so the correct Alpha Vantage symbol is preserved.
+## Repository layout
 
-## CasaOS updater behavior
+| Path | Purpose |
+| --- | --- |
+| `public/` | Shared frontend used by both runtimes |
+| `server.js` | Self-hosted Node.js API/runtime |
+| `Dockerfile` | Self-hosted container image |
+| `docker-compose.casaos.yml` | CasaOS custom-install compose |
+| `docker-compose.yml` | Docker/CasaOS compose variant |
+| `cloudflare/worker.js` | Cloudflare Worker API/runtime |
+| `cloudflare/state.js` | D1-backed cloud state adapter |
+| `cloudflare/google.js` | Cloud Google Calendar/Tasks integration |
+| `cloudflare/agent.js` | Cloud Navi integration |
+| `cloudflare/markets.js` | Cloud Alpha Vantage integration |
+| `cloudflare/display.js` | Cloud e-ink feed/SVG renderer |
+| `cloudflare/migrations/` | D1 schema |
+| `wrangler.jsonc` | Cloudflare Worker + D1 configuration |
 
-Quest Log keeps the one-click **Install update** experience without renaming or replacing CasaOS-managed containers behind CasaOS's back. Quest Log pulls the newest GHCR image, launches a short-lived helper, and hands the existing compose configuration back to CasaOS App Management so CasaOS performs the recreate itself. The helper waits for the new container to become healthy, updates the Maintenance progress state, and then removes itself automatically.
+---
 
-If an older build previously left CasaOS pointing at a deleted container, back up `/DATA/AppData/countdownapp/data`, remove/recreate only the app container once, and re-import the current CasaOS compose without deleting that data directory.
+# Self-hosted deployment
 
-## Appearance
+## Option A — CasaOS
 
-Quest Log supports **System**, **Light**, and **Dark** appearance modes plus six interface themes: **Classic**, **Quest**, **Moss**, **Ember**, **Arcane**, and **Slate**. **Classic** restores the original Quest Log palette, including the clean purple accent used before the theme system was introduced. Appearance settings are stored server-side so they follow the user across devices, while a small local cache applies the last theme before the app finishes loading to avoid a flash of the wrong theme. **Comfortable** and **Compact** interface density options are also available.
-
-Website appearance is independent from the e-ink display palette, so changing the Quest Log theme does not alter Spectra 6 or monochrome FrameOS output.
-
-The Quest Log mark uses the same book + waypoint/compass symbol across all themes. The sidebar mark and browser favicon follow the selected theme automatically; the installed PWA icon uses the Quest variant as the stable default because operating systems generally do not live-update installed app icons when an in-app theme changes.
-
-## CasaOS deployment
-
-GitHub Actions builds the application image from `main` and publishes:
+The published image is:
 
 `ghcr.io/srfarsquatch/countdownapp:edge`
 
-CasaOS pulls the finished image directly. No source checkout or local Docker build is required.
+GitHub Actions publishes both amd64 and arm64 images from `main`.
 
-1. Open **App Store** in CasaOS.
-2. Choose **Custom Install**.
-3. Import/upload `docker-compose.casaos.yml`.
-4. Install the application.
-5. Open `http://<casaos-server-ip>:8088`.
+1. In CasaOS, open **App Store → Custom Install**.
+2. Import `docker-compose.casaos.yml` from this repository.
+3. Configure the optional integration environment variables described below.
+4. Install the app.
+5. Open:
 
-The compose file uses `pull_policy: always`. Recreate/update the app after a successful GitHub Actions build to pull the newest image.
+~~~text
+http://<casaos-server-ip>:8088
+~~~
 
-## Persistent data
+The container listens on port `8080` and the compose maps it to host port `8088`.
 
-The app stores its JSON database at `/DATA/AppData/$AppID/data` on the CasaOS host, bind-mounted to `/data` in the container.
+Persistent application data is stored on the CasaOS host at:
 
-Do not delete that AppData folder if you want to retain countdowns, Google Calendar credentials, selected calendars and the FrameOS display token.
+~~~text
+/DATA/AppData/countdownapp/data
+~~~
 
-## Google Calendar setup
+and mounted to:
 
-Quest Log requests Google's `calendar.events`, `calendar.calendarlist.readonly`, and `tasks` scopes. Calendar events and selected Google Task lists can sync both ways while calendar-subscription management remains read-only. OAuth tokens are stored server-side and encrypted with `APP_SECRET`.
+~~~text
+/data
+~~~
 
-Create a Google Cloud OAuth 2.0 **Web application** credential with both the **Google Calendar API** and **Google Tasks API** enabled.
+Do not delete that directory unless you intentionally want to reset the self-hosted instance.
 
-Set these environment variables in the CasaOS app:
+## Option B — regular Docker
 
-- `GOOGLE_CLIENT_ID` — OAuth client ID.
-- `GOOGLE_CLIENT_SECRET` — OAuth client secret.
-- `APP_SECRET` — a long random secret used to encrypt stored Google tokens.
-- `APP_BASE_URL` — the externally reachable base URL, for example `https://countdown.example.com`.
+Quest Log does not require CasaOS to run. A minimal Docker deployment can use a named volume:
 
-Add this exact authorized redirect URI to the Google OAuth client:
+~~~bash
+docker run -d \
+  --name countdownapp \
+  --restart unless-stopped \
+  -p 8088:8080 \
+  -v questlog-data:/data \
+  -e TZ=America/Vancouver \
+  ghcr.io/srfarsquatch/countdownapp:edge
+~~~
 
-`<APP_BASE_URL>/api/google/callback`
+Open `http://<server-ip>:8088`.
+
+Google, Markets, and stored Navi credentials require additional environment variables.
+
+The CasaOS one-click updater also requires the Docker socket. A normal Docker deployment can omit that mount and update the image using your usual Docker workflow instead.
+
+## Self-hosted environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID` | For Google | Google OAuth web client ID |
+| `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
+| `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
+| `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
+| `ALPHA_VANTAGE_API_KEY` | For Markets | Alpha Vantage API key |
+| `TZ` | Optional | Container timezone |
+| `DOCKER_SOCKET` | Updater only | Defaults to `/var/run/docker.sock` |
+| `TARGET_CONTAINER` | Updater only | Defaults to `countdownapp` |
+| `TARGET_IMAGE` | Updater only | Defaults to the GHCR edge image |
+
+Keep `APP_SECRET` stable. Changing it makes credentials encrypted with the old value unreadable and will require reconnecting those integrations.
+
+## Self-hosted updates
+
+The CasaOS deployment includes an in-app update workflow. Quest Log can pull the newest GHCR image and hand the existing compose definition back to CasaOS App Management so CasaOS performs the managed recreate.
+
+The compose mounts `/var/run/docker.sock` for this feature. Docker socket access is effectively host-level Docker access, so only expose the self-hosted Quest Log instance to trusted users.
+
+If you do not want the in-app updater, use a normal Docker deployment without the Docker socket and update the container externally.
+
+---
+
+# Cloudflare deployment
+
+The cloud runtime is a native Cloudflare Worker. It does **not** proxy to CasaOS and does not need a Cloudflare Tunnel to the self-hosted Quest Log app.
+
+Architecture:
+
+~~~text
+Browser
+   |
+Cloudflare Access
+   |
+Quest Log Worker
+   |
+   +-- D1
+   +-- Google Calendar / Tasks
+   +-- Open-Meteo
+   +-- Alpha Vantage
+   +-- OpenAI or secure HTTPS local-model endpoint
+~~~
+
+## 1. Install dependencies and authenticate Wrangler
+
+~~~bash
+npm install
+npx wrangler login
+~~~
+
+## 2. Create the D1 database
+
+Create a D1 database named `quest-log`:
+
+~~~bash
+npx wrangler d1 create quest-log
+~~~
+
+Copy the returned database ID into `wrangler.jsonc` under:
+
+~~~json
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "quest-log",
+    "database_id": "YOUR_D1_DATABASE_ID"
+  }
+]
+~~~
+
+The binding name must remain:
+
+`DB`
+
+Initialize the database schema:
+
+~~~bash
+npx wrangler d1 execute quest-log --remote --file=./cloudflare/migrations/0001_state_store.sql
+~~~
+
+## 3. Configure Cloudflare Access
+
+Create a **Self-hosted** Cloudflare Access application for the hostname you will use, for example:
+
+~~~text
+questlog.example.com
+~~~
+
+Configure Google or another supported Cloudflare Access identity provider and restrict the Access policy to the users who should be allowed into Quest Log.
+
+From the Access application, collect:
+
+- the Access team domain, such as `your-team.cloudflareaccess.com`;
+- the application AUD/tag.
+
+Add these Worker variables:
+
+| Variable | Example / purpose |
+| --- | --- |
+| `CF_ACCESS_TEAM_DOMAIN` | `your-team.cloudflareaccess.com` |
+| `CF_ACCESS_AUD` | Access application AUD/tag |
+| `ALLOWED_EMAILS` | Comma-separated allowlist of user emails |
+| `CLOUD_WORKSPACE_ID` | Optional; defaults to `default` |
+
+The Worker validates the Cloudflare Access JWT itself in addition to the Access policy.
+
+**Do not create a Bypass policy for the main Quest Log hostname or `/login*`.** Cloudflare Access is intentionally in front of the Worker for normal human access.
+
+## 4. Configure Worker secrets
+
+In **Workers & Pages → Quest Log Worker → Settings → Variables and Secrets**, add only the integrations you plan to use.
+
+Core/integration secrets:
+
+| Name | Type | Used for |
+| --- | --- | --- |
+| `APP_SECRET` | Secret | Google token encryption and OAuth state signing |
+| `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
+| `ALPHA_VANTAGE_API_KEY` | Secret | Markets |
+| `OPENAI_API_KEY` | Secret | Cloud Navi with OpenAI |
+| `LOCAL_AGENT_API_KEY` | Secret | Optional bearer token for a private local-model endpoint |
+| `LOCAL_AGENT_ACCESS_CLIENT_ID` | Secret | Optional Cloudflare Access service-token client ID |
+| `LOCAL_AGENT_ACCESS_CLIENT_SECRET` | Secret | Optional Cloudflare Access service-token client secret |
+
+Useful non-secret variables:
+
+| Name | Used for |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `OPENAI_MODEL` | Optional OpenAI model override |
+| `LOCAL_AGENT_BASE_URL` | Optional default HTTPS local-model base URL |
+| `LOCAL_AGENT_MODEL` | Optional local-model override |
+| `CF_ACCESS_TEAM_DOMAIN` | Access validation |
+| `CF_ACCESS_AUD` | Access validation |
+| `ALLOWED_EMAILS` | Worker-side email allowlist |
+| `CLOUD_WORKSPACE_ID` | D1 workspace key |
+
+`AUTH_BYPASS=true` exists only for local Worker development. Never enable it in production.
+
+Keep `APP_SECRET` stable. Rotating it will make existing encrypted cloud Google tokens unreadable.
+
+## 5. Deploy the Worker
+
+Deploy from the repository:
+
+~~~bash
+npm run deploy:cloudflare
+~~~
+
+Then add your production custom domain to the Worker in Cloudflare and make sure the same hostname is covered by the Access application.
+
+For continuous deployment, connect the GitHub repository to Cloudflare Workers Builds, use `main` as the production branch, and deploy using the repository's `npm run deploy:cloudflare` script. Keep the D1 binding declared in `wrangler.jsonc` so deployments do not lose it.
+
+The cloud edition and the GHCR self-hosted image should both be shipped from the same `main` commit.
+
+---
+
+# Connector setup
+
+## Google Calendar + Google Tasks
+
+Quest Log requests these Google scopes:
+
+~~~text
+https://www.googleapis.com/auth/calendar.events
+https://www.googleapis.com/auth/calendar.calendarlist.readonly
+https://www.googleapis.com/auth/tasks
+~~~
+
+These provide event read/write, calendar-list read access, and Google Tasks read/write.
+
+### Google Cloud configuration
+
+1. Create or select a Google Cloud project.
+2. Enable:
+   - **Google Calendar API**
+   - **Google Tasks API**
+3. Configure **Google Auth Platform / OAuth consent**.
+4. If the app is in testing, add the Google accounts that will use Quest Log as test users.
+5. Create an OAuth 2.0 **Web application** client.
+
+For self-hosted Quest Log, add:
+
+~~~text
+<APP_BASE_URL>/api/google/callback
+~~~
 
 Example:
 
-`https://countdown.example.com/api/google/callback`
+~~~text
+https://planner.example.com/api/google/callback
+~~~
 
-Google generally requires HTTPS for web-app redirect URIs other than localhost, so use a trusted HTTPS reverse proxy/domain or an HTTPS endpoint such as a suitable Tailscale setup when connecting a self-hosted server.
+For cloud Quest Log, add:
 
-After the environment variables are configured and the container is restarted:
+~~~text
+https://questlog.example.com/api/google/callback
+~~~
+
+Use the matching client ID/secret in that runtime.
+
+It is recommended to use a separate Google OAuth client for Quest Log's Calendar/Tasks authorization rather than reusing the OAuth client used by Cloudflare Access for sign-in.
+
+### Connect inside Quest Log
+
+After deployment:
 
 1. Open **Settings → Google Calendar**.
-2. Click **Connect Google Calendar**.
-3. Approve Calendar event access, read-only calendar-list access, and Google Tasks access.
-4. Select the calendars you want Quest Log to display.
-5. Choose which Google Task lists should sync and select a default task list for new linked Quest Log tasks.
-6. Quest Log only enables event editing on calendars where Google reports `writer` or `owner` access.
+2. Choose **Connect Google Calendar**.
+3. Approve the requested scopes.
+4. Select the calendars to display.
+5. Select the Google Task lists to synchronize.
+6. Choose a default Task list for newly linked Quest Log tasks.
 
-If an account was connected before Calendar writeback or Google Tasks sync was enabled, reconnect that account once so Google can issue a token containing the current scopes.
+Event edits are only enabled for calendars where Google's API reports `writer` or `owner` access.
 
-Google Tasks only stores a due **date** through the API, not a due time. Quest Log keeps the local time component while syncing the date to Google.
+Google Tasks exposes a due **date**, not a due time. Quest Log retains its local task time while synchronizing the date to Google.
 
-## FrameOS
+## Alpha Vantage Markets
 
-Open **Display** in Quest Log. It shows private tokenized display URLs:
+1. Create an Alpha Vantage API key.
+2. Self-hosted: set `ALPHA_VANTAGE_API_KEY` in the container environment and restart/recreate the container.
+3. Cloud: store `ALPHA_VANTAGE_API_KEY` as a Worker secret and redeploy if required.
+4. Open **Markets** and use the in-app symbol search to add securities.
 
-- **Rendered SVG**: `/api/frameos/svg?token=...&w=800&h=480`
-- **JSON feed**: `/api/frameos/feed?token=...`
-- **Browser preview**: `/frame?token=...&w=800&h=480`
+Using the in-app search is recommended for Canadian listings so Quest Log stores the provider-qualified symbol returned by Alpha Vantage.
 
-Use the rendered SVG when you want FrameOS to match Quest Log exactly. Set `w` and `h` to the panel's native resolution. The renderer automatically supports portrait and landscape sizing and deliberately limits itself to e-ink-safe colors.
+Market data is cached server-side and refresh intervals are constrained to reduce free-tier API usage.
 
-The JSON feed contains:
+## Weather
 
-- generation timestamp,
-- next calendar event,
-- upcoming selected-calendar events,
-- active manual countdowns,
-- days/seconds remaining.
+No API key is required.
 
-Treat the display token like a password. Use **Rotate display token** if a URL is exposed.
+In Quest Log, choose a weather location in Settings/Displays. Quest Log stores the selected coordinates.
 
-For FrameOS, use the rendered SVG endpoint for the built-in Quest Log layout, or point a custom app at the JSON feed if you want to build your own scene.
+Self-hosted behavior:
 
-Per-countdown display controls include accent color, time/date format, progress source/style, pinning, and e-ink visibility. Display-wide controls include palette, layout, date-header style, refresh interval, and row limits.
+~~~text
+Canadian location
+   +-- Environment and Climate Change Canada current/official data
+   +-- Open-Meteo forecast/fallback
+~~~
 
-Quest Log display modes now include **Daily**, **Weekly**, and **Monthly**. When Weather is enabled and a latitude/longitude is configured, Daily shows current conditions and today's high/low, Weekly adds a compact forecast per day, and Monthly adds weather markers for forecast days. Weather data is fetched from Open-Meteo server-side and cached for 15 minutes. No weather API key, billing account, or extra OAuth scope is required.
+Other self-hosted locations use Open-Meteo.
 
-The **Displays → Section editor** can switch between automatic layout and a custom grid. In custom mode, drag sections to reposition them and use the bottom-right handle to resize them. **Arrange for resolution** creates a two-column landscape layout or a stacked portrait layout based on the preview dimensions. Long agenda/task labels are clipped and shortened inside their section so they do not bleed into neighboring content.
+Cloud behavior:
 
-## Update Center
+~~~text
+Open-Meteo
+~~~
 
-Quest Log checks the published GHCR image in the background and shows an **Update** badge on Settings when a newer container is available. The Settings update card shows the installed build, latest build, last check time, and a staged progress bar while an update is being installed.
+The cloud weather implementation currently does not query Environment Canada.
 
-Update progress survives the brief container restart because it is written to the persistent `/data/update-status.json` file. The UI polls the status endpoint through the restart and reloads Quest Log after the new container reports healthy.
+## Navi — self-hosted AI
 
-## One-click updates
+Open **Settings → AI connection**.
 
-The CasaOS install runs as one long-lived Quest Log container. **Settings → Application updates → Install update** is a one-click flow with no second CasaOS confirmation step.
+### Hermes Agent
 
-When selected, Quest Log:
+Example:
 
-- pulls the newest `ghcr.io/srfarsquatch/countdownapp:edge` image,
-- starts a short-lived helper on the CasaOS host network,
-- reads the current compose definition from CasaOS App Management,
-- asks CasaOS App Management to apply that same compose definition after the new image has been pulled,
-- lets CasaOS recreate the managed Quest Log container so its internal container tracking stays correct,
-- waits for the replacement container to be running and healthy,
-- records progress in `/DATA/AppData/countdownapp/data/update-status.json`,
-- reloads Quest Log when the update finishes,
-- removes the helper automatically.
+~~~text
+Provider: Hermes Agent
+Base URL: http://192.168.1.50:8642/v1
+Model: hermes-agent
+API key: optional, if the Hermes server requires one
+~~~
 
-The helper accesses CasaOS App Management only through CasaOS's local runtime address and uses the already-mounted Docker socket to launch the temporary update process. Docker socket access is effectively host-level Docker control, so only expose Quest Log to people you trust.
+### OpenClaw
 
-## Updating the source
+Enable OpenClaw's OpenAI-compatible Chat Completions API and use values such as:
 
-Push changes to `main`. The **Publish Countdown container** workflow builds and publishes a fresh multi-architecture image. Once GitHub Actions finishes, an installed Quest Log instance can pull it from its **Update now** button.
+~~~text
+Provider: OpenClaw
+Base URL: http://192.168.1.50:18789/v1
+Model: openclaw/default
+API key: your Gateway token
+~~~
 
-## Registry access
+### Other OpenAI-compatible servers
 
-If CasaOS reports `unauthorized` while pulling the image, make the `countdownapp` package public in GitHub Packages or authenticate the CasaOS Docker host to `ghcr.io` with a token that has `read:packages`.
+Choose **OpenAI-compatible** and enter:
 
-## Port
+- the server's `/v1` base URL;
+- model ID;
+- optional bearer token.
 
-The host web interface remains on **8088**. The container now listens internally on **8080**.
+The endpoint must be reachable **from the Quest Log container**, not just from your browser. If the model runs on another computer, do not use `localhost` or `127.0.0.1`; use that computer's LAN-reachable address/hostname.
+
+Quest Log stores a saved self-hosted agent credential encrypted with `APP_SECRET`.
+
+The **Test connection** action checks the provider's `/v1/models` endpoint.
+
+## Navi — cloud OpenAI
+
+Store:
+
+- `OPENAI_API_KEY` as a Worker secret;
+- optional `OPENAI_MODEL` as a variable.
+
+Then choose **OpenAI** in Quest Log's cloud AI settings.
+
+## Navi — cloud to a local/private model
+
+A Cloudflare Worker cannot directly call a private `192.168.x.x` LAN address. The model must be exposed through a secure public **HTTPS** URL.
+
+Typical architecture:
+
+~~~text
+Quest Log Worker
+      |
+      | HTTPS
+      v
+Cloudflare Tunnel / reverse proxy
+      |
+      v
+Hermes / OpenClaw / OpenAI-compatible model server
+~~~
+
+In Quest Log choose **Local model (HTTPS)** and configure the HTTPS `/v1` endpoint.
+
+Optional Worker configuration:
+
+- `LOCAL_AGENT_BASE_URL`
+- `LOCAL_AGENT_MODEL`
+- `LOCAL_AGENT_API_KEY`
+
+If the model endpoint is protected by Cloudflare Access, create a Cloudflare Access **service token** for the model endpoint and store:
+
+- `LOCAL_AGENT_ACCESS_CLIENT_ID`
+- `LOCAL_AGENT_ACCESS_CLIENT_SECRET`
+
+The Worker sends those as `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers.
+
+This connection exposes only the model API to cloud Navi. It is not a tunnel into the self-hosted Quest Log application.
+
+## FrameOS / e-ink
+
+Open **Displays** in Quest Log. The app generates a private display token and exposes:
+
+~~~text
+/api/frameos/svg?token=...&w=800&h=480
+/api/frameos/feed?token=...
+/frame?token=...&w=800&h=480
+~~~
+
+Use:
+
+- **SVG** for the exact Quest Log-rendered display;
+- **JSON feed** for a custom FrameOS scene/client;
+- **/frame** for browser preview/testing.
+
+Treat the display token like a password. Rotate it in Quest Log if a display URL is exposed.
+
+### FrameOS with self-hosted Quest Log
+
+FrameOS must be able to reach the self-hosted Quest Log server over your LAN, VPN, or reverse proxy.
+
+Example:
+
+~~~text
+http://192.168.1.20:8088/api/frameos/svg?token=...&w=800&h=480
+~~~
+
+### FrameOS with cloud Quest Log
+
+Cloudflare Access normally requires an interactive human login, which an unattended e-ink device cannot perform.
+
+Keep the main application protected, but if you need direct FrameOS access create narrowly scoped Access applications for only:
+
+~~~text
+questlog.example.com/frame
+questlog.example.com/api/frameos/*
+~~~
+
+Use a **Bypass / Everyone** policy only on those machine-display paths.
+
+The Worker still validates the private display token before returning feed/SVG data.
+
+Do **not** bypass Access for the rest of `questlog.example.com`.
+
+---
+
+# Cloudflare Access sign-in
+
+Cloud Quest Log uses Cloudflare Access for human authentication.
+
+Unauthenticated users are stopped by Access before the Worker loads. Once authenticated, the Worker validates the Access JWT and surfaces the authenticated email through `/api/runtime`.
+
+The in-app cloud logout action uses:
+
+~~~text
+/cdn-cgi/access/logout
+~~~
+
+Self-hosted Quest Log does not use Cloudflare Access unless you independently place it behind Access/reverse-proxy authentication.
+
+---
+
+# Persistence and backups
+
+## Self-hosted
+
+Main state:
+
+~~~text
+/data/countdown-data.json
+~~~
+
+CasaOS host location:
+
+~~~text
+/DATA/AppData/countdownapp/data
+~~~
+
+Back up that directory to preserve self-hosted Quest Log data.
+
+## Cloud
+
+Cloud state is stored in the D1 database bound as `DB`, currently in the `questlog_state` table.
+
+Back up/export D1 separately if you need an external cloud backup.
+
+The cloud and self-hosted persistence stores are intentionally independent.
+
+---
+
+# Security notes
+
+- Never commit `.dev.vars`, Google client secrets, Alpha Vantage keys, OpenAI keys, or agent bearer tokens.
+- Use Cloudflare **Secrets** for cloud credentials.
+- Keep `APP_SECRET` long, random, private, and stable.
+- Treat FrameOS display tokens as credentials.
+- Cloudflare Access protects the human cloud UI; the Worker's JWT validation is an additional check.
+- Do not add an Access Bypass policy to the main Quest Log hostname.
+- Docker socket access is powerful; only mount it when you want the CasaOS-managed in-app updater.
+- For cloud local AI, expose only the model endpoint through HTTPS — never the self-hosted Quest Log data/runtime.
+
+---
+
+# Local development
+
+Install dependencies:
+
+~~~bash
+npm install
+~~~
+
+Run the self-hosted Node runtime:
+
+~~~bash
+npm run dev:selfhosted
+~~~
+
+Run the Cloudflare Worker locally:
+
+~~~bash
+cp .dev.vars.example .dev.vars
+npm run dev:cloudflare
+~~~
+
+`.dev.vars.example` includes `AUTH_BYPASS=true` for local Worker development. Do not copy that setting into production.
+
+---
+
+# Release model
+
+`main` is the source of truth.
+
+A push/merge to `main` can update both deployment targets:
+
+~~~text
+main
+  |
+  +-- GitHub Actions -> GHCR edge image -> CasaOS / Docker
+  |
+  +-- Cloudflare Workers Builds or Wrangler -> Worker + D1
+~~~
+
+Shared frontend changes should be implemented once in `public/`. Runtime-specific backend behavior belongs in `server.js` or the `cloudflare/` modules while keeping the API contract aligned wherever practical.
+
+For deeper cloud implementation notes, see `cloudflare/README.md`.
