@@ -126,7 +126,7 @@ async function ensureSchema(db){
   await db.prepare("CREATE TABLE IF NOT EXISTS questlog_state (workspace_id TEXT PRIMARY KEY,state_json TEXT NOT NULL,schema_version INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT (datetime('now')),updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
 }
 export async function loadState(env){
-  if(!env.DB)throw new Error('Cloudflare D1 binding DB is not configured.');
+  if(!env.DB)return defaults();
   await ensureSchema(env.DB);
   const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default';
   const row=await env.DB.prepare('SELECT state_json FROM questlog_state WHERE workspace_id=?').bind(workspace).first();
