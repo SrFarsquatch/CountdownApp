@@ -97,7 +97,7 @@ export function normalizeMarkets(x={}){
   }
   return{watchlist,refreshMinutes:clamp(Math.round(num(x.refreshMinutes,1440)),240,1440)};
 }
-function normalizeGoogleAccount(x={}){
+export function normalizeGoogleAccount(x={}){
   const selectedTaskListIds=Array.isArray(x.selectedTaskListIds)?x.selectedTaskListIds.map(String).slice(0,50):[];
   return{id:String(x.id||id()),googleId:cleanText(x.googleId,240),label:cleanText(x.label||x.googleId||'Google account',160),token:typeof x.token==='string'?x.token:null,selectedCalendarIds:Array.isArray(x.selectedCalendarIds)?x.selectedCalendarIds.map(String).slice(0,50):[],selectedTaskListIds,defaultTaskListId:selectedTaskListIds.includes(String(x.defaultTaskListId||''))?String(x.defaultTaskListId):selectedTaskListIds[0]||'',connectedAt:iso(x.connectedAt)||new Date().toISOString()};
 }
