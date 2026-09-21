@@ -6,6 +6,12 @@ import {
   LAYOUTS, PALETTES, DATE_WIDGETS, DISPLAY_MODES, WEATHER_STYLES,
   APPEARANCE_MODES, UI_THEMES, UI_DENSITIES
 } from './state.js';
+import {
+  googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth,
+  calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
+  disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
+} from './google.js';
+import { marketData, marketSearch } from './markets.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -123,7 +129,7 @@ function ensureItemTitle(value,label,max){
 }
 async function handleApi(request,env,identity){
   const url=new URL(request.url),p=url.pathname,method=request.method;
-  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',logoutPath:'/cdn-cgi/access/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
   if(p.startsWith('/api/update/')){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});
@@ -151,7 +157,8 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/tasks'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Task title',160);
-    const now=new Date().toISOString(),item=normalizeTask({...incoming,id:id(),created:now,updated:now});
+    const now=new Date().toISOString();let item=normalizeTask({...incoming,id:id(),created:now,updated:now});
+    if(incoming.googleAccountId&&incoming.googleTaskListId)item=await createGoogleTaskLink(item,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
     state.tasks.push(item);await saveState(env,state);return json(item,201);
   }
   if(p.startsWith('/api/tasks/')){
@@ -162,9 +169,16 @@ async function handleApi(request,env,identity){
       const existing=state.tasks[index],merged={...existing,...incoming,id:itemId,created:existing.created,updated:new Date().toISOString()};
       if(incoming.status&&incoming.status!=='done')merged.completedAt=null;
       if(incoming.status==='done'&&!merged.completedAt)merged.completedAt=new Date().toISOString();
-      state.tasks[index]=normalizeTask(merged);await saveState(env,state);return json(state.tasks[index]);
+      let next=normalizeTask(merged);
+      if(existing.googleTaskId){
+        next.googleAccountId=existing.googleAccountId;next.googleTaskListId=existing.googleTaskListId;next.googleTaskListTitle=existing.googleTaskListTitle;next.googleTaskId=existing.googleTaskId;next.googleParentId=existing.googleParentId;next.googleUpdated=existing.googleUpdated;next.googleEtag=existing.googleEtag;
+        next=await updateLinkedGoogleTask(next,state,env);
+      }else if(incoming.googleAccountId&&incoming.googleTaskListId){
+        next=await createGoogleTaskLink(next,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
+      }
+      state.tasks[index]=next;await saveState(env,state);return json(state.tasks[index]);
     }
-    if(method==='DELETE'){state.tasks.splice(index,1);await saveState(env,state);return json({ok:true})}
+    if(method==='DELETE'){const item=state.tasks[index];await deleteLinkedGoogleTask(item,state,env);state.tasks.splice(index,1);await saveState(env,state);return json({ok:true})}
   }
 
   if(p==='/api/goals'&&method==='POST'){
@@ -231,17 +245,51 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/markets'&&method==='GET'){
-    return json({markets:null,error:env.ALPHA_VANTAGE_API_KEY?'Cloud market quotes are being migrated to the Worker runtime.':'Add ALPHA_VANTAGE_API_KEY as a Worker secret to enable Markets.'});
+    if(!env.ALPHA_VANTAGE_API_KEY)return json({markets:null,error:'Add ALPHA_VANTAGE_API_KEY as a Worker secret to enable Markets.'});
+    try{return json({markets:await marketData(state,env),error:null})}
+    catch(error){return json({markets:state.marketCache?.data||null,error:error.message||'Market data is unavailable.'})}
   }
   if(p==='/api/markets/search'&&method==='GET'){
-    return json({error:'Cloud market search is not enabled yet.'},env.ALPHA_VANTAGE_API_KEY?501:400);
+    if(!env.ALPHA_VANTAGE_API_KEY)return json({error:'ALPHA_VANTAGE_API_KEY is not configured.'},400);
+    const q=url.searchParams.get('q')||'';if(!cleanText(q,80).trim())return json({results:[]});
+    return json({results:await marketSearch(q,env)});
   }
 
-  if(p==='/api/google/events'&&method==='GET')return json({events:[]});
-  if(p==='/api/google/calendars'&&method==='GET')return json({calendars:[]});
-  if(p==='/api/google/tasklists'&&method==='GET')return json({taskLists:[]});
-  if(p==='/api/google/tasks/sync'&&method==='POST')return json({ok:true,sync:{imported:0,exported:0,updated:0,skipped:true}});
-  if(p.startsWith('/api/google/')||p==='/api/google/auth')return json({error:'Cloud Google Calendar/Tasks integration is not enabled yet. Configure the cloud OAuth secrets after the standalone D1 cutover.'},501);
+  if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env);
+  if(p==='/api/google/callback'&&method==='GET')return finishGoogleAuth(request,state,env);
+  if(p==='/api/google/disconnect'&&method==='POST'){state.google.accounts=[];state.tasks=state.tasks.map(t=>normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:''}));await saveState(env,state);return json({ok:true})}
+  if(p.startsWith('/api/google/accounts/')&&p.endsWith('/disconnect')&&method==='POST'){
+    const accountId=decodeURIComponent(p.split('/')[4]||'');return await disconnectAccount(accountId,state,env)?json({ok:true}):json({error:'Google account was not found.'},404);
+  }
+  if(p.startsWith('/api/google/accounts/')&&p.endsWith('/calendars')&&method==='PUT'){
+    const accountId=decodeURIComponent(p.split('/')[4]||''),a=(state.google.accounts||[]).find(x=>x.id===accountId);if(!a)return json({error:'Google account was not found.'},404);
+    const incoming=await body(request);if(!Array.isArray(incoming.calendarIds))return json({error:'calendarIds must be an array.'},400);
+    a.selectedCalendarIds=incoming.calendarIds.map(String).slice(0,50);await saveState(env,state);return json({ok:true});
+  }
+  if(p.startsWith('/api/google/accounts/')&&p.endsWith('/tasklists')&&method==='PUT'){
+    const accountId=decodeURIComponent(p.split('/')[4]||''),a=(state.google.accounts||[]).find(x=>x.id===accountId);if(!a)return json({error:'Google account was not found.'},404);
+    const incoming=await body(request);if(!Array.isArray(incoming.taskListIds))return json({error:'taskListIds must be an array.'},400);
+    const previous=new Set(a.selectedTaskListIds||[]);a.selectedTaskListIds=incoming.taskListIds.map(String).slice(0,50);const selected=new Set(a.selectedTaskListIds);
+    const removed=[...previous].filter(x=>!selected.has(x));if(removed.length)state.tasks=state.tasks.map(t=>t.googleAccountId===accountId&&removed.includes(t.googleTaskListId)?normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:''}):t);
+    const requested=incoming.defaultTaskListId?String(incoming.defaultTaskListId):'';a.defaultTaskListId=a.selectedTaskListIds.includes(requested)?requested:(a.selectedTaskListIds[0]||'');await saveState(env,state);
+    return json({ok:true,sync:await syncGoogleTasks(state,env)});
+  }
+  if(p==='/api/google/calendars'&&method==='GET'){
+    const accountId=url.searchParams.get('accountId');if(!accountId)return json({error:'accountId is required.'},400);return json({calendars:await calendars(accountId,state,env)});
+  }
+  if(p==='/api/google/tasklists'&&method==='GET'){
+    const accountId=url.searchParams.get('accountId');if(!accountId)return json({error:'accountId is required.'},400);return json({taskLists:await taskLists(accountId,state,env)});
+  }
+  if(p==='/api/google/tasks/sync'&&method==='POST')return json({ok:true,sync:await syncGoogleTasks(state,env)});
+  if(p==='/api/google/events'&&method==='GET')return json({events:await eventsBetween(url.searchParams.get('from'),url.searchParams.get('to'),state,env)});
+  const eventMatch=p.match(/^\/api\/google\/accounts\/([^/]+)\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
+  if(eventMatch){
+    const accountId=decodeURIComponent(eventMatch[1]),calendarId=decodeURIComponent(eventMatch[2]),eventId=eventMatch[3]?decodeURIComponent(eventMatch[3]):'';
+    if(method==='POST'&&!eventId)return json({ok:true,event:await mutateEvent(accountId,calendarId,'','POST',await body(request),state,env)},201);
+    if((method==='PATCH'||method==='PUT')&&eventId)return json({ok:true,event:await mutateEvent(accountId,calendarId,eventId,method,await body(request),state,env)});
+    if(method==='DELETE'&&eventId){await mutateEvent(accountId,calendarId,eventId,'DELETE',null,state,env);return json({ok:true})}
+    return json({error:'Unsupported event operation.'},405);
+  }
 
   if(p==='/api/agent/test'&&method==='POST')return json({ok:Boolean(env.OPENAI_API_KEY),models:env.OPENAI_API_KEY?[env.OPENAI_MODEL||'gpt-5.6-luna']:[],error:env.OPENAI_API_KEY?null:'OPENAI_API_KEY is not configured as a Worker secret.'},env.OPENAI_API_KEY?200:400);
   if(p==='/api/agent/chat'&&method==='POST')return json({error:'Navi cloud chat will be enabled after the standalone D1 cutover.'},501);
