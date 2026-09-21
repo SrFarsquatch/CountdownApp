@@ -19,6 +19,13 @@
 .weather-search{display:grid;gap:8px}.weather-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}.weather-search-results{display:grid;gap:5px;max-height:200px;overflow:auto}
 .weather-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.weather-result:hover{border-color:var(--text)}
 .weather-selected{padding:8px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font-size:12px}
+.market-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
+.market-card{border:1px solid var(--line);background:var(--panel2);border-radius:13px;padding:12px;min-width:0}
+.market-symbol{font-size:12px;font-weight:900;letter-spacing:.04em}.market-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.market-price{font-size:23px;font-weight:880;letter-spacing:-.04em;margin-top:9px}.market-change{font-size:11px;font-weight:850;margin-top:3px}.market-change.up{color:#238636}.market-change.down{color:#c62828}
+.market-meta{font-size:10px;color:var(--muted);margin-top:7px}.market-watchlist{display:grid;gap:7px}.market-watch-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--panel2)}
+.market-search-results{display:grid;gap:6px;max-height:240px;overflow:auto}.market-search-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.market-search-result:hover{border-color:var(--text)}
+@media(max-width:900px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.market-grid{grid-template-columns:1fr}}
 .list{display:grid;gap:8px}.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}.item:first-child{border-top:0}.check{width:20px;height:20px;border-radius:7px;border:1.5px solid var(--line);background:transparent;display:grid;place-items:center}.check.done{background:var(--text);border-color:var(--text);color:var(--panel)}.title{font-weight:760}.meta{color:var(--muted);font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:var(--panel2);border:1px solid var(--line)}.pill.high,.pill.urgent{color:var(--danger)}.pill.medium{color:var(--orange)}.pill.low{color:var(--green)}.progress{height:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--accent)}.count-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.count-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel2)}.count-card strong{display:block;font-size:28px;letter-spacing:-.05em;margin:6px 0}.count-card strong.dense{font-size:20px;letter-spacing:-.025em;line-height:1.25}.count-options{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px}.count-options label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:750;color:var(--muted)}.count-options input{width:16px;height:16px;min-height:0;padding:0}.count-card small{color:var(--muted)}.calendar-shell{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px}.mini{padding:15px}.mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;text-align:center}.mini-grid span{padding:6px 2px;border-radius:7px}.mini-grid .today{background:var(--text);color:var(--panel)}.week{overflow:auto;padding:0}.week-head{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));border-bottom:1px solid var(--line)}.week-head div{padding:12px;border-left:1px solid var(--line);font-weight:760}.week-body{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));min-height:620px;background:linear-gradient(to bottom,transparent 49px,var(--line) 50px,transparent 51px);background-size:100% 50px}.time-col{border-right:1px solid var(--line)}.time-col div{height:50px;padding:2px 8px;color:var(--muted);font-size:11px}.day-col{position:relative;border-right:1px solid var(--line);min-height:620px;padding:6px}.event-block{position:relative;margin:4px 0;padding:8px 9px;border-radius:10px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));font-size:12px}.event-block b{display:block}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}.seg button{border:0;background:transparent;border-radius:7px;padding:7px 10px;font-weight:750;color:var(--muted)}.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;font-weight:800;color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 11px;outline:none}textarea{min-height:90px;resize:vertical}.field.full{grid-column:1/-1}.modal-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(5px);z-index:100;padding:22px;align-items:center;justify-content:center}.modal-wrap.open{display:flex}.modal{width:min(640px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.25)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 18px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0}.modal-body{padding:18px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.empty{padding:28px;text-align:center;color:var(--muted)}.goal-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.goal-card h3{margin:4px 0 10px}.goal-number{font-size:28px;font-weight:850;letter-spacing:-.04em}.goal-actions,.row-actions{display:flex;gap:8px;margin-top:12px}.tiny{padding:6px 9px;font-size:12px}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.setting-card h3{margin:4px 0 12px}.account-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px;background:var(--panel2)}.account-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.account-title{font-weight:820;overflow-wrap:anywhere}.calendar-list{display:grid;gap:8px;margin-top:10px}.calendar-list label{display:flex;align-items:center;gap:8px}.calendar-list input{width:16px;height:16px;min-height:0;padding:0}.setting-row{display:grid;grid-template-columns:1fr minmax(150px,240px);gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.setting-row:first-of-type{border-top:0}.preview{padding:12px;background:#d7d6d1;border-radius:14px}.preview img{width:100%;display:block;background:white;border:1px solid #aaa;border-radius:8px}.quick{position:fixed;right:24px;bottom:24px;width:54px;height:54px;border:0;border-radius:18px;background:var(--text);color:var(--panel);font-size:26px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:40}.mobile-nav{display:none}
 .calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.calendar-nav{display:flex;align-items:center;gap:7px}.calendar-title{min-width:170px;text-align:center;font-weight:820}.calendar-stage{overflow:auto;padding:0}.day-view{min-width:560px}.day-row{display:grid;grid-template-columns:80px 1fr;min-height:54px;border-top:1px solid var(--line)}.day-row:first-child{border-top:0}.day-time{padding:10px;color:var(--muted);font-size:12px;border-right:1px solid var(--line)}.day-events{padding:6px 8px}.month-head,.month-grid{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));min-width:770px}.month-head div{padding:10px 8px;text-align:center;font-size:11px;font-weight:800;color:var(--muted);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.month-cell{min-height:118px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}.month-cell.muted-day{opacity:.42}.month-cell.today-cell{box-shadow:inset 0 0 0 2px var(--text)}.month-date{font-size:12px;font-weight:800;margin-bottom:6px}.month-chip{display:block;padding:4px 6px;border-radius:7px;margin:3px 0;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 24%,var(--line));font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.month-chip.task{background:var(--panel2)}.connection-box{margin-top:14px}.connection-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.connection-row:first-child{border-top:0}.connection-url{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px;overflow-wrap:anywhere}.notice{padding:11px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--muted);font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:1050px){.span-8,.span-4,.span-6,.span-12{grid-column:span 12}.calendar-shell{grid-template-columns:1fr}.mini{display:none}.goal-grid{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}.weather-main{grid-template-columns:1fr}.forecast-strip{grid-template-columns:repeat(4,minmax(72px,1fr))}}
@@ -203,6 +210,7 @@
     <button data-view="planner">Planner</button>
     <button data-view="tasks">Tasks</button>
     <button data-view="goals">Goals</button>
+    <button data-view="markets">Markets</button>
     <button data-view="countdowns">Countdowns</button>
     <div class="sep"></div>
     <button data-view="displays">Displays</button>
@@ -227,6 +235,7 @@
     <div class="card span-6"><div class="section-title"><h3>Tasks</h3><button class="btn tiny ghost" data-jump="tasks">View all</button></div><div id="todayTasks" class="list"></div></div>
     <div class="card span-6"><div class="section-title"><h3>Goals</h3><button class="btn tiny ghost" data-jump="goals">View all</button></div><div id="todayGoals" class="list"></div></div>
     <div class="card span-12 weather-card"><div class="section-title"><h3>Weather</h3><span class="meta" id="weatherAttribution">Open-Meteo</span></div><div id="todayWeather"></div></div>
+    <div class="card span-12"><div class="section-title"><h3>Markets</h3><button class="btn tiny ghost" data-jump="markets">Open markets</button></div><div id="todayMarkets" class="market-grid"></div></div>
   </div>
 </section>
 
@@ -250,6 +259,16 @@
 <section class="view" id="view-goals">
   <div class="hero"><div><h2>Goals</h2><p>Track measurable outcomes and deadlines.</p></div><button class="btn primary" data-create="goal">New goal</button></div>
   <div id="goalGrid" class="goal-grid"></div>
+</section>
+
+<section class="view" id="view-markets">
+  <div class="hero"><div><h2>Markets</h2><p>Automatic market prices from Twelve Data. No manual price tracking.</p></div><span class="pill" id="marketProviderStatus">Twelve Data</span></div>
+  <div id="marketStatus" class="notice" style="display:none"></div>
+  <div id="marketGrid" class="market-grid"></div>
+  <div class="settings-grid" style="margin-top:14px">
+    <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Planner to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
+    <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Twelve Data</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
+  </div>
 </section>
 
 <section class="view" id="view-countdowns">
@@ -306,6 +325,7 @@
   <div class="settings-grid">
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Planner.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" style="margin-top:8px">Provider: Open-Meteo · no API key required.</div></div>
+    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Twelve Data</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option></select></div><div class="modal-actions"><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="meta" style="margin-top:8px">API key stays server-side in <code>TWELVE_DATA_API_KEY</code>.</div></div>
     <div class="card setting-card update-card">
       <div class="update-head">
         <div><div class="eyebrow">Maintenance</div><h3 style="margin-bottom:2px">Application updates</h3></div>
@@ -333,7 +353,7 @@
 </div>
 
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
-<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
+<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="markets">Markets</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -341,7 +361,7 @@
 </div></div>
 
 <script>
-let state=null,calEvents=[],weatherData=null,weatherError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false;
+let state=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const fmtDate=(v,o={})=>new Date(v).toLocaleDateString([],{month:'short',day:'numeric',...o});
@@ -374,7 +394,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
+function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
@@ -610,6 +630,16 @@ function renderWeather(){
  }).join('');
  root.innerHTML='<div class="weather-main"><div class="weather-now"><div class="weather-glyph">'+weatherGlyph(current.condition)+'</div><div><div class="weather-temp">'+esc((current.temperature??'—')+unit)+'</div><div class="weather-desc">'+esc(current.description||'Weather')+'</div><div class="weather-location">'+esc(w.locationLabel||'Selected location')+'</div><div class="weather-metrics"><span>Feels '+esc((current.feelsLike??'—')+unit)+'</span><span>'+Math.round(current.humidity||0)+'% humidity</span><span>'+esc(Math.round(current.windSpeed||0)+(w.units==='imperial'?' mph':' km/h'))+'</span></div></div></div><div class="forecast-strip">'+forecast+'</div></div>';
 }
+function marketMoney(value,currency=''){const n=Number(value);if(!Number.isFinite(n))return '—';return (currency?currency+' ':'')+n.toLocaleString([],{minimumFractionDigits:2,maximumFractionDigits:2})}
+function marketCard(q){
+ const pct=Number(q.percentChange),up=Number.isFinite(pct)&&pct>0,down=Number.isFinite(pct)&&pct<0,cls=up?'up':down?'down':'',arrow=up?'▲':down?'▼':'•';
+ return '<div class="market-card"><div class="market-symbol">'+esc(q.symbol||'')+'</div><div class="market-name">'+esc(q.name||q.exchange||'')+'</div><div class="market-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-change '+cls+'">'+arrow+' '+esc(Number.isFinite(pct)?Math.abs(pct).toFixed(2)+'%':'—')+'</div><div class="market-meta">'+esc(q.exchange||'')+(q.datetime?' · '+esc(q.datetime):'')+'</div></div>'
+}
+function renderMarketSummary(rootId){
+ const root=$(rootId);if(!root)return;
+ if(!marketData){root.innerHTML='<div class="empty" style="grid-column:1/-1">'+esc(marketError||'Markets are not configured yet.')+'</div>';return}
+ root.innerHTML=(marketData.quotes||[]).length?(marketData.quotes||[]).map(marketCard).join(''):'<div class="empty" style="grid-column:1/-1">No quotes available.</div>';
+}
 function renderToday(){
  const now=new Date(),hour=now.getHours();$('greeting').textContent=(hour<12?'Good morning':hour<18?'Good afternoon':'Good evening');
  $('todayDate').textContent=now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
@@ -622,7 +652,7 @@ function renderToday(){
  const tasks=open.slice(0,6);$('todayTasks').innerHTML=tasks.length?tasks.map(taskRow).join(''):'<div class="empty">No open tasks.</div>';bindTaskChecks($('todayTasks'));
  const goals=state.goals.filter(g=>g.status==='active').slice(0,4);$('todayGoals').innerHTML=goals.length?goals.map(g=>`<div class="item"><div></div><div><div class="title">${esc(g.title)}</div><div class="progress" style="margin-top:7px"><i style="width:${Math.round(g.progress||0)}%"></i></div></div><strong>${Math.round(g.progress||0)}%</strong></div>`).join(''):'<div class="empty">No active goals.</div>';
  const cds=state.countdowns.filter(c=>new Date(c.end)>now).slice(0,4);$('todayCountdowns').innerHTML=cds.length?cds.map(c=>countCard(c)).join(''):'<div class="empty">No upcoming countdowns.</div>';
- renderWeather();
+ renderWeather();renderMarketSummary('todayMarkets');
 }
 function taskRow(t){const source=t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'';return `<div class="item" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>`}
 function bindTaskChecks(root){root.querySelectorAll('[data-check]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===b.dataset.check);await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PUT',body:JSON.stringify({status:t.status==='done'?'todo':'done'})});await loadAll()});root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>taskModal(state.tasks.find(x=>x.id===r.dataset.task)))}
@@ -816,17 +846,18 @@ $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()-1);else if(plannerView==='week')x.setDate(x.getDate()-7);else x.setMonth(x.getMonth()-1);plannerAnchor=x;renderPlanner()};
 $('plannerNext').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()+1);else if(plannerView==='week')x.setDate(x.getDate()+7);else x.setMonth(x.getMonth()+1);plannerAnchor=x;renderPlanner()};
 
-const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns'};
+const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
 const DISPLAY_SECTION_STYLES={
  agenda:[['list','List'],['timeline','Timeline'],['week','Week rows'],['calendar','Calendar grid']],
  weather:[['compact','Compact'],['current','Current conditions'],['forecast','Forecast strip']],
  tasks:[['checklist','Checklist'],['compact','Compact list']],
  goals:[['bars','Progress bars'],['compact','Compact']],
- countdowns:[['detailed','Detailed'],['compact','Compact']]
+ countdowns:[['detailed','Detailed'],['compact','Compact']],
+ markets:[['summary','Summary'],['compact','Compact'],['ticker','Ticker + name']]
 };
 const DISPLAY_MODES=['dashboard','daily','weekly','monthly','countdowns'];
 function cloneDisplayLayout(layout){
- const fallback={agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:12,y:8,w:12,h:8}};
+ const fallback={agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
@@ -837,7 +868,7 @@ function cloneModeLayouts(source={}){
 function cloneModeSections(source={}){
  const defaults={
   agenda:{enabled:true,style:'list',scope:'upcoming',limit:12},weather:{enabled:true,style:'forecast',limit:5},
-  tasks:{enabled:true,style:'checklist',limit:4},goals:{enabled:true,style:'bars',limit:2},countdowns:{enabled:true,style:'detailed',limit:3}
+  tasks:{enabled:true,style:'checklist',limit:4},goals:{enabled:true,style:'bars',limit:2},countdowns:{enabled:true,style:'detailed',limit:3},markets:{enabled:false,style:'summary',limit:4}
  };
  const out={};
  DISPLAY_MODES.forEach(mode=>{
@@ -866,15 +897,15 @@ function applyLayoutBlock(block,rect){
 function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480),portrait=h>w;
  if(mode==='daily'||mode==='weekly') return portrait
-   ?{agenda:{x:0,y:0,w:24,h:10},weather:{x:0,y:10,w:24,h:2},tasks:{x:0,y:12,w:8,h:4},goals:{x:8,y:12,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4}}
-   :{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4}};
+   ?{agenda:{x:0,y:0,w:24,h:10},weather:{x:0,y:10,w:24,h:2},tasks:{x:0,y:12,w:8,h:4},goals:{x:8,y:12,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}}
+   :{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
  if(mode==='monthly') return portrait
-   ?{agenda:{x:0,y:0,w:24,h:12},weather:{x:0,y:12,w:24,h:2},tasks:{x:0,y:14,w:8,h:2},goals:{x:8,y:14,w:8,h:2},countdowns:{x:16,y:14,w:8,h:2}}
-   :{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4}};
- if(mode==='countdowns') return{agenda:{x:0,y:0,w:12,h:6},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:6,w:12,h:6},countdowns:{x:0,y:0,w:24,h:16}};
+   ?{agenda:{x:0,y:0,w:24,h:12},weather:{x:0,y:12,w:24,h:2},tasks:{x:0,y:14,w:8,h:2},goals:{x:8,y:14,w:8,h:2},countdowns:{x:16,y:14,w:8,h:2},markets:{x:16,y:14,w:8,h:2}}
+   :{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4},markets:{x:18,y:12,w:6,h:4}};
+ if(mode==='countdowns') return{agenda:{x:0,y:0,w:12,h:6},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:6,w:12,h:6},countdowns:{x:0,y:0,w:24,h:16},markets:{x:12,y:8,w:12,h:8}};
  return portrait
-   ?{agenda:{x:0,y:0,w:24,h:6},weather:{x:0,y:6,w:24,h:2},tasks:{x:0,y:8,w:24,h:2},goals:{x:0,y:10,w:24,h:2},countdowns:{x:0,y:12,w:24,h:4}}
-   :{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:12,y:8,w:12,h:8}};
+   ?{agenda:{x:0,y:0,w:24,h:6},weather:{x:0,y:6,w:24,h:2},tasks:{x:0,y:8,w:24,h:2},goals:{x:0,y:10,w:8,h:6},countdowns:{x:8,y:10,w:8,h:6},markets:{x:16,y:10,w:8,h:6}}
+   :{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
 }
 function setLayoutStatus(message,error=false){const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':''}
 function renderWidgetSettings(kind=selectedDisplayWidget){
@@ -968,6 +999,37 @@ $('saveDisplay').onclick=async()=>{
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const el=$(b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent);const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200)}catch{prompt('Copy this URL:',el.textContent)}});
 $('rotateDisplayToken').onclick=async()=>{if(!confirm('Rotate the private display token? Existing FrameOS URLs will stop working.'))return;await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');renderDisplay()};
 
+async function saveMarketSymbols(symbols){
+ await api('/api/settings',{method:'PUT',body:JSON.stringify({marketSymbols:symbols})});
+ state=await api('/api/state');await loadMarkets();renderMarkets();renderToday();
+}
+async function searchMarkets(){
+ const q=$('marketSearchInput').value.trim(),root=$('marketSearchResults');if(!q){root.innerHTML='<div class="meta">Enter a ticker or company name.</div>';return}
+ root.innerHTML='<div class="meta">Searching…</div>';
+ try{
+  const results=(await api('/api/markets/search?q='+encodeURIComponent(q))).results||[];
+  root.innerHTML=results.length?results.map((r,i)=>'<button class="market-search-result" type="button" data-market-result="'+i+'"><strong>'+esc(r.symbol)+'</strong> · '+esc(r.name||r.type||'')+'<div class="meta">'+esc([r.exchange,r.country,r.currency,r.access].filter(Boolean).join(' · '))+'</div></button>').join(''):'<div class="meta">No matching symbols.</div>';
+  root.querySelectorAll('[data-market-result]').forEach(btn=>btn.onclick=async()=>{
+   const r=results[Number(btn.dataset.marketResult)],symbols=[...(state.markets?.symbols||[])];if(!r||symbols.includes(r.symbol))return;
+   if(symbols.length>=8){alert('The watchlist is capped at 8 symbols to protect the Twelve Data free-tier quota.');return}
+   await saveMarketSymbols([...symbols,r.symbol]);root.innerHTML='';$('marketSearchInput').value='';
+  });
+ }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
+}
+function renderMarkets(){
+ const configured=state.markets?.configured;
+ $('marketProviderStatus').textContent=configured?'Twelve Data connected':'Twelve Data not configured';
+ const status=$('marketStatus');status.style.display=marketError?'block':'none';status.textContent=marketError||'';
+ renderMarketSummary('marketGrid');
+ const symbols=state.markets?.symbols||[];
+ $('marketWatchlist').innerHTML=symbols.length?symbols.map(symbol=>'<div class="market-watch-row"><div><strong>'+esc(symbol)+'</strong><div class="meta">Updates automatically</div></div><button class="btn tiny ghost" data-remove-market="'+esc(symbol)+'">Remove</button></div>').join(''):'<div class="empty">No symbols selected.</div>';
+ $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketSymbols(symbols.filter(s=>s!==btn.dataset.removeMarket)));
+ $('marketSearchInput').disabled=!configured;$('marketSearchButton').disabled=!configured;
+ if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Add TWELVE_DATA_API_KEY in Settings/CasaOS first.</div>';
+}
+$('marketSearchButton').onclick=searchMarkets;
+$('marketSearchInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMarkets()}};
+
 async function searchSettingsWeather(){
  const q=$('settingsWeatherSearch').value.trim(),root=$('settingsWeatherResults');if(q.length<2){root.innerHTML='<div class="meta">Type at least 2 characters.</div>';return}
  root.innerHTML='<div class="meta">Searching…</div>';
@@ -994,8 +1056,18 @@ $('saveWeatherSettings').onclick=async()=>{
  await api('/api/settings',{method:'PUT',body:JSON.stringify({weatherLocationLabel:$('settingsWeatherLocationLabel').value.trim(),weatherLatitude:$('settingsWeatherLatitude').value,weatherLongitude:$('settingsWeatherLongitude').value,weatherUnits:$('settingsWeatherUnits').value})});
  state=await api('/api/state');await loadWeather();renderWeatherSettings();renderToday();
 };
+function renderMarketSettings(){
+ const mc=state.markets||{};
+ $('settingsMarketStatus').textContent=mc.configured?'Twelve Data is configured. Quotes are cached server-side to protect your API quota.':'Add TWELVE_DATA_API_KEY to the CasaOS app environment, then restart the container.';
+ $('settingsMarketRefresh').value=String(mc.refreshMinutes||30);
+ $('saveMarketSettings').disabled=!mc.configured;
+}
+$('saveMarketSettings').onclick=async()=>{
+ await api('/api/settings',{method:'PUT',body:JSON.stringify({marketRefreshMinutes:Number($('settingsMarketRefresh').value)})});
+ state=await api('/api/state');await loadMarkets();renderMarketSettings();renderMarkets();renderToday();
+};
 async function renderSettings(){
- renderWeatherSettings();
+ renderWeatherSettings();renderMarketSettings();
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
  let html='<div class="setting-row"><div><strong>Google accounts</strong><div class="meta">'+(state.google.configured?'Connect accounts, choose calendars, and choose which Google Task lists Planner should sync.':'Add Google OAuth environment variables in CasaOS first.')+'</div></div><button class="btn primary" id="addGoogleAccount" '+(state.google.configured?'':'disabled')+'>+ Add account</button></div>';
@@ -1187,6 +1259,10 @@ async function loadWeather(){
  try{const result=await api('/api/weather');weatherData=result.weather||null;weatherError=result.error||''}
  catch(error){weatherData=null;weatherError=error.message||'Weather is unavailable.'}
 }
+async function loadMarkets(){
+ try{const result=await api('/api/markets');marketData=result.markets||null;marketError=result.error||''}
+ catch(error){marketData=null;marketError=error.message||'Market data is unavailable.'}
+}
 async function loadAll(force=false){
  state=await api('/api/state');
  if(force){calendarCache={};taskListCache={}}
@@ -1195,10 +1271,10 @@ async function loadAll(force=false){
    await syncGoogleTasksClient();
    state=await api('/api/state');
  }
- await Promise.all([loadCalendarEvents(),loadWeather()]);
- renderToday();renderTasks();renderGoals();renderCountdowns();
+ await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets()]);
+ renderToday();renderTasks();renderGoals();renderCountdowns();renderMarkets();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
- if(current==='planner')renderPlanner();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
+ if(current==='planner')renderPlanner();if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
 }
 const initial=new URLSearchParams(location.search).get('view')||'today';loadAll().then(()=>{setView(initial);refreshUpdateStatus()});setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
