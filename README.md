@@ -3,14 +3,14 @@
 A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, goals, countdowns and a configurable e-ink dashboard.
 
 ## What it does\n\n- Use a responsive Today dashboard that combines tasks, calendar events, goals and countdowns.\n- Create prioritized tasks with due dates, projects/lists and goal links.\n- Create measurable or deadline-driven goals and track progress.\n- Use Day, Week and Month Planner views with Google-style positioned time blocks, all-day rows, overlapping-event columns, and each calendar's Google color.
-- Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, tasks, goals and/or countdowns.
+- Create, edit and delete Google Calendar events directly from Planner, including quick-creating events by tapping empty Day/Week time slots.\n- Keep the existing countdown system as a first-class planning module.\n- Configure the e-ink feed to show agenda, weather, tasks, goals, countdowns and/or markets.
 - Add current conditions and forecasts from Open-Meteo, with daily, weekly and monthly e-ink planner layouts.
 - Search for a weather location by city/town, save its coordinates automatically, and show the current conditions plus a 7-day forecast on the Today dashboard.
 - Manage weather location and units in Settings, then place Weather as a resizable e-ink dashboard widget with Compact, Current conditions, or Forecast strip styles.
 - Customize Dashboard, Daily, Weekly, Monthly, and Countdowns modes independently. Each mode stores its own widget positions/sizes and per-widget visibility, style, and item limit settings.
 - The e-ink editor now uses a 24 × 16 grid for finer placement/resizing, migrates existing 12 × 8 layouts automatically, and uses a compact live date/mode/time header so more of the screen is available for widgets.
 - Keep colour e-ink and monochrome output modes; weather and calendar accents are quantized to the supported e-ink palette.
-- Build custom e-ink layouts with a drag-and-resize section editor: move Agenda, Tasks, Goals and Countdowns on a resolution-independent 12 × 8 grid, resize each section, and control per-section item limits.\n- Install the web app as a standalone PWA.\n
+- Build custom e-ink layouts with a drag-and-resize section editor on a resolution-independent 24 × 16 grid, including Agenda, Weather, Tasks, Goals, Countdowns, and Markets widgets.\n- Install the web app as a standalone PWA.\n
 
 - Create and edit multiple countdowns with per-countdown accent colors.
 - Choose days-only, days + hours, days + hours + minutes, live seconds, weeks + days, or target-date countdown displays.
@@ -27,6 +27,18 @@ A self-hosted personal planner for CasaOS that combines Google Calendar, tasks, 
 - Provide a dedicated `/frame` preview that uses that same SVG renderer.
 - Render landscape or portrait layouts with split-flap/plain date headers and six-color or monochrome palettes.
 - Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
+
+
+## Twelve Data market setup
+
+Planner can show an automatic market watchlist on the Today dashboard, a dedicated Markets page, and a configurable e-ink Markets widget. Market prices are fetched server-side from Twelve Data and cached to reduce API usage.
+
+1. Create a Twelve Data account and copy the API key from the Twelve Data dashboard.
+2. Add this environment variable to the CasaOS app: `TWELVE_DATA_API_KEY`.
+3. Recreate/restart the container after adding the variable.
+4. Open **Markets** in Planner and search for the stocks, ETFs, or crypto pairs you want to follow.
+
+The API key is never sent to the browser. The watchlist is capped at eight symbols and the default cache interval is 30 minutes; you can change the cache interval in **Settings → Markets**.
 
 ## CasaOS deployment
 
