@@ -38,7 +38,7 @@ Planner can show an automatic market watchlist on the Today dashboard, a dedicat
 3. Recreate/restart the container after adding the variable.
 4. Open **Markets** in Planner and search for the stocks, ETFs, or crypto pairs you want to follow.
 
-The API key is never sent to the browser. The watchlist is capped at eight symbols and the default cache interval is 30 minutes; you can change the cache interval in **Settings → Markets**.
+The API key is never sent to the browser. The watchlist is capped at eight symbols and quotes are cached for at least 30 minutes to stay comfortably within Twelve Data's Basic-plan daily quota. Each watchlist entry keeps its selected exchange so similarly named symbols resolve correctly.
 
 ## CasaOS deployment
 

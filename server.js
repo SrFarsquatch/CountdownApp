@@ -228,7 +228,7 @@ function defaults() {
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
-    markets: { symbols: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
+    markets: { watchlist: ['SPY', 'QQQ', 'DIA', 'BTC/USD'], refreshMinutes: 30 },
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -324,19 +324,38 @@ function normalizeWeather(x = {}) {
   };
 }
 
-function normalizeMarkets(x = {}) {
-  const raw = Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'];
-  const seen = new Set();
-  const symbols = [];
-  for (const value of raw) {
-    const symbol = cleanText(value, 32).toUpperCase();
-    if (!symbol || seen.has(symbol)) continue;
-    seen.add(symbol); symbols.push(symbol);
-    if (symbols.length >= 8) break;
-  }
+function normalizeMarketInstrument(value = {}) {
+  const source = typeof value === 'string' ? { symbol: value } : (value && typeof value === 'object' ? value : {});
+  const symbol = cleanText(source.symbol, 32).toUpperCase();
   return {
-    symbols: symbols.length ? symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD'],
-    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 15, 180)
+    symbol,
+    name: cleanText(source.name || source.instrumentName, 120),
+    exchange: cleanText(source.exchange, 50).toUpperCase(),
+    micCode: cleanText(source.micCode || source.mic_code, 16).toUpperCase(),
+    type: cleanText(source.type || source.instrumentType, 60),
+    country: cleanText(source.country, 60),
+    currency: cleanText(source.currency, 12).toUpperCase(),
+    access: cleanText(source.access, 30)
+  };
+}
+function normalizeMarkets(x = {}) {
+  const raw = Array.isArray(x.watchlist) ? x.watchlist : (Array.isArray(x.symbols) ? x.symbols : ['SPY', 'QQQ', 'DIA', 'BTC/USD']);
+  const seen = new Set();
+  const watchlist = [];
+  for (const value of raw) {
+    const item = normalizeMarketInstrument(value);
+    if (!item.symbol) continue;
+    const key = item.symbol + '|' + item.exchange + '|' + item.micCode;
+    if (seen.has(key)) continue;
+    seen.add(key); watchlist.push(item);
+    if (watchlist.length >= 8) break;
+  }
+  const fallback = ['SPY', 'QQQ', 'DIA', 'BTC/USD'].map(symbol => normalizeMarketInstrument(symbol));
+  const normalized = watchlist.length ? watchlist : fallback;
+  return {
+    watchlist: normalized,
+    symbols: normalized.map(item => item.symbol),
+    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 30)), 30, 180)
   };
 }
 
@@ -1242,19 +1261,35 @@ function marketConfigured() { return Boolean(TWELVE_DATA_API_KEY); }
 function marketNumber(value) {
   const n = Number(value); return Number.isFinite(n) ? n : null;
 }
-function normalizeMarketQuote(raw = {}, fallbackSymbol = '') {
+function normalizeMarketQuote(raw = {}, fallback = {}) {
+  const requested = normalizeMarketInstrument(typeof fallback === 'string' ? { symbol: fallback } : fallback);
   const close = marketNumber(raw.close ?? raw.price);
   const change = marketNumber(raw.change);
   const percentChange = marketNumber(raw.percent_change);
   return {
-    symbol: cleanText(raw.symbol || fallbackSymbol, 32).toUpperCase(),
-    name: cleanText(raw.name || raw.instrument_name || '', 120),
-    exchange: cleanText(raw.exchange || '', 50),
-    currency: cleanText(raw.currency || '', 12),
+    symbol: cleanText(raw.symbol || requested.symbol, 32).toUpperCase(),
+    name: cleanText(raw.name || raw.instrument_name || requested.name, 120),
+    exchange: cleanText(raw.exchange || requested.exchange, 50).toUpperCase(),
+    micCode: cleanText(raw.mic_code || requested.micCode, 16).toUpperCase(),
+    currency: cleanText(raw.currency || requested.currency, 12).toUpperCase(),
+    type: cleanText(raw.type || requested.type, 60),
+    country: cleanText(requested.country, 60),
+    access: cleanText(requested.access, 30),
     datetime: cleanText(raw.datetime || '', 50),
     close, open: marketNumber(raw.open), high: marketNumber(raw.high), low: marketNumber(raw.low),
     previousClose: marketNumber(raw.previous_close), change, percentChange,
-    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open)
+    volume: marketNumber(raw.volume), marketOpen: raw.is_market_open === undefined ? null : Boolean(raw.is_market_open),
+    available: close !== null,
+    error: ''
+  };
+}
+function unavailableMarketQuote(item, message = 'No quote returned for this watchlist symbol.') {
+  const requested = normalizeMarketInstrument(item);
+  return {
+    ...requested,
+    close: null, open: null, high: null, low: null, previousClose: null,
+    change: null, percentChange: null, volume: null, marketOpen: null,
+    datetime: '', available: false, error: cleanText(message, 220)
   };
 }
 async function twelveDataFetch(pathname, params = {}) {
@@ -1267,26 +1302,59 @@ async function twelveDataFetch(pathname, params = {}) {
   if (!response.ok || raw.status === 'error' || raw.code >= 400) throw new Error(cleanText(raw.message || 'Twelve Data request failed (' + response.status + ').', 220));
   return { raw, headers: response.headers };
 }
-async function marketData() {
-  const config = normalizeMarkets(db.markets);
-  const key = config.symbols.join(',');
-  if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
-  const { raw, headers } = await twelveDataFetch('/quote', { symbol: key });
-  let quotes = [];
-  if (raw && typeof raw === 'object' && raw.symbol) quotes = [normalizeMarketQuote(raw, config.symbols[0])];
-  else if (raw && typeof raw === 'object') {
-    quotes = config.symbols.map(symbol => {
-      const item = raw[symbol] || raw[symbol.toUpperCase()] || raw[symbol.replace('/', '')];
-      return item && item.status !== 'error' ? normalizeMarketQuote(item, symbol) : null;
-    }).filter(Boolean);
+async function resolveMarketInstrument(item) {
+  const normalized = normalizeMarketInstrument(item);
+  if (normalized.exchange || normalized.symbol.includes('/')) return normalized;
+  try {
+    const results = await marketSearch(normalized.symbol);
+    const exact = results.find(result => result.symbol === normalized.symbol) || results[0];
+    return exact ? normalizeMarketInstrument(exact) : normalized;
+  } catch {
+    return normalized;
   }
+}
+
+async function marketData() {
+  let config = normalizeMarkets(db.markets);
+  let enriched = false;
+  const resolved = [];
+  for (const item of config.watchlist) {
+    const next = await resolveMarketInstrument(item);
+    resolved.push(next);
+    if ((!item.exchange && next.exchange) || (!item.name && next.name) || (!item.currency && next.currency)) enriched = true;
+  }
+  if (enriched) {
+    db.markets = normalizeMarkets({ ...db.markets, watchlist: resolved });
+    save(db);
+    config = normalizeMarkets(db.markets);
+  }
+
+  const key = config.watchlist.map(item => [item.symbol,item.exchange,item.micCode].join('|')).join(',');
+  if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
+
+  const results = await Promise.all(config.watchlist.map(async item => {
+    try {
+      const params = { symbol: item.symbol };
+      if (item.exchange) params.exchange = item.exchange;
+      if (item.micCode) params.mic_code = item.micCode;
+      const { raw, headers } = await twelveDataFetch('/quote', params);
+      if (raw.status === 'error' || raw.code >= 400) return { quote: unavailableMarketQuote(item, raw.message), headers };
+      return { quote: normalizeMarketQuote(raw, item), headers };
+    } catch (error) {
+      return { quote: unavailableMarketQuote(item, error.message || 'Quote unavailable.'), headers: null };
+    }
+  }));
+
+  const quotes = results.map(result => result.quote);
+  const creditValues = results.map(result => Number(result.headers?.get('api-credits-used') || result.headers?.get('api-credits-request') || 0)).filter(Number.isFinite);
   const data = {
     provider: 'Twelve Data',
     quotes,
+    watchlist: config.watchlist,
     symbols: config.symbols,
     updatedAt: new Date().toISOString(),
-    creditsUsed: headers.get('api-credits-used') || '',
-    creditsLeft: headers.get('api-credits-left') || ''
+    creditsUsed: creditValues.length ? String(creditValues.reduce((sum, value) => sum + value, 0)) : '',
+    creditsLeft: results.map(result => result.headers?.get('api-credits-left')).find(Boolean) || ''
   };
   marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
   return data;
@@ -1298,10 +1366,11 @@ async function marketSearch(query) {
   return (raw.data || []).map(item => ({
     symbol: cleanText(item.symbol, 32).toUpperCase(),
     name: cleanText(item.instrument_name, 120),
-    exchange: cleanText(item.exchange, 50),
+    exchange: cleanText(item.exchange, 50).toUpperCase(),
+    micCode: cleanText(item.mic_code, 16).toUpperCase(),
     type: cleanText(item.instrument_type, 60),
     country: cleanText(item.country, 60),
-    currency: cleanText(item.currency, 12),
+    currency: cleanText(item.currency, 12).toUpperCase(),
     access: cleanText(item.access?.plan || item.access?.global || '', 30)
   })).filter(item => item.symbol);
 }
@@ -1861,14 +1930,15 @@ function renderSvg(data, w, h) {
         const rowH = compact ? 22 : 31;
         if (cursor + rowH > y + maxHeight) break;
         const pct = Number(quote.percentChange);
-        const change = Number.isFinite(pct) ? pct : 0;
+        const available = quote.available !== false && quote.close != null;
+        const change = available && Number.isFinite(pct) ? pct : null;
         const accent = palette === 'mono' ? black : (change > 0 ? HEX.green : change < 0 ? HEX.red : black);
         const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '•';
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
         svg += '<text x="' + x + '" y="' + (cursor + (compact?15:18)) + '" font-size="' + (compact?10.5:12.5) + '" font-weight="800">' + esc(quote.symbol) + '</text>';
         if (style === 'ticker' && quote.name) svg += '<text x="' + (x+58) + '" y="' + (cursor+18) + '" font-size="9" class="muted">' + esc(truncateForWidth(quote.name,Math.max(50,width-150),9)) + '</text>';
-        svg += '<text x="' + (x + width - 58) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?10.5:12) + '" font-weight="700">' + esc(quote.close==null?'—':Number(quote.close).toFixed(2)) + '</text>';
-        svg += '<text x="' + (x + width) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?9.5:11) + '" font-weight="800" fill="' + accent + '">' + arrow + ' ' + esc((Math.abs(change)).toFixed(2)) + '%</text>';
+        svg += '<text x="' + (x + width - 58) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?10.5:12) + '" font-weight="700">' + esc(available?Number(quote.close).toFixed(2):'N/A') + '</text>';
+        svg += '<text x="' + (x + width) + '" y="' + (cursor + (compact?15:18)) + '" text-anchor="end" font-size="' + (compact?9.5:11) + '" font-weight="800" fill="' + accent + '">' + (available ? arrow + ' ' + esc(Math.abs(change||0).toFixed(2)) + '%' : 'Unavailable') + '</text>';
         cursor += rowH;
       }
     }
@@ -2287,10 +2357,10 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
       if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
-      if (incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
+      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
         db.markets = normalizeMarkets({
           ...db.markets,
-          symbols: incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.symbols,
+          watchlist: incoming.marketWatchlist !== undefined ? incoming.marketWatchlist : (incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.watchlist),
           refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : db.markets.refreshMinutes
         });
         marketCache = { key: '', expiresAt: 0, data: null };
