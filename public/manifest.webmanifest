@@ -5,6 +5,19 @@
   "start_url": "/?view=today",
   "display": "standalone",
   "background_color": "#f3f2ef",
-  "theme_color": "#f5f4f1",
-  "icons": []
+  "theme_color": "#5f5a52",
+  "icons": [
+    {
+      "src": "/branding/icon-quest.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/branding/icon-quest.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
 }
