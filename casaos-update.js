@@ -115,12 +115,19 @@ async function applyThroughCasaOS() {
 
   if (!composeYAML.trim()) throw new Error('CasaOS returned an empty compose configuration.');
 
+  // Preserve the existing CasaOS-managed compose and only migrate old product-facing labels.
+  const brandedComposeYAML = composeYAML
+    .replace(/custom:\s*Planner\b/g, 'custom: Quest Log')
+    .replace(/en_US:\s*Countdown\b/g, 'en_US: Quest Log')
+    .replace(/Persistent CountdownApp data/g, 'Persistent Quest Log data')
+    .replace(/Planner web interface and FrameOS API/g, 'Quest Log web interface and FrameOS API');
+
   await casaOSRequest(
     'PUT',
     appPath + '?dry_run=false&check_port_conflict=false',
     {
       headers: { 'Content-Type': 'application/yaml' },
-      body: composeYAML
+      body: brandedComposeYAML
     }
   );
 
