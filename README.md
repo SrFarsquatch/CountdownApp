@@ -29,6 +29,40 @@ Quest Log is a self-hosted personal planning app for CasaOS that combines Google
 - Run on amd64 or arm64 from the existing GHCR/CasaOS deployment flow.
 
 
+## AI agent integration
+
+Quest Log can connect to **Hermes Agent**, **OpenClaw**, or another service that exposes an OpenAI-compatible API. The connection is server-to-server: the browser talks only to Quest Log, and Quest Log forwards chat requests to the configured agent endpoint.
+
+The agent receives a bounded snapshot of open planner data such as tasks, goals, countdowns, upcoming selected-calendar events, and writable calendar identifiers. When it suggests a planner change, Quest Log presents that change for approval before executing it. The initial tool set can create or update tasks, goals, countdowns, and Google Calendar events. Delete operations are intentionally not exposed to the agent.
+
+### Local Hermes Agent
+
+Run Hermes Agent's API server on a machine reachable from the Quest Log container, then open **Settings → AI connection** and use values similar to:
+
+- Provider: **Hermes Agent**
+- API base URL: `http://<agent-ip>:8642/v1`
+- Model: `hermes-agent`
+- Bearer token/API key: the Hermes API server key, if one is configured
+
+Do not use `127.0.0.1` or `localhost` when Hermes is running on a different machine from the Quest Log container. Use the agent machine's LAN address or another hostname that the container can resolve.
+
+### Local OpenClaw
+
+Enable OpenClaw's OpenAI-compatible Chat Completions endpoint in the Gateway, then use values similar to:
+
+- Provider: **OpenClaw**
+- API base URL: `http://<agent-ip>:18789/v1`
+- Model: `openclaw/default`
+- Bearer token/API key: the OpenClaw Gateway token
+
+Treat the OpenClaw Gateway token as a high-trust credential. Quest Log stores the configured token encrypted with `APP_SECRET` and never includes it in `/api/state` or sends it to the browser.
+
+### Cloud / custom provider
+
+Choose **OpenAI-compatible**, enter the provider's `/v1` base URL, model name, and API key. The same connector is used for local and cloud endpoints, so switching providers does not change the planner action layer.
+
+The **Test connection** button checks the configured endpoint's `/v1/models` route. The agent endpoint must be reachable from the Quest Log server/container, not merely from the browser you are using.
+
 ## Hybrid weather
 
 Quest Log uses a hybrid weather pipeline. **Open-Meteo** remains the global forecast source and fallback. For Canadian locations, Quest Log also queries Environment and Climate Change Canada's experimental **City Page Weather** GeoMet collection and uses the nearest official city page when it is close enough to the selected location.
