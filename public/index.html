@@ -443,7 +443,7 @@
       <p class="meta">Connect Quest Log to Hermes Agent, OpenClaw, or another OpenAI-compatible endpoint. Local and cloud endpoints use the same connector.</p>
       <label class="setting-row"><span>Enabled</span><input id="agentEnabled" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Provider</span><select id="agentProvider"><option value="hermes">Hermes Agent</option><option value="openclaw">OpenClaw</option><option value="openai-compatible">OpenAI-compatible</option></select></div>
-      <div class="field"><label>API base URL</label><input id="agentBaseUrl" placeholder="http://192.168.1.50:8642/v1"></div>
+      <div class="field"><label>API base URL</label><input id="agentBaseUrl" placeholder="http://192.168.1.50:8642/v1"><div class="meta" id="agentEndpointHint">Use an address reachable from the Quest Log server/container. For an agent on another LAN machine, use that machine's LAN IP.</div></div>
       <div class="field"><label>Model / agent</label><input id="agentModel" placeholder="hermes-agent"></div>
       <div class="field"><label>Bearer token / API key</label><input id="agentApiKey" type="password" autocomplete="new-password" placeholder="Leave blank to keep the saved key"></div>
       <label class="setting-row"><span>Planner context</span><select id="agentContextDays"><option value="7">7 days</option><option value="14">14 days</option><option value="21">21 days</option><option value="30">30 days</option></select></label>
@@ -1488,8 +1488,22 @@ async function applyAgentActions(index){
  try{const result=await api('/api/agent/actions',{method:'POST',body:JSON.stringify({actions:message.actions})});message.applied=true;const results=result.results||[],ok=results.filter(r=>r.ok),failed=results.filter(r=>!r.ok);message.content+=(ok.length?'\n\nApplied: '+ok.map(r=>r.label).join('; '):'')+(failed.length?'\n\nCould not apply: '+failed.map(r=>r.label).join('; '):'');saveAgentHistory();await loadAll(true);renderAgent()}
  catch(error){alert(error.message||'Could not apply agent changes.');renderAgent()}
 }
-function renderAgentSettings(){const cfg=state?.agent||{};$('agentEnabled').checked=Boolean(cfg.enabled);$('agentProvider').value=cfg.provider||'hermes';$('agentBaseUrl').value=cfg.baseUrl||'';$('agentModel').value=cfg.model||'';$('agentContextDays').value=String(cfg.contextDays||14);$('agentApiKey').value='';$('agentKeyStatus').textContent=cfg.hasApiKey?'A bearer token/API key is saved securely on the server.':(cfg.canStoreApiKey?'No API key saved. Local endpoints can still work if they do not require one.':'Set APP_SECRET before saving an API key.')}
-function applyAgentProviderDefaults(force=false){const provider=$('agentProvider').value,url=$('agentBaseUrl'),model=$('agentModel'),currentUrl=url.value.trim(),currentModel=model.value.trim();if(provider==='hermes'){if(force||!currentUrl)url.value='http://127.0.0.1:8642/v1';if(force||!currentModel||currentModel==='openclaw/default')model.value='hermes-agent'}else if(provider==='openclaw'){if(force||!currentUrl||currentUrl.includes(':8642'))url.value='http://127.0.0.1:18789/v1';if(force||!currentModel||currentModel==='hermes-agent')model.value='openclaw/default'}}
+function renderAgentSettings(){const cfg=state?.agent||{};$('agentEnabled').checked=Boolean(cfg.enabled);$('agentProvider').value=cfg.provider||'hermes';$('agentBaseUrl').value=cfg.baseUrl||'';$('agentModel').value=cfg.model||'';$('agentContextDays').value=String(cfg.contextDays||14);$('agentApiKey').value='';$('agentKeyStatus').textContent=cfg.hasApiKey?'A bearer token/API key is saved securely on the server.':(cfg.canStoreApiKey?'No API key saved. Local endpoints can still work if they do not require one.':'Set APP_SECRET before saving an API key.');applyAgentProviderDefaults(false)}
+function applyAgentProviderDefaults(force=false){
+ const provider=$('agentProvider').value,url=$('agentBaseUrl'),model=$('agentModel'),hint=$('agentEndpointHint'),currentModel=model.value.trim();
+ if(provider==='hermes'){
+   url.placeholder='http://<agent-ip>:8642/v1';
+   if(hint)hint.textContent='Hermes example: http://<agent-ip>:8642/v1. Use an address reachable from the Quest Log server/container, not localhost unless the agent is inside this same container.';
+   if(force||!currentModel||currentModel==='openclaw/default')model.value='hermes-agent';
+ }else if(provider==='openclaw'){
+   url.placeholder='http://<agent-ip>:18789/v1';
+   if(hint)hint.textContent='OpenClaw example: http://<agent-ip>:18789/v1. Enable its OpenAI-compatible chat endpoint first, then use an address reachable from Quest Log.';
+   if(force||!currentModel||currentModel==='hermes-agent')model.value='openclaw/default';
+ }else{
+   url.placeholder='https://api.example.com/v1';
+   if(hint)hint.textContent='Enter the provider\'s OpenAI-compatible /v1 base URL. Credentials stay server-side in Quest Log.';
+ }
+}
 $('agentProvider').onchange=()=>applyAgentProviderDefaults(true);
 $('saveAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Saving…';try{const payload={agentEnabled:$('agentEnabled').checked,agentProvider:$('agentProvider').value,agentBaseUrl:$('agentBaseUrl').value.trim(),agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Agent settings saved.'}catch(error){status.textContent=error.message}};
 $('testAgent').onclick=async()=>{const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Testing saved connection…';try{const result=await api('/api/agent/test',{method:'POST'});const models=result.models||[];status.textContent='Connection successful'+(models.length?' · '+models.slice(0,5).join(', '):'.')}catch(error){status.textContent=error.message}};
