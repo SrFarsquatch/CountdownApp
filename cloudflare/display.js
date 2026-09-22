@@ -162,7 +162,9 @@ export function renderDisplaySvg(data,width=800,height=480){
       if(cfg.style==='week'){
         const monday=startOfDay(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const rowH=Math.max(22,Math.min(40,(bh-25)/7));
         for(let i=0;i<7&&cy+rowH<=y+bh;i++){
-          const day=new Date(monday);day.setDate(day.getDate()+i),entries=eventsForDay(data,day).map(event=>({kind:'event',event})).slice(0,2);
+          const day=new Date(monday);
+          day.setDate(day.getDate()+i);
+          const entries=eventsForDay(data,day).map(event=>({kind:'event',event})).slice(0,2);
           svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/><text x="'+x+'" y="'+(cy+15)+'" font-size="9" font-weight="800">'+esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()+' '+day.getDate())+'</text>';
           let tx=x+58;for(const e of entries){svg+='<circle cx="'+tx+'" cy="'+(cy+11)+'" r="3" fill="'+eventAccent(e.event,palette)+'"/><text x="'+(tx+7)+'" y="'+(cy+15)+'" font-size="9.5">'+esc(short(e.event.title,Math.max(10,Math.floor((bw-(tx-x))/7))))+'</text>';tx+=Math.max(90,bw*.42)}cy+=rowH;
         }
