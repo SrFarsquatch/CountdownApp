@@ -239,7 +239,7 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
 | `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
 | `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
-| `TICKERBOT_API_KEY` | Optional fallback | Shared Tickerbot API key; normally saved in-app and encrypted with `APP_SECRET` |
+| `TICKERBOT_API_KEY` | For Markets | Shared Tickerbot API key supplied as an environment/Worker secret |
 | `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
 | `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
 | `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
