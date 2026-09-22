@@ -144,10 +144,13 @@ export function normalizeGoogleAccount(x={}){
   const selectedTaskListIds=Array.isArray(x.selectedTaskListIds)?x.selectedTaskListIds.map(String).slice(0,50):[];
   return{id:String(x.id||id()),googleId:cleanText(x.googleId,240),label:cleanText(x.label||x.googleId||'Google account',160),token:typeof x.token==='string'?x.token:null,selectedCalendarIds:Array.isArray(x.selectedCalendarIds)?x.selectedCalendarIds.map(String).slice(0,50):[],selectedTaskListIds,defaultTaskListId:selectedTaskListIds.includes(String(x.defaultTaskListId||''))?String(x.defaultTaskListId):selectedTaskListIds[0]||'',connectedAt:iso(x.connectedAt)||new Date().toISOString()};
 }
+function displayToken(){
+  return crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','').slice(0,16);
+}
 function normalizeDisplay(x={}){
-  const generatedToken=crypto.randomUUID().replaceAll('-')+crypto.randomUUID().replaceAll('-').slice(0,16);
+  const generatedToken=displayToken();
   const base={token:generatedToken,title:'Today',maxEvents:5,maxCountdowns:3,maxTasks:6,maxGoals:3,layout:'auto',palette:'spectra6',dateWidgetStyle:'plain',mode:'daily',plannerLayoutVersion:5,sectionLayoutMode:'custom',sectionLayout:defaultLayout('dashboard'),sectionOrder:[...DISPLAY_KEYS],weatherStyle:'forecast',modeLayouts:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultLayout(m)])),modeSections:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultSections(m)])),refreshMinutes:15,showAgenda:true,showTasks:true,showGoals:true,showCountdowns:true,showWeather:true};
-  const m={...base,...x},token=cleanText(x?.token,160)||generatedToken;
+  const rawToken=cleanText(x?.token,160),token=/^[a-f0-9]{48}$/i.test(rawToken)?rawToken:generatedToken,m={...base,...x};
   return{...m,token,sectionLayoutMode:'custom',sectionLayout:normalizeSectionLayout(m.sectionLayout,'dashboard'),sectionOrder:normalizeSectionOrder(m.sectionOrder),modeLayouts:normalizeModeLayouts(m.modeLayouts,m.sectionLayout),modeSections:normalizeModeSections(m.modeSections),plannerLayoutVersion:5};
 }
 export function defaults(){
@@ -189,8 +192,8 @@ export async function loadState(env){
   const row=await env.DB.prepare('SELECT state_json FROM questlog_state WHERE workspace_id=?').bind(workspace).first();
   if(!row?.state_json){const state=defaults();await saveState(env,state);return state}
   try{
-    const parsed=JSON.parse(row.state_json),state=normalizeState(parsed);
-    if(!cleanText(parsed?.display?.token,160))await saveState(env,state);
+    const parsed=JSON.parse(row.state_json),state=normalizeState(parsed),storedToken=cleanText(parsed?.display?.token,160);
+    if(!/^[a-f0-9]{48}$/i.test(storedToken)||state.display.token!==storedToken)await saveState(env,state);
     return state;
   }catch{const state=defaults();await saveState(env,state);return state}
 }
