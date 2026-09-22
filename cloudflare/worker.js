@@ -354,7 +354,7 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/agent/models'&&method==='GET'){
-    try{return json(await listAgentModels(state,env))}catch(error){return json({ok:false,error:error.message||'Could not load models.'},400)}
+    try{return json(await listAgentModels(state,env,url.searchParams.get('provider')||''))}catch(error){return json({ok:false,error:error.message||'Could not load models.'},400)}
   }
   if(p==='/api/agent/test'&&method==='POST'){
     try{return json(await testAgent(state,env))}catch(error){return json({ok:false,error:error.message||'Agent connection failed.'},400)}
