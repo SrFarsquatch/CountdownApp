@@ -287,10 +287,11 @@ function parseEnvelope(raw){
   if(!parsed||typeof parsed!=='object')return{message:original||'I could not format a response.',actions:[]};
   return{message:cleanText(parsed.message||parsed.reply||original,10000),actions:Array.isArray(parsed.actions)?parsed.actions.map(normalizeAction).filter(Boolean).slice(0,10):[]};
 }
-export async function listAgentModels(state,env){
-  const cfg=await endpointConfig(state,env);
+export async function listAgentModels(state,env,providerOverride=''){
+  const provider=cleanText(providerOverride,40),scoped=provider?{...state,agent:{...(state.agent||{}),provider}}:state;
+  const cfg=await endpointConfig(scoped,env);
   try{
-    const result=await modelFetch(state,env,'models',{method:'GET'});
+    const result=await modelFetch(scoped,env,'models',{method:'GET'});
     const data=result.data,raw=Array.isArray(data?.data)?data.data:(Array.isArray(data?.models)?data.models:[]);
     const models=raw.map(x=>cleanText(x?.id||x?.name||x,200)).filter(Boolean);
     return{ok:true,provider:cfg.provider,models:[...new Set(models)].slice(0,200),configuredModel:cfg.model||''};
