@@ -249,7 +249,11 @@ export async function testAgent(state,env){
     const models=raw.map(x=>x?.id||x?.name||x).filter(Boolean).slice(0,10);
     return{ok:true,provider:cfg.provider,models:models.length?models:[cfg.model]};
   }catch(error){
-    if(cfg.style==='anthropic')throw error;
+    if(cfg.style==='anthropic'){
+      const payload={model:cfg.model,max_tokens:8,messages:[{role:'user',content:'Reply with the word OK.'}]};
+      await modelFetch(state,env,'messages',{method:'POST',body:JSON.stringify(payload)});
+      return{ok:true,provider:cfg.provider,models:[cfg.model]};
+    }
     const payload={model:cfg.model,stream:false,messages:[{role:'user',content:'Reply with the word OK.'}],max_tokens:8};
     await modelFetch(state,env,'chat/completions',{method:'POST',body:JSON.stringify(payload)});
     return{ok:true,provider:cfg.provider,models:[cfg.model]};
