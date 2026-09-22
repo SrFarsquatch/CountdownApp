@@ -107,16 +107,10 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
 }
 
 function color(name,palette){return einkAccent(name,palette,'blue')}
-function sectionAccent(kind,palette){
-  if(palette==='mono')return HEX.black;
-  return({agenda:HEX.blue,weather:HEX.yellow,tasks:HEX.green,goals:HEX.blue,countdowns:HEX.red,markets:HEX.green})[kind]||HEX.blue;
-}
-function sectionTitle(label,x,y,accent=HEX.blue){
-  return'<rect x="'+x+'" y="'+(y-9)+'" width="3" height="10" rx="1.5" fill="'+accent+'"/><text x="'+(x+9)+'" y="'+y+'" class="k">'+esc(label)+'</text>';
-}
+function sectionTitle(label,x,y){return'<text x="'+x+'" y="'+y+'" class="k">'+esc(label)+'</text>'}
 function bar(percent,x,y,w,h,fill){
-  const p=clamp(num(percent,0),0,100),accent=einkAccent(fill,'spectra6','blue'),cy=y+h/2;
-  return'<line x1="'+x+'" y1="'+cy+'" x2="'+(x+w)+'" y2="'+cy+'" stroke="'+HEX.black+'" stroke-width="1"/><line x1="'+x+'" y1="'+cy+'" x2="'+(x+w*p/100).toFixed(1)+'" y2="'+cy+'" stroke="'+accent+'" stroke-width="'+Math.max(3,h*.7)+'" stroke-linecap="round"/>';
+  const p=clamp(num(percent,0),0,100);
+  return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(h/2)+'" fill="'+HEX.white+'" stroke="'+HEX.black+'" stroke-width="1"/><rect x="'+x+'" y="'+y+'" width="'+(w*p/100).toFixed(1)+'" height="'+h+'" rx="'+(h/2)+'" fill="'+einkAccent(fill,'spectra6','blue')+'"/>';
 }
 function countdownLabel(c){
   const r=c.remaining||{};
@@ -159,15 +153,14 @@ function eventAccent(event,palette){
 }
 function money(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2):'N/A'}
 
-export function renderDisplaySvg(data,width=600,height=400){
-  const w=clamp(Math.round(num(width,600)),300,2000),h=clamp(Math.round(num(height,400)),300,2000),palette=data.display?.palette||'spectra6';
+export function renderDisplaySvg(data,width=800,height=480){
+  const w=clamp(Math.round(num(width,800)),300,2000),h=clamp(Math.round(num(height,480)),300,2000),palette=data.display?.palette||'spectra6';
   const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black=HEX.black,muted=HEX.black,rule=HEX.black;
   const now=new Date(),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
-  const modeAccent=palette==='mono'?HEX.black:HEX.blue;
-  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:10px;font-weight:800;letter-spacing:1.35px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:.7;stroke-dasharray:1 3;stroke-linecap:round}.section-box{fill:#FFFFFF;stroke:none}</style>';
-  svg+='<text x="'+pad+'" y="'+(pad+14)+'" font-size="12" font-weight="800" letter-spacing=".7">'+esc(now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase())+'</text>';
-  svg+='<rect x="'+(w-pad-74)+'" y="'+(pad+2)+'" width="74" height="18" rx="9" fill="'+modeAccent+'"/><text x="'+(w-pad-37)+'" y="'+(pad+15)+'" text-anchor="middle" font-size="9" font-weight="800" fill="'+(modeAccent===HEX.yellow?HEX.black:HEX.white)+'" letter-spacing=".8">'+esc(modeLabel)+'</text>';
-  svg+='<text x="'+(w-pad-84)+'" y="'+(pad+15)+'" text-anchor="end" font-size="10" font-weight="700">'+esc(now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text>';
+  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1}</style>';
+  svg+='<text x="'+pad+'" y="'+(pad+15)+'" font-size="12" font-weight="800" letter-spacing="1">'+esc(now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase())+'</text>';
+  svg+='<text x="'+(w-pad)+'" y="'+(pad+15)+'" text-anchor="end" font-size="11" font-weight="800" letter-spacing="1">'+esc(modeLabel+' · '+now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text>';
+  svg+='<line x1="'+pad+'" y1="'+(pad+23)+'" x2="'+(w-pad)+'" y2="'+(pad+23)+'" class="line"/>';
 
   const sections=data.display?.modeSections||{},layout=normalizeSectionLayout(data.display?.modeLayout,mode),order=normalizeSectionOrder(data.display?.sectionOrder);
   const sectionData={agenda:agendaEntries(data),weather:data.weather?[data.weather]:[],tasks:data.tasks||[],goals:data.goals||[],countdowns:data.countdowns||[],markets:data.markets?.quotes||[]};
@@ -181,10 +174,9 @@ export function renderDisplaySvg(data,width=600,height=400){
   if(defs.length)svg+='<defs>'+defs.join('')+'</defs>';
 
   for(const box of queue){
-    const kind=box.kind,accent=sectionAccent(kind,palette);
-    svg+='<rect x="'+box.x+'" y="'+box.y+'" width="'+box.bw+'" height="'+box.bh+'" rx="9" class="section-box"/><rect x="'+(box.x+1)+'" y="'+(box.y+1)+'" width="'+Math.max(14,box.bw-2)+'" height="3" rx="1.5" fill="'+accent+'"/><g clip-path="url(#'+box.clip+')">';
-    const x=box.x+box.inset,y=box.y+box.inset+2,bw=Math.max(20,box.bw-box.inset*2),bh=Math.max(20,box.bh-box.inset*2-2),items=sectionData[kind]||[],cfg=sections[kind]||{};
-    svg+=sectionTitle(({agenda:'AGENDA',weather:'WEATHER',tasks:'TASKS',goals:'GOALS',countdowns:'COUNTDOWNS',markets:'MARKETS'})[kind],x,y+11,accent);
+    svg+='<rect x="'+box.x+'" y="'+box.y+'" width="'+box.bw+'" height="'+box.bh+'" rx="7" class="section-box"/><g clip-path="url(#'+box.clip+')">';
+    const x=box.x+box.inset,y=box.y+box.inset,bw=Math.max(20,box.bw-box.inset*2),bh=Math.max(20,box.bh-box.inset*2),kind=box.kind,items=sectionData[kind]||[],cfg=sections[kind]||{};
+    svg+=sectionTitle(({agenda:'AGENDA',weather:'WEATHER',tasks:'TASKS',goals:'GOALS',countdowns:'COUNTDOWNS',markets:'MARKETS'})[kind],x,y+11);
     let cy=y+22;
     if(!items.length){svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="12" class="muted">'+esc(kind==='weather'&&data.weatherError?data.weatherError:kind==='markets'&&data.marketError?data.marketError:kind==='agenda'&&data.calendarError?data.calendarError:'Nothing to show.')+'</text>';svg+='</g>';continue}
 
@@ -231,11 +223,11 @@ export function renderDisplaySvg(data,width=600,height=400){
         }else{
           const max=Math.max(1,Math.min(cfg.limit||7,forecast.length)),shortBox=bh<105;
           if(shortBox){
-            const currentW=Math.min(126,Math.max(96,bw*.19)),days=forecast.slice(0,max),cellW=Math.max(54,(bw-currentW)/Math.max(1,days.length));
-            svg+=weatherIcon(current.condition,x,cy+5,30,palette)+'<text x="'+(x+38)+'" y="'+(cy+22)+'" font-size="20" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+x+'" y="'+(cy+39)+'" font-size="8.5" class="muted">'+esc(short(current.description||'',16))+'</text>';
+            const currentW=Math.min(112,Math.max(88,bw*.18)),days=forecast.slice(0,max),cellW=Math.max(52,(bw-currentW)/Math.max(1,days.length));
+            svg+=weatherIcon(current.condition,x,cy+2,26,palette)+'<text x="'+(x+34)+'" y="'+(cy+19)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text>';
             days.forEach((d,i)=>{
               const dx=x+currentW+i*cellW;
-              if(i===0)svg+='<line x1="'+(dx-7)+'" y1="'+(cy+2)+'" x2="'+(dx-7)+'" y2="'+Math.min(y+bh-4,cy+45)+'" stroke="'+accent+'" stroke-width="2"/>';
+              if(i===0)svg+='<line x1="'+(dx-5)+'" y1="'+cy+'" x2="'+(dx-5)+'" y2="'+Math.min(y+bh-3,cy+48)+'" class="line"/>';
               svg+='<text x="'+dx+'" y="'+(cy+10)+'" font-size="8" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
               svg+=weatherIcon(d.condition,dx,cy+14,17,palette);
               svg+='<text x="'+(dx+21)+'" y="'+(cy+27)+'" font-size="9.5" font-weight="800">'+esc(Math.round(num(d.high,0))+'°')+'</text><text x="'+(dx+21)+'" y="'+(cy+39)+'" font-size="8" class="muted">'+esc(Math.round(num(d.low,0))+'°')+'</text>';
