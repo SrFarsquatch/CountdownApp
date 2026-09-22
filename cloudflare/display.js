@@ -171,7 +171,18 @@ export function renderDisplaySvg(data,width=800,height=480){
         ['M','T','W','T','F','S','S'].forEach((d,i)=>svg+='<text x="'+(x+i*cellW+cellW/2)+'" y="'+(cy+9)+'" text-anchor="middle" font-size="7.5" font-weight="800" class="muted">'+d+'</text>');cy+=13;
         for(let i=0;i<42;i++){const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,yy=cy+row*cellH;if(yy+cellH>y+bh)break;svg+='<rect x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+'" fill="none" stroke="'+rule+'"/><text x="'+(cx+4)+'" y="'+(yy+11)+'" font-size="8">'+day.getDate()+'</text>';const ev=eventsForDay(data,day).slice(0,3);ev.forEach((e,j)=>svg+='<circle cx="'+(cx+6+j*8)+'" cy="'+(yy+cellH-6)+'" r="2.5" fill="'+eventAccent(e,palette)+'"/>')}
       }else{
-        for(const entry of items.slice(0,cfg.limit||12)){if(cy+31>y+bh)break;const d=new Date(entry.event.start),when=entry.event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/><circle cx="'+(x+4)+'" cy="'+(cy+16)+'" r="4" fill="'+eventAccent(entry.event,palette)+'"/><text x="'+(x+14)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-86)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+20)+'" text-anchor="end" font-size="10" class="muted">'+esc(when)+'</text>';cy+=30}
+        const timeline=cfg.style==='timeline';
+        for(const entry of items.slice(0,cfg.limit||12)){
+          if(cy+31>y+bh)break;
+          const d=new Date(entry.event.start),when=entry.event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),accent=eventAccent(entry.event,palette);
+          svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';
+          if(timeline){
+            svg+='<text x="'+x+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(when)+'</text><circle cx="'+(x+61)+'" cy="'+(cy+16)+'" r="4" fill="'+accent+'"/><text x="'+(x+72)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-74)/7))))+'</text>';
+          }else{
+            svg+='<circle cx="'+(x+4)+'" cy="'+(cy+16)+'" r="4" fill="'+accent+'"/><text x="'+(x+14)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-86)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+20)+'" text-anchor="end" font-size="10" class="muted">'+esc(when)+'</text>';
+          }
+          cy+=30;
+        }
       }
     }else if(kind==='weather'){
       const weather=data.weather,current=weather?.current,forecast=weather?.forecast||[],unit=weather?.units==='imperial'?'°F':'°C';
