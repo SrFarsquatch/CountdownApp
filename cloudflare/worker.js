@@ -393,7 +393,7 @@ async function handleApi(request,env,identity){
     if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
     try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
     const feed=buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError});
-    const width=clamp(num(url.searchParams.get('w'),600),300,2000),height=clamp(num(url.searchParams.get('h'),400),300,2000);
+    const width=clamp(num(url.searchParams.get('w'),800),300,2000),height=clamp(num(url.searchParams.get('h'),480),300,2000);
     return text(renderDisplaySvg(feed,width,height),200,'image/svg+xml; charset=utf-8',{'cache-control':'no-store, max-age=0'});
   }
 
