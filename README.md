@@ -741,3 +741,10 @@ main
 Shared frontend changes should be implemented once in `public/`. Runtime-specific backend behavior belongs in `server.js` or the `cloudflare/` modules while keeping the API contract aligned wherever practical.
 
 For deeper cloud implementation notes, see `cloudflare/README.md`.
+
+
+### Pimoroni Inky Impression 4.0" (Spectra 6)
+
+Quest Log's `spectra6` display palette is tuned for the 600×400 Pimoroni Inky Impression 4.0" Spectra 6 panel. Rendered SVG output is restricted to the panel's six native colors: black, white, red, green, blue, and yellow. The display editor defaults to 600×400, with a 400×600 portrait preset.
+
+Use the FrameOS device driver for the Pimoroni Inky Impression 4.0" 2025/Spectra 6 model. Avoid adding arbitrary RGB colors to the e-ink renderer; event and accent colors are quantized to the native palette.
