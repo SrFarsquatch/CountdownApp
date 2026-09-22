@@ -11,7 +11,7 @@ import {
   calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
-import { marketData, marketSearch } from './markets.js';
+import { marketData, marketSearch, testMarketConnection, saveMarketCredential, clearMarketCredential } from './markets.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
@@ -278,8 +278,11 @@ async function handleApi(request,env,identity){
     if(incoming.weatherLatitude!==undefined||incoming.weatherLongitude!==undefined||incoming.weatherLocationLabel!==undefined||incoming.weatherCountryCode!==undefined||incoming.weatherUnits!==undefined){
       state.weather=normalizeWeather({...state.weather,latitude:incoming.weatherLatitude??state.weather.latitude,longitude:incoming.weatherLongitude??state.weather.longitude,locationLabel:incoming.weatherLocationLabel??state.weather.locationLabel,countryCode:incoming.weatherCountryCode??state.weather.countryCode,units:incoming.weatherUnits??state.weather.units});
     }
-    if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined){
+    if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined||incoming.marketApiKey!==undefined||incoming.marketClearApiKey!==undefined){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
+      if(incoming.marketClearApiKey)await clearMarketCredential(state,env);
+      if(incoming.marketApiKey!==undefined&&cleanText(incoming.marketApiKey,5000))await saveMarketCredential(state,env,cleanText(incoming.marketApiKey,5000));
+      state.marketCache=null;
     }
     if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined||incoming.agentApiKey!==undefined||incoming.agentClearApiKey!==undefined){
       const requested=String(incoming.agentProvider||state.agent.provider||'openai');
@@ -307,14 +310,16 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/markets'&&method==='GET'){
-    if(!env.ALPHA_VANTAGE_API_KEY)return json({markets:null,error:'Add ALPHA_VANTAGE_API_KEY as a Worker secret to enable Markets.'});
     try{return json({markets:await marketData(state,env),error:null})}
     catch(error){return json({markets:state.marketCache?.data||null,error:error.message||'Market data is unavailable.'})}
   }
   if(p==='/api/markets/search'&&method==='GET'){
-    if(!env.ALPHA_VANTAGE_API_KEY)return json({error:'ALPHA_VANTAGE_API_KEY is not configured.'},400);
-    const q=url.searchParams.get('q')||'';if(!cleanText(q,80).trim())return json({results:[]});
-    return json({results:await marketSearch(q,env)});
+    const q=url.searchParams.get('q')||'';if(!cleanText(q,64).trim())return json({results:[]});
+    return json({results:await marketSearch(q,state,env)});
+  }
+  if(p==='/api/markets/test'&&method==='POST'){
+    try{return json(await testMarketConnection(state,env))}
+    catch(error){return json({ok:false,error:error.message||'Tickerbot connection failed.'},400)}
   }
 
   if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env);
@@ -379,8 +384,7 @@ async function handleApi(request,env,identity){
     let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
     if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
     if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
-    if(env.ALPHA_VANTAGE_API_KEY){try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}}
-    else marketError='ALPHA_VANTAGE_API_KEY is not configured.';
+    try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
     return json(buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError}));
   }
   if(p==='/api/frameos/svg'&&method==='GET'){
@@ -389,8 +393,7 @@ async function handleApi(request,env,identity){
     let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
     if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
     if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
-    if(env.ALPHA_VANTAGE_API_KEY){try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}}
-    else marketError='ALPHA_VANTAGE_API_KEY is not configured.';
+    try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
     const feed=buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError});
     const width=clamp(num(url.searchParams.get('w'),800),300,2000),height=clamp(num(url.searchParams.get('h'),480),300,2000);
     return text(renderDisplaySvg(feed,width,height),200,'image/svg+xml; charset=utf-8',{'cache-control':'no-store, max-age=0'});
