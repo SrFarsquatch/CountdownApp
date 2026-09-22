@@ -495,15 +495,15 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
     <div class="card setting-card"><div class="eyebrow">Layout</div><h3>Display content</h3>
       <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="weekly">Weekly planner</option><option value="monthly">Monthly planner</option><option value="countdowns">Countdowns only</option></select></div>
       <div class="setting-row"><span>Orientation</span><select id="displayLayout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
-      <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Spectra 6 (Pimoroni Inky Impression 4.0")</option><option value="mono">Black & white</option></select></div>
+      <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Spectra 6 (6-color e-ink)</option><option value="mono">Black & white</option></select></div>
       <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
       <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather location and units are managed in Settings.</div>
       <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Preview</div><h3>FrameOS output</h3>
-      <div class="setting-row"><span>Resolution</span><div style="display:flex;gap:7px"><input id="previewW" type="number" value="600" min="300" max="2000"><input id="previewH" type="number" value="400" min="300" max="2000"></div></div>
+      <div class="setting-row"><span>Resolution</span><div style="display:flex;gap:7px"><input id="previewW" type="number" value="800" min="300" max="2000"><input id="previewH" type="number" value="480" min="300" max="2000"></div></div>
       <div class="preview"><img id="displayPreview" alt="E-ink preview"></div>
-      <div class="row-actions"><button class="btn tiny" id="landPreset">600 × 400</button><button class="btn tiny" id="portPreset">400 × 600</button><button class="btn tiny" id="openFrame">Open full screen</button></div>
+      <div class="row-actions"><button class="btn tiny" id="landPreset">800 × 480</button><button class="btn tiny" id="portPreset">480 × 800</button><button class="btn tiny" id="openFrame">Open full screen</button></div>
     </div>
   </div>
 
@@ -1429,7 +1429,7 @@ function applyLayoutBlock(block,rect){
  block.classList.toggle('off',settings.enabled===false);
 }
 function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
- const w=Math.max(300,Number($('previewW').value)||600),h=Math.max(300,Number($('previewH').value)||400),portrait=h>w;
+ const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480),portrait=h>w;
  if(mode==='daily'||mode==='weekly') return portrait
    ?{agenda:{x:0,y:0,w:24,h:10},weather:{x:0,y:10,w:24,h:2},tasks:{x:0,y:12,w:8,h:4},goals:{x:8,y:12,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}}
    :{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
@@ -1470,7 +1470,7 @@ function renderSectionLayoutEditor(renderSettings=true){
  if(!displaySectionsDraft)displaySectionsDraft=cloneModeSections(state.display.modeSections);
  displayLayoutDraft=displayLayoutsDraft[mode]||cloneDisplayLayout();
  const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor');
- const w=Math.max(300,Number($('previewW').value)||600),h=Math.max(300,Number($('previewH').value)||400);shell.style.aspectRatio=w+'/'+h;
+ const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);shell.style.aspectRatio=w+'/'+h;
  const now=new Date(),modeLabels={dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'};
  if($('layoutEditorDate'))$('layoutEditorDate').textContent=now.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
  if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
@@ -1506,12 +1506,12 @@ function renderDisplay(){
  if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.locationLabel?'Weather: '+wc.locationLabel+' · location managed in Settings.':'Choose a weather location in Settings.';
  displayLayoutsDraft=cloneModeLayouts(d.modeLayouts);displaySectionsDraft=cloneModeSections(d.modeSections);displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];
  const root=location.origin;
- $('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||600)+'&h='+Math.max(300,Number($('previewH').value)||400);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||600)+'&h='+Math.max(300,Number($('previewH').value)||400);
+ $('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);
  renderSectionLayoutEditor();previewDisplay();
 }
 function previewDisplay(){
  if(!state)return;
- const w=Math.max(300,Number($('previewW').value)||600),h=Math.max(300,Number($('previewH').value)||400);
+ const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
  $('displayPreview').src=state.display.svgPath+'&w='+w+'&h='+h+'&_='+Date.now();
  if($('svgUrl'))$('svgUrl').textContent=location.origin+state.display.svgPath+'&w='+w+'&h='+h;
  if($('feedUrl'))$('feedUrl').textContent=location.origin+state.display.feedPath;
@@ -1519,14 +1519,14 @@ function previewDisplay(){
  if($('einkLayoutShell'))renderSectionLayoutEditor();
 }
 $('previewW').onchange=$('previewH').onchange=()=>{renderSectionLayoutEditor(false);previewDisplay()};
-$('landPreset').onclick=()=>{$('previewW').value=600;$('previewH').value=400;renderSectionLayoutEditor(false);previewDisplay()};
-$('portPreset').onclick=()=>{$('previewW').value=400;$('previewH').value=600;renderSectionLayoutEditor(false);previewDisplay()};
+$('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;renderSectionLayoutEditor(false);previewDisplay()};
+$('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;renderSectionLayoutEditor(false);previewDisplay()};
 $('openFrame').onclick=async()=>{
  const popup=window.open('about:blank','_blank');
  try{
    const fresh=await api('/api/state');
    state={...state,...fresh};
-   const w=Math.max(300,Number($('previewW').value)||600),h=Math.max(300,Number($('previewH').value)||400);
+   const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
    const target=state.display.viewPath+'&w='+w+'&h='+h;
    if(popup)popup.location.href=target;else window.location.href=target;
  }catch(error){
