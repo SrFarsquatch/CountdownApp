@@ -11,7 +11,7 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || '';
+const TICKERBOT_API_KEY = process.env.TICKERBOT_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -255,7 +255,7 @@ function defaults() {
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
     appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
-    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 1440 },
+    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 15, credential: null },
     marketCache: null,
     agent: { enabled: false, provider: 'hermes', baseUrl: '', model: 'hermes-agent', credential: null, requireConfirmation: true, contextDays: 14 },
     notifications: normalizeNotifications({}),
@@ -474,9 +474,10 @@ function normalizeMarkets(x = {}) {
   }
   const normalized = watchlist.length ? watchlist : defaultMarketWatchlist();
   return {
-    watchlist: normalized,
-    symbols: normalized.map(item => item.symbol),
-    refreshMinutes: (() => { const requested = Math.round(num(x.refreshMinutes, 1440)); return requested < 720 ? 1440 : clamp(requested, 720, 1440); })()
+    watchlist: normalized.slice(0, 50),
+    symbols: normalized.slice(0, 50).map(item => item.symbol),
+    refreshMinutes: clamp(Math.round(num(x.refreshMinutes, 15)), 5, 1440),
+    credential: typeof x.credential === 'string' ? x.credential : null
   };
 }
 
@@ -2338,36 +2339,14 @@ function persistMarketCache() {
   } : null;
   save(db);
 }
-function marketConfigured() { return Boolean(ALPHA_VANTAGE_API_KEY); }
+function marketApiKey() {
+  return cleanText(decrypt(db.markets?.credential) || TICKERBOT_API_KEY, 5000);
+}
+function marketConfigured() { return Boolean(marketApiKey()); }
 function marketNumber(value) {
-  const n = Number(String(value ?? '').replace('%','')); return Number.isFinite(n) ? n : null;
+  const n = Number(value); return Number.isFinite(n) ? n : null;
 }
-function alphaEffectiveRefreshMinutes(config) {
-  const count = Math.max(1, config.watchlist.length);
-  const quotaSafe = Math.ceil((count * 1440) / 20);
-  return Math.max(config.refreshMinutes, quotaSafe);
-}
-function normalizeMarketQuote(raw = {}, fallback = {}) {
-  const requested = normalizeMarketInstrument(fallback);
-  const close = marketNumber(raw['05. price']);
-  return {
-    ...requested,
-    providerSymbol: cleanText(raw['01. symbol'] || requested.providerSymbol, 32).toUpperCase(),
-    close,
-    open: marketNumber(raw['02. open']),
-    high: marketNumber(raw['03. high']),
-    low: marketNumber(raw['04. low']),
-    volume: marketNumber(raw['06. volume']),
-    datetime: cleanText(raw['07. latest trading day'] || '', 50),
-    previousClose: marketNumber(raw['08. previous close']),
-    change: marketNumber(raw['09. change']),
-    percentChange: marketNumber(raw['10. change percent']),
-    marketOpen: null,
-    available: close !== null,
-    error: ''
-  };
-}
-function unavailableMarketQuote(item, message = 'No quote returned for this watchlist symbol.') {
+function unavailableMarketQuote(item, message = 'Tickerbot returned no quote for this symbol.') {
   const requested = normalizeMarketInstrument(item);
   return {
     ...requested,
@@ -2376,122 +2355,95 @@ function unavailableMarketQuote(item, message = 'No quote returned for this watc
     datetime: '', available: false, error: cleanText(message, 220)
   };
 }
-let alphaRequestChain = Promise.resolve();
-let alphaLastRequestAt = 0;
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function alphaProviderError(raw = {}, status = 0) {
-  const message = cleanText(raw['Error Message'] || raw.Note || raw.Information || '', 260);
-  if (/1 request per second|spread.*sparsely|call frequency/i.test(message)) {
-    return { kind: 'burst', message: 'Alpha Vantage rate limit hit. Quest Log will retry automatically.' };
+async function tickerbotRequest(resource) {
+  const apiKey = marketApiKey();
+  if (!apiKey) throw new Error('Add the shared Tickerbot API key in Settings → Markets.');
+  const response = await fetch('https://api.tickerbot.io/v2/' + String(resource || '').replace(/^\/+/, ''), {
+    headers: { Authorization: 'Bearer ' + apiKey, Accept: 'application/json' }
+  });
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = cleanText(raw?.error?.message || raw?.message || raw?.error || '', 260);
+    if (response.status === 401) throw new Error('Tickerbot rejected the saved API key.');
+    if (response.status === 429) throw new Error('Tickerbot rate limit reached. Quest Log will keep using cached market data.');
+    throw new Error(message || 'Tickerbot request failed (' + response.status + ').');
   }
-  if (/25 requests per day|daily.*limit|standard api call frequency/i.test(message)) {
-    return { kind: 'daily', message: 'Alpha Vantage daily free API limit reached. Cached market data will be used until the allowance resets.' };
-  }
-  return { kind: 'api', message: message || 'Alpha Vantage request failed (' + status + ').' };
+  return raw;
 }
-
-async function alphaVantageRequest(params = {}) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const wait = Math.max(0, 1150 - (Date.now() - alphaLastRequestAt));
-    if (wait) await sleep(wait);
-    alphaLastRequestAt = Date.now();
-
-    const query = new URLSearchParams({ ...params, apikey: ALPHA_VANTAGE_API_KEY });
-    const response = await fetch('https://www.alphavantage.co/query?' + query);
-    const raw = await response.json().catch(() => ({}));
-    const providerError = alphaProviderError(raw, response.status);
-
-    if (response.ok && !raw['Error Message'] && !raw.Note && !raw.Information) return raw;
-
-    if (providerError.kind === 'burst' && attempt === 0) {
-      await sleep(1250);
-      continue;
-    }
-    const error = new Error(providerError.message);
-    error.kind = providerError.kind;
-    throw error;
-  }
-  const error = new Error('Alpha Vantage rate limit hit. Try again shortly.');
-  error.kind = 'burst';
-  throw error;
+function tickerbotQuote(raw = {}, fallback = {}, asOf = '') {
+  const requested = normalizeMarketInstrument(fallback);
+  const close = marketNumber(raw.price);
+  const percentChange = marketNumber(raw.change_1d_pct);
+  const previousClose = close != null && percentChange != null && Math.abs(100 + percentChange) > 0.0001
+    ? close / (1 + percentChange / 100) : null;
+  const change = close != null && previousClose != null ? close - previousClose : null;
+  return {
+    ...requested,
+    symbol: cleanText(raw.ticker || requested.symbol, 32).toUpperCase(),
+    providerSymbol: cleanText(raw.ticker || requested.providerSymbol, 32).toUpperCase(),
+    name: cleanText(raw.name || requested.name, 120),
+    exchange: cleanText(raw.exchange || requested.exchange, 80),
+    region: cleanText(raw.country || requested.region, 80).toUpperCase(),
+    type: cleanText(raw.asset_type || requested.type, 60),
+    currency: cleanText(raw.currency_name || requested.currency || 'USD', 12).toUpperCase(),
+    close, open: null, high: null, low: null,
+    volume: marketNumber(raw.volume_today),
+    datetime: cleanText(raw.date || asOf, 50),
+    previousClose, change, percentChange,
+    marketOpen: null, available: close !== null, error: ''
+  };
 }
-
-function alphaVantageFetch(params = {}) {
-  if (!marketConfigured()) return Promise.reject(new Error('Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.'));
-  const run = alphaRequestChain.then(() => alphaVantageRequest(params));
-  alphaRequestChain = run.catch(() => {});
-  return run;
-}
-
 async function marketData() {
   const config = normalizeMarkets(db.markets);
-  const effectiveRefreshMinutes = alphaEffectiveRefreshMinutes(config);
-  const key = config.watchlist.map(item => item.providerSymbol).join(',');
+  const key = 'tickerbot:' + config.watchlist.map(item => item.providerSymbol).join(',');
   if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
-
-  const quotes = [];
-  for (const item of config.watchlist) {
-    if (item.providerSymbol.includes('/')) {
-      quotes.push(unavailableMarketQuote(item, 'Crypto pairs are not included in the Alpha Vantage stock quote watchlist. Remove and re-add this item as a supported equity or ETF.'));
-      continue;
-    }
-    try {
-      const raw = await alphaVantageFetch({ function: 'GLOBAL_QUOTE', symbol: item.providerSymbol });
-      const quote = raw['Global Quote'] || {};
-      quotes.push(Object.keys(quote).length ? normalizeMarketQuote(quote, item) : unavailableMarketQuote(item, 'Alpha Vantage returned no quote for this symbol.'));
-    } catch (error) {
-      const stale = marketCache.data?.quotes?.find(q => q.providerSymbol === item.providerSymbol || q.symbol === item.symbol);
-      if (stale?.close != null) {
-        quotes.push({ ...stale, stale: true, error: error.message || 'Using cached quote.' });
-      } else {
-        quotes.push(unavailableMarketQuote(item, error.message || 'Quote unavailable.'));
-      }
-      if (error.kind === 'daily') break;
-    }
+  if (!config.watchlist.length) {
+    const data = { provider: 'Tickerbot', quotes: [], watchlist: [], symbols: [], updatedAt: new Date().toISOString(), refreshMinutes: config.refreshMinutes, effectiveRefreshMinutes: config.refreshMinutes, freeMonthlyRequestLimit: 10000, batchSize: 50 };
+    marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data }; persistMarketCache(); return data;
   }
-  while (quotes.length < config.watchlist.length) {
-    const item = config.watchlist[quotes.length];
-    const stale = marketCache.data?.quotes?.find(q => q.providerSymbol === item.providerSymbol || q.symbol === item.symbol);
-    quotes.push(stale?.close != null
-      ? { ...stale, stale: true, error: 'Using cached quote because the Alpha Vantage daily free API limit was reached.' }
-      : unavailableMarketQuote(item, 'Skipped because the Alpha Vantage daily free API limit was reached.'));
+  let raw;
+  try {
+    const symbols = config.watchlist.map(item => encodeURIComponent(item.providerSymbol)).join(',');
+    raw = await tickerbotRequest('tickers/' + symbols);
+  } catch (error) {
+    if (marketCache.data) return { ...marketCache.data, quotes: (marketCache.data.quotes || []).map(q => ({ ...q, stale: true, error: error.message || 'Using cached quote.' })) };
+    throw error;
   }
-
+  const rows = raw?.data && typeof raw.data === 'object' ? raw.data : {};
+  const notFound = new Set((raw?.not_found || []).map(x => String(x).toUpperCase()));
+  const quotes = config.watchlist.map(item => {
+    const symbol = item.providerSymbol.toUpperCase();
+    const row = rows[symbol] || rows[item.symbol?.toUpperCase?.()];
+    if (row) return tickerbotQuote(row, item, raw.as_of || '');
+    return unavailableMarketQuote(item, notFound.has(symbol) ? 'Tickerbot does not track this symbol.' : 'Tickerbot returned no quote for this symbol.');
+  });
   const data = {
-    provider: 'Alpha Vantage',
-    quotes,
-    watchlist: config.watchlist,
-    symbols: config.symbols,
-    updatedAt: new Date().toISOString(),
-    refreshMinutes: config.refreshMinutes,
-    effectiveRefreshMinutes,
-    freeDailyRequestLimit: 25
+    provider: 'Tickerbot', quotes, watchlist: config.watchlist, symbols: config.symbols,
+    updatedAt: new Date().toISOString(), providerAsOf: cleanText(raw.as_of, 50),
+    refreshMinutes: config.refreshMinutes, effectiveRefreshMinutes: config.refreshMinutes,
+    freeMonthlyRequestLimit: 10000, batchSize: 50
   };
-  marketCache = { key, expiresAt: Date.now() + effectiveRefreshMinutes * 60000, data };
+  marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
   persistMarketCache();
   return data;
 }
 async function marketSearch(query) {
-  const q = cleanText(query, 80).trim();
+  const q = cleanText(query, 64).trim();
   if (!q) return [];
-  const raw = await alphaVantageFetch({ function: 'SYMBOL_SEARCH', keywords: q });
-  return (raw.bestMatches || []).slice(0, 10).map(item => {
-    const providerSymbol = cleanText(item['1. symbol'], 32).toUpperCase();
-    return normalizeMarketInstrument({
-      symbol: alphaDisplaySymbol(providerSymbol),
-      providerSymbol,
-      name: item['2. name'],
-      type: item['3. type'],
-      region: item['4. region'],
-      exchange: item['4. region'],
-      marketOpen: item['5. marketOpen'],
-      marketClose: item['6. marketClose'],
-      timezone: item['7. timezone'],
-      currency: item['8. currency'],
-      matchScore: item['9. matchScore']
-    });
-  }).filter(item => item.providerSymbol);
+  const raw = await tickerbotRequest('tickers?search=' + encodeURIComponent(q) + '&asset_class=stocks&limit=10');
+  return (raw.results || []).filter(item => item?.active !== false).slice(0, 10).map(item => normalizeMarketInstrument({
+    symbol: item.ticker,
+    providerSymbol: item.ticker,
+    name: item.name,
+    type: item.asset_type,
+    region: item.country,
+    exchange: item.exchange,
+    currency: item.currency_name
+  })).filter(item => item.providerSymbol);
+}
+async function testMarketConnection() {
+  const raw = await tickerbotRequest('tickers/SPY');
+  return { ok: Boolean(raw?.data), provider: 'Tickerbot', ticker: raw?.data?.ticker || 'SPY', name: raw?.data?.name || '' };
 }
 
 function agendaRange(scope, now = new Date()) {
@@ -2548,7 +2500,7 @@ async function feed() {
     if (marketConfigured()) {
       try { markets = await marketData(); }
       catch (error) { marketError = error.message; }
-    } else marketError = 'Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.';
+    } else marketError = 'Add the shared Tickerbot API key in Settings → Markets.';
   }
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
@@ -3232,7 +3184,7 @@ function state() {
     updater: { configured: updaterConfigured() },
     appearance: normalizeAppearance(db.appearance),
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
-    markets: (() => { const config = normalizeMarkets(db.markets); return { ...config, configured: marketConfigured(), provider: 'Alpha Vantage', effectiveRefreshMinutes: alphaEffectiveRefreshMinutes(config), freeDailyRequestLimit: 25 }; })(),
+    markets: (() => { const config = normalizeMarkets(db.markets); return { watchlist: config.watchlist, symbols: config.symbols, refreshMinutes: config.refreshMinutes, configured: marketConfigured(), hasApiKey: marketConfigured(), canStoreApiKey: Boolean(APP_SECRET), provider: 'Tickerbot', effectiveRefreshMinutes: config.refreshMinutes, freeMonthlyRequestLimit: 10000, batchSize: 50 }; })(),
     agent: agentPublicConfig(),
     notifications: publicNotificationConfig(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
@@ -3556,15 +3508,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/markets' && req.method === 'GET') {
-      if (!marketConfigured()) return json(res, 200, { markets: null, error: 'Add ALPHA_VANTAGE_API_KEY in CasaOS to enable Markets.' });
       try { return json(res, 200, { markets: await marketData(), error: null }); }
       catch (error) { return json(res, 200, { markets: marketCache.data || null, error: error.message || 'Market data is unavailable.' }); }
     }
     if (p === '/api/markets/search' && req.method === 'GET') {
       const q = url.searchParams.get('q') || '';
-      if (!marketConfigured()) return json(res, 400, { error: 'ALPHA_VANTAGE_API_KEY is not configured.' });
-      if (!cleanText(q, 80).trim()) return json(res, 200, { results: [] });
+      if (!cleanText(q, 64).trim()) return json(res, 200, { results: [] });
       return json(res, 200, { results: await marketSearch(q) });
+    }
+    if (p === '/api/markets/test' && req.method === 'POST') {
+      try { return json(res, 200, await testMarketConnection()); }
+      catch (error) { return json(res, 400, { ok: false, error: error.message || 'Tickerbot connection failed.' }); }
     }
 
     if (p === '/api/settings' && req.method === 'PUT') {
@@ -3622,12 +3576,19 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
       if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
-      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
+      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined || incoming.marketApiKey !== undefined || incoming.marketClearApiKey !== undefined) {
+        const current = normalizeMarkets(db.markets);
         db.markets = normalizeMarkets({
-          ...db.markets,
-          watchlist: incoming.marketWatchlist !== undefined ? incoming.marketWatchlist : (incoming.marketSymbols !== undefined ? incoming.marketSymbols : db.markets.watchlist),
-          refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : db.markets.refreshMinutes
+          ...current,
+          watchlist: incoming.marketWatchlist !== undefined ? incoming.marketWatchlist : (incoming.marketSymbols !== undefined ? incoming.marketSymbols : current.watchlist),
+          refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : current.refreshMinutes,
+          credential: current.credential
         });
+        if (incoming.marketClearApiKey) db.markets.credential = null;
+        if (incoming.marketApiKey !== undefined && cleanText(incoming.marketApiKey, 5000)) {
+          if (!APP_SECRET) return json(res, 400, { error: 'Set APP_SECRET before saving the shared Tickerbot API key.' });
+          db.markets.credential = encrypt(cleanText(incoming.marketApiKey, 5000));
+        }
         marketCache = { key: '', expiresAt: 0, data: null };
         db.marketCache = null;
       }
