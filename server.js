@@ -1867,7 +1867,11 @@ async function testAgentConnection() {
     const models = rawModels.map(item => cleanText(item?.id || item?.name || item, 160)).filter(Boolean).slice(0, 30);
     return { ok: true, models: models.length ? models : (config.model ? [config.model] : []), configuredModel: config.model };
   } catch (error) {
-    if (config.provider === 'anthropic') throw error;
+    if (config.provider === 'anthropic') {
+      const payload = { model: config.model, max_tokens: 8, messages: [{ role: 'user', content: 'Reply with the word OK.' }] };
+      await agentFetch(config, 'messages', { method: 'POST', body: JSON.stringify(payload) }, 15000);
+      return { ok: true, models: config.model ? [config.model] : [], configuredModel: config.model };
+    }
     const payload = { model: config.model, stream: false, messages: [{ role: 'user', content: 'Reply with the word OK.' }], max_tokens: 8 };
     await agentFetch(config, 'chat/completions', { method: 'POST', body: JSON.stringify(payload) }, 15000);
     return { ok: true, models: config.model ? [config.model] : [], configuredModel: config.model };
