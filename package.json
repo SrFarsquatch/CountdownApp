@@ -15,6 +15,7 @@
     "wrangler": "^4.0.0"
   },
   "dependencies": {
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "yahoo-finance2": "^4.0.2"
   }
 }
