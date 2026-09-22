@@ -322,3 +322,8 @@ Because Cloudflare Access protects the main Quest Log hostname before requests r
 The more-specific path applications take precedence over the parent Quest Log Access application. The Worker still requires the private display token, so these paths are not anonymously usable without that token.
 
 Do not bypass Access for the rest of the Quest Log hostname.
+
+
+### Spectra 6 display target
+
+The default Quest Log e-ink target is the Pimoroni Inky Impression 4.0" Spectra 6 panel at 600×400. The rendered SVG uses only black, white, red, green, blue, and yellow so FrameOS does not need to approximate unsupported gray or purple shades.
