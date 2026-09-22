@@ -56,12 +56,12 @@ const UI_DENSITIES = ['comfortable', 'compact'];
 const AGENT_PROVIDERS = ['openai','anthropic','gemini','openrouter','groq','mistral','deepseek','xai','ollama','lmstudio','hermes','openclaw','openai-compatible'];
 const AGENT_PROVIDER_PRESETS = {
   openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.6-luna', apiStyle: 'openai' },
-  anthropic: { baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5', apiStyle: 'anthropic' },
-  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-3.8-flash', apiStyle: 'openai' },
+  anthropic: { baseUrl: 'https://api.anthropic.com/v1', model: '', apiStyle: 'anthropic' },
+  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: '', apiStyle: 'openai' },
   openrouter: { baseUrl: 'https://openrouter.ai/api/v1', model: '', apiStyle: 'openai' },
-  groq: { baseUrl: 'https://api.groq.com/openai/v1', model: 'openai/gpt-oss-20b', apiStyle: 'openai' },
-  mistral: { baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-large-latest', apiStyle: 'openai' },
-  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiStyle: 'openai' },
+  groq: { baseUrl: 'https://api.groq.com/openai/v1', model: '', apiStyle: 'openai' },
+  mistral: { baseUrl: 'https://api.mistral.ai/v1', model: '', apiStyle: 'openai' },
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: '', apiStyle: 'openai' },
   xai: { baseUrl: 'https://api.x.ai/v1', model: '', apiStyle: 'openai' },
   ollama: { baseUrl: '', model: '', apiStyle: 'openai' },
   lmstudio: { baseUrl: '', model: '', apiStyle: 'openai' },
