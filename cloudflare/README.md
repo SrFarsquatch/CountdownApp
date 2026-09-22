@@ -122,12 +122,20 @@ These credentials and tokens belong to the cloud deployment only.
 
 ### Navi / AI models
 
-Cloud Navi can use either OpenAI or a local OpenAI-compatible model.
+Cloud Navi supports hosted provider presets plus a local OpenAI-compatible endpoint.
 
-OpenAI uses:
+Hosted provider secrets:
 
-- `OPENAI_API_KEY` (Worker secret)
-- optional `OPENAI_MODEL`
+- OpenAI: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
+- Anthropic: `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
+- Gemini: `GEMINI_API_KEY`, optional `GEMINI_MODEL`
+- OpenRouter: `OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`
+- Groq: `GROQ_API_KEY`, optional `GROQ_MODEL`
+- Mistral: `MISTRAL_API_KEY`, optional `MISTRAL_MODEL`
+- DeepSeek: `DEEPSEEK_API_KEY`, optional `DEEPSEEK_MODEL`
+- xAI: `XAI_API_KEY`, optional `XAI_MODEL`
+
+Anthropic uses its native Messages API. The other hosted presets use OpenAI-compatible endpoints.
 
 For a local model, configure Navi in the cloud UI with provider **Local model (HTTPS)** and an HTTPS OpenAI-compatible `/v1` endpoint. A typical setup is:
 
