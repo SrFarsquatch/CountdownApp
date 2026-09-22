@@ -7,8 +7,18 @@ import { eventsBetween, calendars, taskLists, mutateEvent } from './google.js';
 
 const ACTION_TYPES=['create_task','update_task','create_goal','update_goal','create_countdown','update_countdown','create_event','update_event'];
 
+const PROVIDER_CONFIG={
+  openai:{base:'https://api.openai.com/v1',key:'OPENAI_API_KEY',modelEnv:'OPENAI_MODEL',defaultModel:'gpt-5.6-luna',style:'openai'},
+  anthropic:{base:'https://api.anthropic.com/v1',key:'ANTHROPIC_API_KEY',modelEnv:'ANTHROPIC_MODEL',defaultModel:'',style:'anthropic'},
+  gemini:{base:'https://generativelanguage.googleapis.com/v1beta/openai',key:'GEMINI_API_KEY',modelEnv:'GEMINI_MODEL',defaultModel:'',style:'openai'},
+  openrouter:{base:'https://openrouter.ai/api/v1',key:'OPENROUTER_API_KEY',modelEnv:'OPENROUTER_MODEL',defaultModel:'',style:'openai'},
+  groq:{base:'https://api.groq.com/openai/v1',key:'GROQ_API_KEY',modelEnv:'GROQ_MODEL',defaultModel:'',style:'openai'},
+  mistral:{base:'https://api.mistral.ai/v1',key:'MISTRAL_API_KEY',modelEnv:'MISTRAL_MODEL',defaultModel:'',style:'openai'},
+  deepseek:{base:'https://api.deepseek.com',key:'DEEPSEEK_API_KEY',modelEnv:'DEEPSEEK_MODEL',defaultModel:'',style:'openai'},
+  xai:{base:'https://api.x.ai/v1',key:'XAI_API_KEY',modelEnv:'XAI_MODEL',defaultModel:'',style:'openai'}
+};
 function endpointConfig(state,env){
-  const cfg=state.agent||{},provider=cfg.provider==='local'?'local':'openai';
+  const cfg=state.agent||{},provider=cfg.provider||'openai';
   if(provider==='local'){
     const base=cleanText(cfg.baseUrl||env.LOCAL_AGENT_BASE_URL,500).replace(/\/+$/,'');
     if(!base)throw new Error('Configure a local model HTTPS endpoint in Navi settings.');
@@ -16,6 +26,7 @@ function endpointConfig(state,env){
     if(parsed.protocol!=='https:')throw new Error('Cloud Navi local model endpoints must use HTTPS.');
     return{
       provider,
+      style:'openai',
       base,
       model:cleanText(cfg.model||env.LOCAL_AGENT_MODEL||'local-model',160),
       headers:{
@@ -28,12 +39,16 @@ function endpointConfig(state,env){
       }
     };
   }
-  if(!env.OPENAI_API_KEY)throw new Error('OPENAI_API_KEY is not configured as a Worker secret.');
+  const preset=PROVIDER_CONFIG[provider]||PROVIDER_CONFIG.openai,key=env[preset.key];
+  if(!key)throw new Error(preset.key+' is not configured as a Worker secret.');
   return{
-    provider:'openai',
-    base:'https://api.openai.com/v1',
-    model:cleanText(env.OPENAI_MODEL||cfg.model||'gpt-5.6-luna',160),
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+env.OPENAI_API_KEY}
+    provider,
+    style:preset.style,
+    base:preset.base,
+    model:cleanText(env[preset.modelEnv]||cfg.model||preset.defaultModel,160),
+    headers:preset.style==='anthropic'
+      ?{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':key}
+      :{'Content-Type':'application/json',Authorization:'Bearer '+key}
   };
 }
 async function modelFetch(state,env,resource,options={}){
@@ -59,6 +74,7 @@ function responseText(data){
   const content=data?.choices?.[0]?.message?.content;
   if(typeof content==='string')return content.trim();
   if(Array.isArray(content))return content.map(x=>typeof x==='string'?x:(x?.text||x?.content||'')).filter(Boolean).join('\n').trim();
+  if(Array.isArray(data?.content))return data.content.map(x=>typeof x==='string'?x:(x?.text||x?.content||'')).filter(Boolean).join('\n').trim();
   if(typeof data?.output_text==='string')return data.output_text.trim();
   return'';
 }
@@ -226,21 +242,30 @@ function parseEnvelope(raw){
 }
 export async function testAgent(state,env){
   const cfg=endpointConfig(state,env);
+  if(!cfg.model)throw new Error('Configure a model for '+cfg.provider+' first.');
   try{
     const result=await modelFetch(state,env,'models',{method:'GET'});
-    const data=result.data,models=Array.isArray(data?.data)?data.data.map(x=>x.id).filter(Boolean).slice(0,10):[cfg.model];
+    const data=result.data,raw=Array.isArray(data?.data)?data.data:(Array.isArray(data?.models)?data.models:[]);
+    const models=raw.map(x=>x?.id||x?.name||x).filter(Boolean).slice(0,10);
     return{ok:true,provider:cfg.provider,models:models.length?models:[cfg.model]};
-  }catch{
-    // Some compatible local endpoints do not expose /models. A minimal chat request is a better fallback test.
+  }catch(error){
+    if(cfg.style==='anthropic')throw error;
     const payload={model:cfg.model,stream:false,messages:[{role:'user',content:'Reply with the word OK.'}],max_tokens:8};
     await modelFetch(state,env,'chat/completions',{method:'POST',body:JSON.stringify(payload)});
     return{ok:true,provider:cfg.provider,models:[cfg.model]};
   }
 }
 export async function chat(state,env,messages){
-  const cfg=endpointConfig(state,env),context=await plannerContext(state,env);
-  const payload={model:cfg.model,stream:false,messages:[{role:'system',content:systemPrompt()},{role:'system',content:'Current Quest Log context (JSON):\n'+JSON.stringify(context)},...cleanMessages(messages)]};
-  const {data}=await modelFetch(state,env,'chat/completions',{method:'POST',body:JSON.stringify(payload)});
+  const cfg=endpointConfig(state,env),context=await plannerContext(state,env),history=cleanMessages(messages);
+  if(!cfg.model)throw new Error('Configure a model for '+cfg.provider+' first.');
+  let resource='chat/completions',payload;
+  if(cfg.style==='anthropic'){
+    resource='messages';
+    payload={model:cfg.model,stream:false,max_tokens:4096,system:systemPrompt()+'\n\nCurrent Quest Log context (JSON):\n'+JSON.stringify(context),messages:history};
+  }else{
+    payload={model:cfg.model,stream:false,messages:[{role:'system',content:systemPrompt()},{role:'system',content:'Current Quest Log context (JSON):\n'+JSON.stringify(context)},...history]};
+  }
+  const {data}=await modelFetch(state,env,resource,{method:'POST',body:JSON.stringify(payload)});
   const text=responseText(data);if(!text)throw new Error('The agent returned an empty response.');
   return parseEnvelope(text);
 }
