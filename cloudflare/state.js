@@ -88,7 +88,20 @@ export function normalizeModeLayouts(input,legacy){
 }
 export function normalizeModeSections(input){
   const source=input&&typeof input==='object'?input:{},out={};
-  for(const mode of DISPLAY_MODES)out[mode]={...defaultSections(mode),...(source[mode]||{})};
+  const styles={agenda:['list','timeline','week','calendar'],weather:['compact','current','forecast'],tasks:['checklist','compact'],goals:['bars','compact'],countdowns:['detailed','compact'],markets:['summary','compact','ticker']};
+  for(const mode of DISPLAY_MODES){
+    const base=defaultSections(mode),rawMode=source[mode]&&typeof source[mode]==='object'?source[mode]:{},sections={};
+    for(const key of DISPLAY_KEYS){
+      const raw=rawMode[key]&&typeof rawMode[key]==='object'?rawMode[key]:{},fallback=base[key];
+      sections[key]={...fallback,...raw,enabled:raw.enabled===undefined?fallback.enabled:Boolean(raw.enabled),style:en(raw.style,styles[key],fallback.style),limit:clamp(Math.round(num(raw.limit,fallback.limit)),1,20)};
+      if(key==='agenda'){
+        sections[key].scope=en(raw.scope,['today','week','month','upcoming'],fallback.scope);
+        if(sections[key].style==='calendar')sections[key].scope='month';
+        if(sections[key].style==='week')sections[key].scope='week';
+      }
+    }
+    out[mode]=sections;
+  }
   return out;
 }
 export function normalizeCountdown(x={}){
@@ -197,4 +210,13 @@ export async function saveMarketCache(env,marketCache){
   const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default';
   await env.DB.prepare("UPDATE questlog_state SET state_json=json_set(state_json,'$.marketCache',json(?)),updated_at=datetime('now') WHERE workspace_id=?")
     .bind(JSON.stringify(marketCache??null),workspace).run();
+}
+
+export async function saveGoogleAccounts(env,accounts){
+  if(!env.DB)return;
+  await ensureSchema(env.DB);
+  const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default';
+  const normalized=Array.isArray(accounts)?accounts.map(normalizeGoogleAccount):[];
+  await env.DB.prepare("UPDATE questlog_state SET state_json=json_set(state_json,'$.google.accounts',json(?)),updated_at=datetime('now') WHERE workspace_id=?")
+    .bind(JSON.stringify(normalized),workspace).run();
 }
