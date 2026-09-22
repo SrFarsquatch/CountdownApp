@@ -304,16 +304,16 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 #view-planner .mini-grid .selected{outline:1px solid var(--accent);background:var(--accent-soft);color:var(--text)}
 #view-planner .mini-grid .today{outline-color:var(--text)}
 #view-planner .calendar-stage{height:100%;min-height:0;max-height:none;border-radius:14px}
-#calendarStage[data-calendar-mode="day"],#calendarStage[data-calendar-mode="week"],#calendarStage[data-calendar-mode="week-mobile"]{overflow-x:auto;overflow-y:hidden}
+#calendarStage[data-calendar-mode="day"],#calendarStage[data-calendar-mode="week"],#calendarStage[data-calendar-mode="week-mobile"]{overflow:auto;scrollbar-gutter:stable}
 #calendarStage[data-timeline-dense="true"] .timeline-hour-label{font-size:7px;transform:translateY(-4px)}
 #calendarStage[data-timeline-dense="true"] .calendar-event-block{padding:1px 3px;border-left-width:2px;border-radius:4px}
 #calendarStage[data-timeline-dense="true"] .cal-block-title{font-size:8px;line-height:1}
 #calendarStage[data-timeline-dense="true"] .cal-block-time,#calendarStage[data-timeline-dense="true"] .cal-block-source{display:none}
-.calendar-event-block.event-compact{padding:2px 4px;border-left-width:3px;border-radius:5px}
-.calendar-event-block.event-compact .cal-block-title{font-size:9px;line-height:1.05}
+.calendar-event-block.event-compact{padding:2px 5px;border-left-width:3px;border-radius:5px}
+.calendar-event-block.event-compact .cal-block-title{font-size:10px;line-height:1.1}
 .calendar-event-block.event-compact .cal-block-time,.calendar-event-block.event-compact .cal-block-source{display:none}
-.calendar-event-block.event-tiny{padding:0 4px;border-left-width:3px;border-radius:4px;display:flex;align-items:center}
-.calendar-event-block.event-tiny .cal-block-title{font-size:8px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calendar-event-block.event-tiny{padding:1px 5px;border-left-width:3px;border-radius:4px;display:flex;align-items:center}
+.calendar-event-block.event-tiny .cal-block-title{font-size:9px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .calendar-event-block.event-tiny .cal-block-time,.calendar-event-block.event-tiny .cal-block-source{display:none}
 .timeline-root{min-width:0}
 .timeline-time-rail,.timeline-lane{height:var(--timeline-height,624px)}
@@ -331,7 +331,11 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 .week-day-button:hover{background:var(--panel2)}
 .all-day-label{min-height:30px;padding:7px 7px 5px;align-items:center;justify-content:flex-end;overflow:hidden;white-space:nowrap}
 .all-day-cell{min-height:30px;max-height:58px;padding:3px 4px;gap:3px;overflow:auto}
-.timeline-day-all-day,.week-all-day{min-height:30px}
+.timeline-day-all-day,.week-all-day{min-height:30px;background:var(--panel)}
+.timeline-day-all-day{position:sticky;top:0;z-index:11}
+.week-day-heads{height:54px}
+.week-all-day{position:sticky;top:54px;z-index:11}
+#calendarStage[data-calendar-mode="week-mobile"] .timeline-day-all-day{top:55px}
 .day-time-grid,.week-time-grid{border-top:1px solid var(--line)}
 .timeline-hour-label{padding-right:1px}
 .all-day-chip{padding:3px 5px}
@@ -364,7 +368,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
   #plannerViews button{width:auto;min-width:58px;min-height:40px;padding:5px 8px}
   #connectInline{width:auto;min-height:40px;padding:6px 9px;font-size:11px}
   #view-planner .calendar-shell{display:block;height:100%;min-height:0;margin:0!important}
-  #view-planner .calendar-stage{height:100%;width:100%;min-width:0;max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #view-planner .calendar-stage{height:100%;width:100%;min-width:0;max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-gutter:stable}
   .timeline-day-all-day,.day-time-grid{grid-template-columns:52px minmax(0,1fr)}
   .all-day-label{font-size:8px;padding:6px 4px}
   .timeline-hour-label{right:5px;font-size:9px}
@@ -1174,16 +1178,14 @@ function plannerLabel(range){
  const last=new Date(range.end);last.setDate(last.getDate()-1);
  return range.start.toLocaleDateString([],{month:'short',day:'numeric'})+' – '+last.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});
 }
-let HOUR_HEIGHT=26,TIMELINE_HEIGHT=24*HOUR_HEIGHT;
-function fitTimelineToStage(mode){
+let HOUR_HEIGHT=48,TIMELINE_HEIGHT=24*HOUR_HEIGHT;
+function fitTimelineToStage(){
  const stage=$('calendarStage');if(!stage)return;
- const reserved=mode==='week'?76:mode==='week-mobile'?84:36;
- const available=Math.max(216,(stage.clientHeight||600)-reserved);
- HOUR_HEIGHT=Math.max(9,available/24);
+ HOUR_HEIGHT=window.matchMedia('(max-width:760px)').matches?52:48;
  TIMELINE_HEIGHT=HOUR_HEIGHT*24;
- stage.style.setProperty('--timeline-hour-height',HOUR_HEIGHT.toFixed(3)+'px');
- stage.style.setProperty('--timeline-height',TIMELINE_HEIGHT.toFixed(3)+'px');
- stage.dataset.timelineDense=HOUR_HEIGHT<17?'true':'false';
+ stage.style.setProperty('--timeline-hour-height',HOUR_HEIGHT+'px');
+ stage.style.setProperty('--timeline-height',TIMELINE_HEIGHT+'px');
+ stage.dataset.timelineDense='false';
 }
 function eventOverlapsDay(e,day,next){const s=new Date(e.start),end=new Date(e.end||e.start);return s<next&&end>day}
 function taskCalendarSpan(t){
@@ -1217,12 +1219,12 @@ function layoutTimedItems(items,day,next){
    const top=(item.startMs-dayMs)/60000/60*HOUR_HEIGHT;
    const rawHeight=(item.endMs-item.startMs)/60000/60*HOUR_HEIGHT;
    const width=100/item.columns,left=item.col*width;
-   return{...item,top,height:Math.max(6,rawHeight),left,width};
+   return{...item,top,height:Math.max(18,rawHeight),left,width};
  });
 }
 function timeRailHtml(){
- let h='<div class="timeline-time-rail">',step=HOUR_HEIGHT<15?2:1;
- for(let hour=step;hour<24;hour+=step){const d=new Date();d.setHours(hour,0,0,0);h+='<span class="timeline-hour-label" style="top:'+(hour*HOUR_HEIGHT)+'px">'+d.toLocaleTimeString([],{hour:'numeric'})+'</span>'}
+ let h='<div class="timeline-time-rail">';
+ for(let hour=1;hour<24;hour++){const d=new Date();d.setHours(hour,0,0,0);h+='<span class="timeline-hour-label" style="top:'+(hour*HOUR_HEIGHT)+'px">'+d.toLocaleTimeString([],{hour:'numeric'})+'</span>'}
  return h+'</div>';
 }
 function formatGmtOffset(date=new Date()){
@@ -1259,8 +1261,13 @@ function timelineFocusDate(range){
  if(candidates.length)return new Date(Math.min(...candidates.map(d=>d.getTime())));
  const fallback=new Date(range.start);fallback.setHours(8,0,0,0);return fallback;
 }
-function scrollTimeline(){
- requestAnimationFrame(()=>{const stage=$('calendarStage');if(stage)stage.scrollTop=0});
+function scrollTimeline(range){
+ requestAnimationFrame(()=>{
+   const stage=$('calendarStage');if(!stage)return;
+   const focus=timelineFocusDate(range),hour=focus.getHours()+focus.getMinutes()/60;
+   const target=Math.max(0,(hour-2)*HOUR_HEIGHT);
+   stage.scrollTop=target;
+ });
 }
 function bindCalendarInteractions(){
  const root=$('calendarStage');if(!root)return;
