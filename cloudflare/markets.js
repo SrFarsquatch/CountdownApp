@@ -1,5 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
-import { saveState, normalizeMarkets, cleanText } from './state.js';
+import { saveMarketCache, normalizeMarkets, cleanText } from './state.js';
 
 const yahooFinance=new YahooFinance({queue:{concurrency:2,interval:250}});
 const marketNumber=value=>{const n=Number(value);return Number.isFinite(n)?n:null};
@@ -66,7 +66,7 @@ export async function marketData(state,env){
   if(cache?.data&&cache.key===key&&Number(cache.expiresAt)>Date.now())return cache.data;
   if(!config.watchlist.length){
     const data={provider:'Yahoo Finance',quotes:[],watchlist:[],symbols:[],updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:config.refreshMinutes,batchSize:50,unofficial:true};
-    state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveState(env,state);return data;
+    state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveMarketCache(env,state.marketCache);return data;
   }
   let rows=[];
   try{
@@ -86,7 +86,7 @@ export async function marketData(state,env){
     return row?quoteFromYahoo(row,item):unavailable(item);
   });
   const data={provider:'Yahoo Finance',quotes,watchlist:config.watchlist,symbols:config.watchlist.map(x=>x.symbol),updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:config.refreshMinutes,batchSize:50,unofficial:true};
-  state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveState(env,state);return data;
+  state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveMarketCache(env,state.marketCache);return data;
 }
 export async function marketSearch(query,state,env){
   const q=cleanText(query,80).trim();if(!q)return[];
