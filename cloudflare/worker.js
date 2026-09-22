@@ -377,7 +377,7 @@ async function handleApi(request,env,identity){
     return json({feedPath:'/api/frameos/feed?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token});
   }
   if(p==='/api/frameos/feed'&&method==='GET'){
-    if(url.searchParams.get('token')!==state.display.token)return json({error:'Invalid display token'},401);
+    if(!identity?.displayAuthorized&&url.searchParams.get('token')!==state.display.token)return json({error:'Invalid display token'},401);
     const range=displayRange(state);
     let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
     if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
@@ -386,7 +386,7 @@ async function handleApi(request,env,identity){
     return json(buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError}));
   }
   if(p==='/api/frameos/svg'&&method==='GET'){
-    if(url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
+    if(!identity?.displayAuthorized&&url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
     const range=displayRange(state);
     let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
     if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
@@ -422,12 +422,17 @@ export default{
     const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/svg';
     if(machineDisplay){
       try{
-        const state=await loadState(env);
-        if(url.searchParams.get('token')!==state.display.token)return url.pathname==='/frame'?text('Invalid display token',401):json({error:'Invalid display token'},401);
+        const state=await loadState(env),tokenValid=url.searchParams.get('token')===state.display.token;
+        let displayIdentity={email:null,sub:'display-token',bypass:true,displayAuthorized:true};
+        if(!tokenValid){
+          const identity=await authenticate(request,env);
+          displayIdentity={...identity,displayAuthorized:true};
+        }
         if(url.pathname==='/frame')return env.ASSETS.fetch(new Request(new URL('/frame.html',url),request));
-        return await handleApi(request,env,{email:null,sub:'display-token',bypass:true});
+        return await handleApi(request,env,displayIdentity);
       }catch(error){
-        return url.pathname==='/frame'?text(error.message||'Display unavailable.',500):json({error:error.message||'Display unavailable.'},500);
+        const status=Number(error.status)||401;
+        return url.pathname==='/frame'?text(error.message||'Display unavailable.',status):json({error:error.message||'Display unavailable.'},status);
       }
     }
     let identity;
