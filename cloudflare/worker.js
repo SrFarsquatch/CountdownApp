@@ -11,7 +11,7 @@ import {
   calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
-import { marketData, marketSearch, testMarketConnection, saveMarketCredential, clearMarketCredential } from './markets.js';
+import { marketData, marketSearch, testMarketConnection } from './markets.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
@@ -278,10 +278,8 @@ async function handleApi(request,env,identity){
     if(incoming.weatherLatitude!==undefined||incoming.weatherLongitude!==undefined||incoming.weatherLocationLabel!==undefined||incoming.weatherCountryCode!==undefined||incoming.weatherUnits!==undefined){
       state.weather=normalizeWeather({...state.weather,latitude:incoming.weatherLatitude??state.weather.latitude,longitude:incoming.weatherLongitude??state.weather.longitude,locationLabel:incoming.weatherLocationLabel??state.weather.locationLabel,countryCode:incoming.weatherCountryCode??state.weather.countryCode,units:incoming.weatherUnits??state.weather.units});
     }
-    if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined||incoming.marketApiKey!==undefined||incoming.marketClearApiKey!==undefined){
+    if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
-      if(incoming.marketClearApiKey)await clearMarketCredential(state,env);
-      if(incoming.marketApiKey!==undefined&&cleanText(incoming.marketApiKey,5000))await saveMarketCredential(state,env,cleanText(incoming.marketApiKey,5000));
       state.marketCache=null;
     }
     if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined||incoming.agentApiKey!==undefined||incoming.agentClearApiKey!==undefined){
