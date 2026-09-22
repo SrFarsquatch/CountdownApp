@@ -53,7 +53,22 @@ const GOAL_STATUS = ['active', 'complete', 'paused'];
 const APPEARANCE_MODES = ['system', 'light', 'dark'];
 const UI_THEMES = ['classic', 'quest', 'moss', 'ember', 'arcane', 'slate'];
 const UI_DENSITIES = ['comfortable', 'compact'];
-const AGENT_PROVIDERS = ['hermes', 'openclaw', 'openai-compatible'];
+const AGENT_PROVIDERS = ['openai','anthropic','gemini','openrouter','groq','mistral','deepseek','xai','ollama','lmstudio','hermes','openclaw','openai-compatible'];
+const AGENT_PROVIDER_PRESETS = {
+  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.6-luna', apiStyle: 'openai' },
+  anthropic: { baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5', apiStyle: 'anthropic' },
+  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-3.8-flash', apiStyle: 'openai' },
+  openrouter: { baseUrl: 'https://openrouter.ai/api/v1', model: '', apiStyle: 'openai' },
+  groq: { baseUrl: 'https://api.groq.com/openai/v1', model: 'openai/gpt-oss-20b', apiStyle: 'openai' },
+  mistral: { baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-large-latest', apiStyle: 'openai' },
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiStyle: 'openai' },
+  xai: { baseUrl: 'https://api.x.ai/v1', model: '', apiStyle: 'openai' },
+  ollama: { baseUrl: '', model: '', apiStyle: 'openai' },
+  lmstudio: { baseUrl: '', model: '', apiStyle: 'openai' },
+  hermes: { baseUrl: '', model: 'hermes-agent', apiStyle: 'openai' },
+  openclaw: { baseUrl: '', model: 'openclaw/default', apiStyle: 'openai' },
+  'openai-compatible': { baseUrl: '', model: '', apiStyle: 'openai' }
+};
 const AGENT_ACTION_TYPES = ['create_task', 'update_task', 'create_goal', 'update_goal', 'create_countdown', 'update_countdown', 'create_event', 'update_event'];
 const HEX = {
   black: '#111111', red: '#d62828', blue: '#1769aa', green: '#2f7d32',
@@ -383,17 +398,22 @@ function normalizeAgentBaseUrl(value) {
     return '';
   }
 }
+function agentProviderPreset(provider) {
+  return AGENT_PROVIDER_PRESETS[provider] || AGENT_PROVIDER_PRESETS['openai-compatible'];
+}
 function defaultAgentModel(provider) {
-  if (provider === 'openclaw') return 'openclaw/default';
-  if (provider === 'hermes') return 'hermes-agent';
-  return '';
+  return agentProviderPreset(provider).model || '';
+}
+function defaultAgentBaseUrl(provider) {
+  return agentProviderPreset(provider).baseUrl || '';
 }
 function normalizeAgent(x = {}) {
   const provider = en(x.provider, AGENT_PROVIDERS, 'hermes');
+  const requestedBase = normalizeAgentBaseUrl(x.baseUrl);
   return {
     enabled: Boolean(x.enabled),
     provider,
-    baseUrl: normalizeAgentBaseUrl(x.baseUrl),
+    baseUrl: requestedBase || defaultAgentBaseUrl(provider),
     model: cleanText(x.model, 160) || defaultAgentModel(provider),
     credential: typeof x.credential === 'string' ? x.credential : null,
     requireConfirmation: true,
@@ -1468,6 +1488,13 @@ function agentEndpoint(config, resource) {
 }
 function agentHeaders(config) {
   const apiKey = agentApiKey(config);
+  if (config.provider === 'anthropic') {
+    return {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      ...(apiKey ? { 'x-api-key': apiKey } : {})
+    };
+  }
   return {
     'Content-Type': 'application/json',
     ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {})
@@ -1502,6 +1529,9 @@ function agentMessageText(data) {
   if (typeof content === 'string') return content.trim();
   if (Array.isArray(content)) {
     return content.map(part => typeof part === 'string' ? part : (part?.text || part?.content || '')).filter(Boolean).join('\n').trim();
+  }
+  if (Array.isArray(data?.content)) {
+    return data.content.map(part => typeof part === 'string' ? part : (part?.text || part?.content || '')).filter(Boolean).join('\n').trim();
   }
   if (typeof data?.output_text === 'string') return data.output_text.trim();
   return '';
@@ -1801,16 +1831,29 @@ async function agentChat(messages) {
   if (!config.baseUrl) throw new Error('Configure the agent endpoint in Settings first.');
   if (!config.model) throw new Error('Configure an agent model in Settings first.');
   const context = await agentPlannerContext();
-  const payload = {
-    model: config.model,
-    stream: false,
-    messages: [
-      { role: 'system', content: agentSystemPrompt() },
-      { role: 'system', content: 'Current Quest Log context (JSON):\n' + JSON.stringify(context) },
-      ...cleanAgentMessages(messages)
-    ]
-  };
-  const data = await agentFetch(config, 'chat/completions', { method: 'POST', body: JSON.stringify(payload) });
+  const history = cleanAgentMessages(messages);
+  let resource = 'chat/completions', payload;
+  if (config.provider === 'anthropic') {
+    resource = 'messages';
+    payload = {
+      model: config.model,
+      stream: false,
+      max_tokens: 4096,
+      system: agentSystemPrompt() + '\n\nCurrent Quest Log context (JSON):\n' + JSON.stringify(context),
+      messages: history
+    };
+  } else {
+    payload = {
+      model: config.model,
+      stream: false,
+      messages: [
+        { role: 'system', content: agentSystemPrompt() },
+        { role: 'system', content: 'Current Quest Log context (JSON):\n' + JSON.stringify(context) },
+        ...history
+      ]
+    };
+  }
+  const data = await agentFetch(config, resource, { method: 'POST', body: JSON.stringify(payload) });
   const text = agentMessageText(data);
   if (!text) throw new Error('The agent returned an empty response.');
   return { ...parseAgentEnvelope(text), provider: config.provider, model: config.model };
@@ -1818,9 +1861,17 @@ async function agentChat(messages) {
 async function testAgentConnection() {
   const config = normalizeAgent(db.agent);
   if (!config.baseUrl) throw new Error('Configure the agent endpoint first.');
-  const data = await agentFetch(config, 'models', { method: 'GET' }, 15000);
-  const models = Array.isArray(data?.data) ? data.data.map(item => cleanText(item?.id, 160)).filter(Boolean).slice(0, 30) : [];
-  return { ok: true, models, configuredModel: config.model };
+  try {
+    const data = await agentFetch(config, 'models', { method: 'GET' }, 15000);
+    const rawModels = Array.isArray(data?.data) ? data.data : (Array.isArray(data?.models) ? data.models : []);
+    const models = rawModels.map(item => cleanText(item?.id || item?.name || item, 160)).filter(Boolean).slice(0, 30);
+    return { ok: true, models: models.length ? models : (config.model ? [config.model] : []), configuredModel: config.model };
+  } catch (error) {
+    if (config.provider === 'anthropic') throw error;
+    const payload = { model: config.model, stream: false, messages: [{ role: 'user', content: 'Reply with the word OK.' }], max_tokens: 8 };
+    await agentFetch(config, 'chat/completions', { method: 'POST', body: JSON.stringify(payload) }, 15000);
+    return { ok: true, models: config.model ? [config.model] : [], configuredModel: config.model };
+  }
 }
 async function executeAgentAction(rawAction) {
   const action = normalizeAgentAction(rawAction);
