@@ -373,7 +373,7 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/display/rotate-token'&&method==='POST'){
-    state.display.token=crypto.randomUUID().replaceAll('-')+crypto.randomUUID().replaceAll('-').slice(0,16);await saveState(env,state);
+    state.display.token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','').slice(0,16);await saveState(env,state);
     return json({feedPath:'/api/frameos/feed?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token});
   }
   if(p==='/api/frameos/feed'&&method==='GET'){
