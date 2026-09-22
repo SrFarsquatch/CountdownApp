@@ -165,9 +165,9 @@ When both Access service-token values are present, the Worker sends the standard
 
 ### Markets
 
-Quest Log uses Tickerbot as the shared market-data provider. Store `TICKERBOT_API_KEY` as a **Cloudflare Worker secret**. It is not entered or managed from the Quest Log UI and is never returned to the browser.
+Quest Log uses the unofficial `yahoo-finance2` client server-side for market data. No market API key is required. The same integration works in Node and the Cloudflare Worker, and Quest Log caches quote results for the configured refresh interval.
 
-Quest Log batches up to 50 watchlist symbols in one Tickerbot state request and caches the result for the configured refresh interval.
+Yahoo Finance is not an official public developer API, so availability and response shape are not guaranteed. Keep the market adapter isolated so it can be swapped later if needed.
 
 ### Weather
 
