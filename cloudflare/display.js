@@ -56,7 +56,7 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
     nextEvent:events.find(e=>new Date(e.end||e.start).getTime()>=now)||null,
     events:sections.agenda.enabled?events.slice(0,sections.agenda.limit):[],
     calendarEvents:sections.agenda.enabled?events.slice(0,250):[],
-    agendaTasks:sections.agenda.enabled?agendaTasks.slice(0,250):[],
+    agendaTasks:[],
     plannerTasks:(sections.agenda.enabled||sections.tasks.enabled)?tasks.filter(t=>t.status!=='done'&&t.displayEnabled!==false).slice(0,250):[],
     tasks:sections.tasks.enabled?tasks.filter(t=>t.status!=='done'&&t.displayEnabled!==false).slice(0,sections.tasks.limit):[],
     goals:sections.goals.enabled?activeGoals.slice(0,sections.goals.limit):[],
@@ -114,11 +114,7 @@ function weatherIcon(condition,x,y,size,palette){
   return cloud;
 }
 function agendaEntries(data){
-  const today=startOfDay(new Date()).getTime();
-  return[
-    ...(data.calendarEvents||data.events||[]).map(event=>({kind:'event',when:new Date(event.start).getTime(),event})),
-    ...(data.agendaTasks||[]).map(task=>({kind:'task',when:task.due?new Date(task.due).getTime():Infinity,task}))
-  ].sort((a,b)=>{const ao=a.kind==='task'&&a.when<today,bo=b.kind==='task'&&b.when<today;if(ao!==bo)return ao?-1:1;return a.when-b.when});
+  return(data.calendarEvents||data.events||[]).map(event=>({kind:'event',when:new Date(event.start).getTime(),event})).sort((a,b)=>a.when-b.when);
 }
 function eventsForDay(data,day){
   const a=startOfDay(day),b=new Date(a);b.setDate(b.getDate()+1);
@@ -166,16 +162,16 @@ export function renderDisplaySvg(data,width=800,height=480){
       if(cfg.style==='week'){
         const monday=startOfDay(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const rowH=Math.max(22,Math.min(40,(bh-25)/7));
         for(let i=0;i<7&&cy+rowH<=y+bh;i++){
-          const day=new Date(monday);day.setDate(day.getDate()+i),entries=[...eventsForDay(data,day).map(event=>({kind:'event',event})),...tasksForDay(data,day).map(task=>({kind:'task',task}))].slice(0,2);
+          const day=new Date(monday);day.setDate(day.getDate()+i),entries=eventsForDay(data,day).map(event=>({kind:'event',event})).slice(0,2);
           svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/><text x="'+x+'" y="'+(cy+15)+'" font-size="9" font-weight="800">'+esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()+' '+day.getDate())+'</text>';
-          let tx=x+58;for(const e of entries){if(e.kind==='event'){svg+='<circle cx="'+tx+'" cy="'+(cy+11)+'" r="3" fill="'+eventAccent(e.event,palette)+'"/><text x="'+(tx+7)+'" y="'+(cy+15)+'" font-size="9.5">'+esc(short(e.event.title,Math.max(10,Math.floor((bw-(tx-x))/7))))+'</text>'}else{svg+='<rect x="'+(tx-2)+'" y="'+(cy+7)+'" width="7" height="7" fill="#fff" stroke="'+black+'"/><text x="'+(tx+8)+'" y="'+(cy+15)+'" font-size="9.5">'+esc(short(e.task.title,26))+'</text>'}tx+=Math.max(90,bw*.42)}cy+=rowH;
+          let tx=x+58;for(const e of entries){svg+='<circle cx="'+tx+'" cy="'+(cy+11)+'" r="3" fill="'+eventAccent(e.event,palette)+'"/><text x="'+(tx+7)+'" y="'+(cy+15)+'" font-size="9.5">'+esc(short(e.event.title,Math.max(10,Math.floor((bw-(tx-x))/7))))+'</text>';tx+=Math.max(90,bw*.42)}cy+=rowH;
         }
       }else if(cfg.style==='calendar'){
         const first=new Date(now.getFullYear(),now.getMonth(),1),offset=(first.getDay()+6)%7,start=new Date(first);start.setDate(start.getDate()-offset),cellW=bw/7,cellH=Math.max(24,Math.min(48,(bh-38)/6));
         ['M','T','W','T','F','S','S'].forEach((d,i)=>svg+='<text x="'+(x+i*cellW+cellW/2)+'" y="'+(cy+9)+'" text-anchor="middle" font-size="7.5" font-weight="800" class="muted">'+d+'</text>');cy+=13;
-        for(let i=0;i<42;i++){const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,yy=cy+row*cellH;if(yy+cellH>y+bh)break;svg+='<rect x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+'" fill="none" stroke="'+rule+'"/><text x="'+(cx+4)+'" y="'+(yy+11)+'" font-size="8">'+day.getDate()+'</text>';const ev=eventsForDay(data,day).slice(0,2),ts=tasksForDay(data,day).slice(0,Math.max(0,3-ev.length));ev.forEach((e,j)=>svg+='<circle cx="'+(cx+6+j*8)+'" cy="'+(yy+cellH-6)+'" r="2.5" fill="'+eventAccent(e,palette)+'"/>');ts.forEach((t,j)=>{const px=cx+6+(ev.length+j)*8;svg+='<rect x="'+(px-2.5)+'" y="'+(yy+cellH-8.5)+'" width="5" height="5" fill="#fff" stroke="'+black+'"/>'})}
+        for(let i=0;i<42;i++){const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,yy=cy+row*cellH;if(yy+cellH>y+bh)break;svg+='<rect x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+'" fill="none" stroke="'+rule+'"/><text x="'+(cx+4)+'" y="'+(yy+11)+'" font-size="8">'+day.getDate()+'</text>';const ev=eventsForDay(data,day).slice(0,3);ev.forEach((e,j)=>svg+='<circle cx="'+(cx+6+j*8)+'" cy="'+(yy+cellH-6)+'" r="2.5" fill="'+eventAccent(e,palette)+'"/>')}
       }else{
-        for(const entry of items.slice(0,cfg.limit||12)){if(cy+31>y+bh)break;svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';if(entry.kind==='event'){const d=new Date(entry.event.start),when=entry.event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});svg+='<circle cx="'+(x+4)+'" cy="'+(cy+16)+'" r="4" fill="'+eventAccent(entry.event,palette)+'"/><text x="'+(x+14)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-86)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+20)+'" text-anchor="end" font-size="10" class="muted">'+esc(when)+'</text>'}else{const due=entry.task.due?new Date(entry.task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'Anytime';svg+='<rect x="'+x+'" y="'+(cy+11)+'" width="10" height="10" rx="2" fill="#fff" stroke="'+black+'"/><text x="'+(x+18)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.task.title,Math.max(12,Math.floor((bw-85)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+20)+'" text-anchor="end" font-size="10" class="muted">'+esc(due)+'</text>'}cy+=30}
+        for(const entry of items.slice(0,cfg.limit||12)){if(cy+31>y+bh)break;const d=new Date(entry.event.start),when=entry.event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/><circle cx="'+(x+4)+'" cy="'+(cy+16)+'" r="4" fill="'+eventAccent(entry.event,palette)+'"/><text x="'+(x+14)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-86)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+20)+'" text-anchor="end" font-size="10" class="muted">'+esc(when)+'</text>';cy+=30}
       }
     }else if(kind==='weather'){
       const weather=data.weather,current=weather?.current,forecast=weather?.forecast||[],unit=weather?.units==='imperial'?'°F':'°C';
