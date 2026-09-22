@@ -456,8 +456,8 @@ function defaultMarketWatchlist() {
   return [
     normalizeMarketInstrument({ symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', currency: 'USD' }),
     normalizeMarketInstrument({ symbol: 'QQQ', name: 'Invesco QQQ Trust', currency: 'USD' }),
-    normalizeMarketInstrument({ symbol: 'RY', providerSymbol: 'RY.TRT', name: 'Royal Bank of Canada', exchange: 'Toronto', region: 'Canada', currency: 'CAD' }),
-    normalizeMarketInstrument({ symbol: 'XEQT', providerSymbol: 'XEQT.TRT', name: 'iShares Core Equity ETF Portfolio', exchange: 'Toronto', region: 'Canada', currency: 'CAD' })
+    normalizeMarketInstrument({ symbol: 'AAPL', name: 'Apple Inc.', currency: 'USD' }),
+    normalizeMarketInstrument({ symbol: 'MSFT', name: 'Microsoft Corporation', currency: 'USD' })
   ];
 }
 function normalizeMarkets(x = {}) {
@@ -470,7 +470,7 @@ function normalizeMarkets(x = {}) {
     const key = item.providerSymbol;
     if (seen.has(key)) continue;
     seen.add(key); watchlist.push(item);
-    if (watchlist.length >= 8) break;
+    if (watchlist.length >= 50) break;
   }
   const normalized = watchlist.length ? watchlist : defaultMarketWatchlist();
   return {
