@@ -317,7 +317,7 @@ async function handleApi(request,env,identity){
   }
   if(p==='/api/markets/test'&&method==='POST'){
     try{return json(await testMarketConnection(state,env))}
-    catch(error){return json({ok:false,error:error.message||'Tickerbot connection failed.'},400)}
+    catch(error){return json({ok:false,error:error.message||'Yahoo Finance connection failed.'},400)}
   }
 
   if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env);
