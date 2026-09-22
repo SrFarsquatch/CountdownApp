@@ -167,7 +167,9 @@ export function renderDisplaySvg(data,width=800,height=480){
           let tx=x+58;for(const e of entries){svg+='<circle cx="'+tx+'" cy="'+(cy+11)+'" r="3" fill="'+eventAccent(e.event,palette)+'"/><text x="'+(tx+7)+'" y="'+(cy+15)+'" font-size="9.5">'+esc(short(e.event.title,Math.max(10,Math.floor((bw-(tx-x))/7))))+'</text>';tx+=Math.max(90,bw*.42)}cy+=rowH;
         }
       }else if(cfg.style==='calendar'){
-        const first=new Date(now.getFullYear(),now.getMonth(),1),offset=(first.getDay()+6)%7,start=new Date(first);start.setDate(start.getDate()-offset),cellW=bw/7,cellH=Math.max(24,Math.min(48,(bh-38)/6));
+        const first=new Date(now.getFullYear(),now.getMonth(),1),offset=(first.getDay()+6)%7,start=new Date(first);
+        start.setDate(start.getDate()-offset);
+        const cellW=bw/7,cellH=Math.max(24,Math.min(48,(bh-38)/6));
         ['M','T','W','T','F','S','S'].forEach((d,i)=>svg+='<text x="'+(x+i*cellW+cellW/2)+'" y="'+(cy+9)+'" text-anchor="middle" font-size="7.5" font-weight="800" class="muted">'+d+'</text>');cy+=13;
         for(let i=0;i<42;i++){const day=new Date(start);day.setDate(start.getDate()+i);const col=i%7,row=Math.floor(i/7),cx=x+col*cellW,yy=cy+row*cellH;if(yy+cellH>y+bh)break;svg+='<rect x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+'" fill="none" stroke="'+rule+'"/><text x="'+(cx+4)+'" y="'+(yy+11)+'" font-size="8">'+day.getDate()+'</text>';const ev=eventsForDay(data,day).slice(0,3);ev.forEach((e,j)=>svg+='<circle cx="'+(cx+6+j*8)+'" cy="'+(yy+cellH-6)+'" r="2.5" fill="'+eventAccent(e,palette)+'"/>')}
       }else{
