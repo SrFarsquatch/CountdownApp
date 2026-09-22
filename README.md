@@ -227,7 +227,7 @@ docker run -d \
 
 Open `http://<server-ip>:8088`.
 
-Google, Markets, and stored Navi credentials require additional environment variables.
+Google and stored Navi credentials may require additional environment variables. Markets use Yahoo Finance server-side and do not require a market API key.
 
 The CasaOS one-click updater also requires the Docker socket. A normal Docker deployment can omit that mount and update the image using your usual Docker workflow instead.
 
@@ -239,7 +239,6 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
 | `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
 | `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
-| `` | For Markets | Shared Yahoo Finance API key supplied as an environment/Worker secret |
 | `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
 | `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
 | `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
@@ -355,7 +354,6 @@ Core/integration secrets:
 | --- | --- | --- |
 | `APP_SECRET` | Secret | Google token encryption and OAuth state signing |
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
-| `` | Secret | Markets |
 | `OPENAI_API_KEY` | Secret | Optional fallback for Cloud Navi OpenAI |
 | `ANTHROPIC_API_KEY` | Secret | Optional fallback for Cloud Navi Anthropic |
 | `GEMINI_API_KEY` | Secret | Optional fallback for Cloud Navi Gemini |
@@ -465,16 +463,15 @@ Event edits are only enabled for calendars where Google's API reports `writer` o
 
 Google Tasks exposes a due **date**, not a due time. Quest Log retains its local task time while synchronizing the date to Google.
 
-## Alpha Vantage Markets
+## Yahoo Finance Markets
 
-1. Create an Alpha Vantage API key.
-2. Self-hosted: set `` in the container environment and restart/recreate the container.
-3. Cloud: store `` as a Worker secret and redeploy if required.
-4. Open **Markets** and use the in-app symbol search to add securities.
+Quest Log uses the unofficial `yahoo-finance2` server-side client for market quotes and symbol search. No market API key is required.
 
-Using the in-app search is recommended for Canadian listings so Quest Log stores the provider-qualified symbol returned by Alpha Vantage.
+Open **Markets** and use the in-app search to add securities. Canadian symbols use Yahoo Finance suffixes such as `.TO` for TSX and `.V` for TSX Venture. Existing legacy `.TRT` and `.TRV` watchlist symbols are migrated automatically.
 
-Market data is cached server-side and refresh intervals are constrained to reduce free-tier API usage.
+Market data is cached server-side so Today, Markets, Navi, and e-ink views can reuse the same snapshot instead of making duplicate requests.
+
+Yahoo Finance does not provide an official public developer API, so availability and response formats can change. Quest Log keeps the provider behind its market adapter so it can be replaced later without redesigning the frontend.
 
 ## Weather
 
@@ -691,7 +688,7 @@ The cloud and self-hosted persistence stores are intentionally independent.
 
 # Security notes
 
-- Never commit `.dev.vars`, Google client secrets, Alpha Vantage keys, OpenAI keys, or agent bearer tokens.
+- Never commit `.dev.vars`, Google client secrets, OpenAI keys, or agent bearer tokens.
 - Use Cloudflare **Secrets** for cloud credentials.
 - Keep `APP_SECRET` long, random, private, and stable.
 - Treat FrameOS display tokens as credentials.
