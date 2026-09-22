@@ -13,7 +13,6 @@ CLOUD_WORKSPACE_ID=default
 # Cloud-only integration secrets/variables are configured directly on the Worker:
 # GOOGLE_CLIENT_ID
 # GOOGLE_CLIENT_SECRET
-# APP_SECRET
 # APP_SECRET=replace-with-a-long-random-secret
 #
 # Cloud AI provider keys can normally be entered in Quest Log itself and encrypted into D1.
