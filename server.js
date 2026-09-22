@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const webpush = require('web-push');
+const YahooFinance = require('yahoo-finance2').default;
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 8080);
@@ -11,7 +12,6 @@ const DB_PATH = path.join(DATA_DIR, 'countdown-data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const TICKERBOT_API_KEY = process.env.TICKERBOT_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -421,34 +421,35 @@ function normalizeAgent(x = {}) {
   };
 }
 
-function alphaProviderSymbol(source = {}) {
-  const raw = cleanText(source.providerSymbol || source.alphaSymbol || source.symbol, 32).toUpperCase();
+function yahooProviderSymbol(source = {}) {
+  let raw = cleanText(source.providerSymbol || source.symbol, 32).toUpperCase()
+    .replace(/\.TRT$/i, '.TO').replace(/\.TRV$/i, '.V');
   if (!raw) return '';
-  if (raw.includes('.') || raw.includes('/')) return raw;
+  if (raw.includes('.') || raw.includes('=') || raw.includes('-')) return raw;
   const exchange = cleanText(source.exchange, 80).toUpperCase();
   const region = cleanText(source.region || source.country, 80).toUpperCase();
-  if (/TSXV|VENTURE/.test(exchange) || /VENTURE/.test(region)) return raw + '.TRV';
-  if (/TSX|TORONTO/.test(exchange) || /TORONTO/.test(region)) return raw + '.TRT';
+  if (/TSXV|VENTURE/.test(exchange) || /VENTURE/.test(region)) return raw + '.V';
+  if (/TSX|TORONTO/.test(exchange) || /TORONTO|CANADA/.test(region)) return raw + '.TO';
   return raw;
 }
-function alphaDisplaySymbol(providerSymbol = '') {
-  return cleanText(providerSymbol, 32).toUpperCase().replace(/\.(TRT|TRV)$/i, '');
+function yahooDisplaySymbol(providerSymbol = '') {
+  return cleanText(providerSymbol, 32).toUpperCase().replace(/\.(TO|V)$/i, '');
 }
 function normalizeMarketInstrument(value = {}) {
   const source = typeof value === 'string' ? { symbol: value } : (value && typeof value === 'object' ? value : {});
-  const providerSymbol = alphaProviderSymbol(source);
-  const displaySymbol = cleanText(source.displaySymbol || source.symbol || alphaDisplaySymbol(providerSymbol), 32).toUpperCase();
+  const providerSymbol = yahooProviderSymbol(source);
+  const displaySymbol = cleanText(source.displaySymbol || source.symbol || yahooDisplaySymbol(providerSymbol), 32).toUpperCase().replace(/\.(TO|V)$/i, '');
   return {
-    symbol: displaySymbol || alphaDisplaySymbol(providerSymbol),
+    symbol: displaySymbol || yahooDisplaySymbol(providerSymbol),
     providerSymbol,
-    name: cleanText(source.name || source.instrumentName, 120),
+    name: cleanText(source.name || source.instrumentName || source.shortname || source.longname, 120),
     exchange: cleanText(source.exchange || source.region, 80),
     region: cleanText(source.region || source.country, 80),
-    type: cleanText(source.type || source.instrumentType, 60),
+    type: cleanText(source.type || source.instrumentType || source.quoteType, 60),
     currency: cleanText(source.currency, 12).toUpperCase(),
     marketOpen: cleanText(source.marketOpen, 20),
     marketClose: cleanText(source.marketClose, 20),
-    timezone: cleanText(source.timezone, 60),
+    timezone: cleanText(source.timezone || source.exchangeTimezoneName, 60),
     matchScore: cleanText(source.matchScore, 20)
   };
 }
@@ -2339,14 +2340,17 @@ function persistMarketCache() {
   } : null;
   save(db);
 }
-function marketApiKey() {
-  return cleanText(TICKERBOT_API_KEY, 5000);
-}
-function marketConfigured() { return Boolean(marketApiKey()); }
+const yahooFinance = new YahooFinance({ queue: { concurrency: 2, interval: 250 } });
+function marketConfigured() { return true; }
 function marketNumber(value) {
   const n = Number(value); return Number.isFinite(n) ? n : null;
 }
-function unavailableMarketQuote(item, message = 'Tickerbot returned no quote for this symbol.') {
+function marketIsoDate(value) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
+function unavailableMarketQuote(item, message = 'Yahoo Finance returned no quote for this symbol.') {
   const requested = normalizeMarketInstrument(item);
   return {
     ...requested,
@@ -2355,95 +2359,96 @@ function unavailableMarketQuote(item, message = 'Tickerbot returned no quote for
     datetime: '', available: false, error: cleanText(message, 220)
   };
 }
-async function tickerbotRequest(resource) {
-  const apiKey = marketApiKey();
-  if (!apiKey) throw new Error('TICKERBOT_API_KEY is not configured in the server environment.');
-  const response = await fetch('https://api.tickerbot.io/v2/' + String(resource || '').replace(/^\/+/, ''), {
-    headers: { Authorization: 'Bearer ' + apiKey, Accept: 'application/json' }
-  });
-  const raw = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = cleanText(raw?.error?.message || raw?.message || raw?.error || '', 260);
-    if (response.status === 401) throw new Error('Tickerbot rejected the saved API key.');
-    if (response.status === 429) throw new Error('Tickerbot rate limit reached. Quest Log will keep using cached market data.');
-    throw new Error(message || 'Tickerbot request failed (' + response.status + ').');
-  }
-  return raw;
-}
-function tickerbotQuote(raw = {}, fallback = {}, asOf = '') {
+function yahooMarketQuote(raw = {}, fallback = {}) {
   const requested = normalizeMarketInstrument(fallback);
-  const close = marketNumber(raw.price);
-  const percentChange = marketNumber(raw.change_1d_pct);
-  const previousClose = close != null && percentChange != null && Math.abs(100 + percentChange) > 0.0001
-    ? close / (1 + percentChange / 100) : null;
-  const change = close != null && previousClose != null ? close - previousClose : null;
+  const close = marketNumber(raw.regularMarketPrice);
   return {
     ...requested,
-    symbol: cleanText(raw.ticker || requested.symbol, 32).toUpperCase(),
-    providerSymbol: cleanText(raw.ticker || requested.providerSymbol, 32).toUpperCase(),
-    name: cleanText(raw.name || requested.name, 120),
-    exchange: cleanText(raw.exchange || requested.exchange, 80),
-    region: cleanText(raw.country || requested.region, 80).toUpperCase(),
-    type: cleanText(raw.asset_type || requested.type, 60),
-    currency: cleanText(raw.currency_name || requested.currency || 'USD', 12).toUpperCase(),
-    close, open: null, high: null, low: null,
-    volume: marketNumber(raw.volume_today),
-    datetime: cleanText(raw.date || asOf, 50),
-    previousClose, change, percentChange,
-    marketOpen: null, available: close !== null, error: ''
+    symbol: cleanText(raw.symbol || requested.symbol, 32).toUpperCase().replace(/\.(TO|V)$/i, ''),
+    providerSymbol: cleanText(raw.symbol || requested.providerSymbol, 32).toUpperCase(),
+    name: cleanText(raw.longName || raw.shortName || raw.displayName || requested.name, 120),
+    exchange: cleanText(raw.fullExchangeName || raw.exchange || requested.exchange, 80),
+    region: cleanText(raw.region || requested.region, 80).toUpperCase(),
+    type: cleanText(raw.quoteType || raw.typeDisp || requested.type, 60),
+    currency: cleanText(raw.currency || requested.currency, 12).toUpperCase(),
+    timezone: cleanText(raw.exchangeTimezoneName || requested.timezone, 60),
+    close,
+    open: marketNumber(raw.regularMarketOpen),
+    high: marketNumber(raw.regularMarketDayHigh ?? raw.dayHigh),
+    low: marketNumber(raw.regularMarketDayLow ?? raw.dayLow),
+    volume: marketNumber(raw.regularMarketVolume ?? raw.volume),
+    datetime: marketIsoDate(raw.regularMarketTime),
+    previousClose: marketNumber(raw.regularMarketPreviousClose),
+    change: marketNumber(raw.regularMarketChange),
+    percentChange: marketNumber(raw.regularMarketChangePercent),
+    marketOpen: String(raw.marketState || '').toUpperCase() === 'REGULAR',
+    available: close !== null,
+    error: ''
   };
 }
 async function marketData() {
   const config = normalizeMarkets(db.markets);
-  const key = 'tickerbot:' + config.watchlist.map(item => item.providerSymbol).join(',');
+  const key = 'yahoo:' + config.watchlist.map(item => item.providerSymbol).join(',');
   if (marketCache.data && marketCache.key === key && marketCache.expiresAt > Date.now()) return marketCache.data;
   if (!config.watchlist.length) {
-    const data = { provider: 'Tickerbot', quotes: [], watchlist: [], symbols: [], updatedAt: new Date().toISOString(), refreshMinutes: config.refreshMinutes, effectiveRefreshMinutes: config.refreshMinutes, freeMonthlyRequestLimit: 10000, batchSize: 50 };
+    const data = { provider: 'Yahoo Finance', quotes: [], watchlist: [], symbols: [], updatedAt: new Date().toISOString(), refreshMinutes: config.refreshMinutes, effectiveRefreshMinutes: config.refreshMinutes, batchSize: 50, unofficial: true };
     marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data }; persistMarketCache(); return data;
   }
-  let raw;
+  let rows = [];
   try {
-    const symbols = config.watchlist.map(item => encodeURIComponent(item.providerSymbol)).join(',');
-    raw = await tickerbotRequest('tickers/' + symbols);
+    rows = await yahooFinance.quote(config.watchlist.map(item => item.providerSymbol), { fields: [
+      'symbol','shortName','longName','displayName','quoteType','typeDisp','currency','region','exchange','fullExchangeName','exchangeTimezoneName',
+      'marketState','regularMarketPrice','regularMarketOpen','regularMarketDayHigh','regularMarketDayLow','regularMarketVolume',
+      'regularMarketPreviousClose','regularMarketChange','regularMarketChangePercent','regularMarketTime'
+    ] });
+    if (!Array.isArray(rows)) rows = rows ? [rows] : [];
   } catch (error) {
-    if (marketCache.data) return { ...marketCache.data, quotes: (marketCache.data.quotes || []).map(q => ({ ...q, stale: true, error: error.message || 'Using cached quote.' })) };
-    throw error;
+    if (marketCache.data) return { ...marketCache.data, quotes: (marketCache.data.quotes || []).map(q => ({ ...q, stale: true, error: 'Yahoo Finance refresh failed. Using cached quote.' })) };
+    throw new Error('Yahoo Finance quote request failed: ' + cleanText(error?.message || error, 180));
   }
-  const rows = raw?.data && typeof raw.data === 'object' ? raw.data : {};
-  const notFound = new Set((raw?.not_found || []).map(x => String(x).toUpperCase()));
+  const bySymbol = new Map(rows.map(row => [String(row?.symbol || '').toUpperCase(), row]));
   const quotes = config.watchlist.map(item => {
-    const symbol = item.providerSymbol.toUpperCase();
-    const row = rows[symbol] || rows[item.symbol?.toUpperCase?.()];
-    if (row) return tickerbotQuote(row, item, raw.as_of || '');
-    return unavailableMarketQuote(item, notFound.has(symbol) ? 'Tickerbot does not track this symbol.' : 'Tickerbot returned no quote for this symbol.');
+    const row = bySymbol.get(item.providerSymbol.toUpperCase());
+    return row ? yahooMarketQuote(row, item) : unavailableMarketQuote(item);
   });
   const data = {
-    provider: 'Tickerbot', quotes, watchlist: config.watchlist, symbols: config.symbols,
-    updatedAt: new Date().toISOString(), providerAsOf: cleanText(raw.as_of, 50),
-    refreshMinutes: config.refreshMinutes, effectiveRefreshMinutes: config.refreshMinutes,
-    freeMonthlyRequestLimit: 10000, batchSize: 50
+    provider: 'Yahoo Finance', quotes, watchlist: config.watchlist, symbols: config.symbols,
+    updatedAt: new Date().toISOString(), refreshMinutes: config.refreshMinutes,
+    effectiveRefreshMinutes: config.refreshMinutes, batchSize: 50, unofficial: true
   };
   marketCache = { key, expiresAt: Date.now() + config.refreshMinutes * 60000, data };
   persistMarketCache();
   return data;
 }
 async function marketSearch(query) {
-  const q = cleanText(query, 64).trim();
+  const q = cleanText(query, 80).trim();
   if (!q) return [];
-  const raw = await tickerbotRequest('tickers?search=' + encodeURIComponent(q) + '&asset_class=stocks&limit=10');
-  return (raw.results || []).filter(item => item?.active !== false).slice(0, 10).map(item => normalizeMarketInstrument({
-    symbol: item.ticker,
-    providerSymbol: item.ticker,
-    name: item.name,
-    type: item.asset_type,
-    region: item.country,
-    exchange: item.exchange,
-    currency: item.currency_name
-  })).filter(item => item.providerSymbol);
+  let raw;
+  try {
+    raw = await yahooFinance.search(q, { region: 'CA', lang: 'en-CA', quotesCount: 12, newsCount: 0, enableCb: false, enableNavLinks: false });
+  } catch (error) {
+    throw new Error('Yahoo Finance search failed: ' + cleanText(error?.message || error, 180));
+  }
+  return (raw?.quotes || [])
+    .filter(item => item?.isYahooFinance !== false && item?.symbol && ['EQUITY','ETF','MUTUALFUND','INDEX','CURRENCY','CRYPTOCURRENCY','FUTURE'].includes(String(item.quoteType || '').toUpperCase()))
+    .slice(0, 10)
+    .map(item => normalizeMarketInstrument({
+      symbol: item.symbol, providerSymbol: item.symbol,
+      name: item.longname || item.shortname,
+      type: item.quoteType || item.typeDisp,
+      exchange: item.exchDisp || item.exchange,
+      region: /\.(TO|V)$/i.test(item.symbol) ? 'Canada' : '',
+      currency: /\.(TO|V)$/i.test(item.symbol) ? 'CAD' : ''
+    }))
+    .filter(item => item.providerSymbol);
 }
 async function testMarketConnection() {
-  const raw = await tickerbotRequest('tickers/SPY');
-  return { ok: Boolean(raw?.data), provider: 'Tickerbot', ticker: raw?.data?.ticker || 'SPY', name: raw?.data?.name || '' };
+  try {
+    const raw = await yahooFinance.quote('SPY', { fields: ['symbol','shortName','longName','regularMarketPrice','currency'] });
+    return { ok: Boolean(raw?.symbol && marketNumber(raw?.regularMarketPrice) !== null), provider: 'Yahoo Finance', ticker: raw?.symbol || 'SPY', name: raw?.longName || raw?.shortName || '' };
+  } catch (error) {
+    throw new Error('Yahoo Finance connection failed: ' + cleanText(error?.message || error, 180));
+  }
 }
 
 function agendaRange(scope, now = new Date()) {
@@ -2500,7 +2505,7 @@ async function feed() {
     if (marketConfigured()) {
       try { markets = await marketData(); }
       catch (error) { marketError = error.message; }
-    } else marketError = 'Add the shared Tickerbot API key in Settings → Markets.';
+    } else marketError = 'Yahoo Finance market data is temporarily unavailable.';
   }
   const countdowns = sortedCountdowns()
     .filter(c => c.displayEnabled && new Date(c.end).getTime() > now)
@@ -3184,7 +3189,7 @@ function state() {
     updater: { configured: updaterConfigured() },
     appearance: normalizeAppearance(db.appearance),
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
-    markets: (() => { const config = normalizeMarkets(db.markets); return { watchlist: config.watchlist, symbols: config.symbols, refreshMinutes: config.refreshMinutes, configured: marketConfigured(), hasApiKey: marketConfigured(), canStoreApiKey: Boolean(APP_SECRET), provider: 'Tickerbot', effectiveRefreshMinutes: config.refreshMinutes, freeMonthlyRequestLimit: 10000, batchSize: 50 }; })(),
+    markets: (() => { const config = normalizeMarkets(db.markets); return { watchlist: config.watchlist, symbols: config.symbols, refreshMinutes: config.refreshMinutes, configured: true, provider: 'Yahoo Finance', effectiveRefreshMinutes: config.refreshMinutes, batchSize: 50, unofficial: true }; })(),
     agent: agentPublicConfig(),
     notifications: publicNotificationConfig(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
