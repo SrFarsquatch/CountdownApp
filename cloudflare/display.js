@@ -3,7 +3,28 @@ import {
   normalizeSectionOrder, DISPLAY_MODES, DISPLAY_KEYS
 } from './state.js';
 
-const HEX={black:'#111111',red:'#d22f27',blue:'#2457c5',green:'#29834a',yellow:'#d8a300',purple:'#7746b8'};
+const HEX={black:'#000000',white:'#FFFFFF',red:'#FF0000',blue:'#0000FF',green:'#00FF00',yellow:'#FFFF00'};
+const ACCENT_COLORS=[HEX.black,HEX.red,HEX.blue,HEX.green,HEX.yellow];
+function parseHex(value){
+  const match=/^#?([0-9a-f]{6})$/i.exec(String(value||''));
+  if(!match)return null;
+  const n=parseInt(match[1],16);
+  return{r:n>>16,g:(n>>8)&255,b:n&255};
+}
+function einkAccent(value,palette,fallback='blue'){
+  if(palette==='mono')return HEX.black;
+  const named=String(value||'').toLowerCase();
+  if(named==='purple')return HEX.blue;
+  if(HEX[named]&&named!=='white')return HEX[named];
+  const rgb=parseHex(value);
+  if(!rgb)return HEX[fallback]||HEX.blue;
+  let best=HEX[fallback]||HEX.blue,bestDistance=Infinity;
+  for(const candidate of ACCENT_COLORS){
+    const c=parseHex(candidate),distance=(rgb.r-c.r)**2+(rgb.g-c.g)**2+(rgb.b-c.b)**2;
+    if(distance<bestDistance){bestDistance=distance;best=candidate}
+  }
+  return best;
+}
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=(value,max=40)=>{const s=String(value??'');return s.length<=max?s:s.slice(0,Math.max(1,max-1))+'…'};
 const dateKey=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
@@ -85,11 +106,11 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
   };
 }
 
-function color(name,palette){return palette==='mono'?HEX.black:(HEX[name]||HEX.black)}
+function color(name,palette){return einkAccent(name,palette,'blue')}
 function sectionTitle(label,x,y){return'<text x="'+x+'" y="'+y+'" class="k">'+esc(label)+'</text>'}
 function bar(percent,x,y,w,h,fill){
   const p=clamp(num(percent,0),0,100);
-  return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(h/2)+'" fill="#deded8"/><rect x="'+x+'" y="'+y+'" width="'+(w*p/100).toFixed(1)+'" height="'+h+'" rx="'+(h/2)+'" fill="'+fill+'"/>';
+  return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(h/2)+'" fill="'+HEX.white+'" stroke="'+HEX.black+'" stroke-width="1"/><rect x="'+x+'" y="'+y+'" width="'+(w*p/100).toFixed(1)+'" height="'+h+'" rx="'+(h/2)+'" fill="'+einkAccent(fill,'spectra6','blue')+'"/>';
 }
 function countdownLabel(c){
   const r=c.remaining||{};
@@ -103,12 +124,16 @@ function countdownLabel(c){
 function weatherAccent(condition,palette){
   if(palette==='mono')return HEX.black;
   const t=String(condition||'').toUpperCase();
-  if(/THUNDER|STORM/.test(t))return HEX.purple;if(/RAIN|DRIZZLE|SHOWER|SNOW|ICE/.test(t))return HEX.blue;if(/CLEAR|SUN/.test(t))return HEX.yellow;return HEX.black;
+  if(/THUNDER|STORM/.test(t))return HEX.red;
+  if(/RAIN|DRIZZLE|SHOWER|SNOW|ICE/.test(t))return HEX.blue;
+  if(/CLEAR|SUN/.test(t))return HEX.yellow;
+  if(/CLOUD|FOG|HAZE/.test(t))return HEX.black;
+  return HEX.green;
 }
 function weatherIcon(condition,x,y,size,palette){
-  const t=String(condition||'').toUpperCase(),accent=weatherAccent(t,palette),black='#111';
+  const t=String(condition||'').toUpperCase(),accent=weatherAccent(t,palette),black=HEX.black;
   if(/CLEAR|SUN/.test(t))return'<circle cx="'+(x+size*.5)+'" cy="'+(y+size*.5)+'" r="'+(size*.22)+'" fill="'+accent+'"/><path d="M'+(x+size*.5)+' '+y+'v'+(size*.18)+'M'+(x+size*.5)+' '+(y+size*.82)+'v'+(size*.18)+'M'+x+' '+(y+size*.5)+'h'+(size*.18)+'M'+(x+size*.82)+' '+(y+size*.5)+'h'+(size*.18)+'" stroke="'+accent+'" stroke-width="'+Math.max(1.5,size*.06)+'"/>';
-  const cloud='<path d="M'+(x+size*.12)+' '+(y+size*.62)+'c0-'+(size*.16)+' '+(size*.13)+'-'+(size*.27)+' '+(size*.29)+'-'+(size*.27)+' '+(size*.07)+'-'+(size*.17)+' '+(size*.22)+'-'+(size*.27)+' '+(size*.4)+'-'+(size*.27)+' '+(size*.23)+' 0 '+(size*.42)+' '+(size*.18)+' '+(size*.42)+' '+(size*.4)+' 0 '+(size*.16)+'-'+(size*.13)+' '+(size*.29)+'-'+(size*.29)+' '+(size*.29)+'H'+(x+size*.36)+'c-'+(size*.13)+' 0-'+(size*.24)+'-'+(size*.11)+'-'+(size*.24)+'-'+(size*.24)+'z" fill="'+(palette==='mono'?black:'#777')+'"/>';
+  const cloud='<path d="M'+(x+size*.12)+' '+(y+size*.62)+'c0-'+(size*.16)+' '+(size*.13)+'-'+(size*.27)+' '+(size*.29)+'-'+(size*.27)+' '+(size*.07)+'-'+(size*.17)+' '+(size*.22)+'-'+(size*.27)+' '+(size*.4)+'-'+(size*.27)+' '+(size*.23)+' 0 '+(size*.42)+' '+(size*.18)+' '+(size*.42)+' '+(size*.4)+' 0 '+(size*.16)+'-'+(size*.13)+' '+(size*.29)+'-'+(size*.29)+' '+(size*.29)+'H'+(x+size*.36)+'c-'+(size*.13)+' 0-'+(size*.24)+'-'+(size*.11)+'-'+(size*.24)+'-'+(size*.24)+'z" fill="'+black+'"/>';
   if(/RAIN|DRIZZLE|SHOWER/.test(t))return cloud+'<path d="M'+(x+size*.35)+' '+(y+size*.78)+'l-'+(size*.06)+' '+(size*.13)+'M'+(x+size*.58)+' '+(y+size*.78)+'l-'+(size*.06)+' '+(size*.13)+'" stroke="'+accent+'" stroke-width="'+Math.max(1.5,size*.055)+'"/>';
   if(/SNOW|ICE/.test(t))return cloud+'<circle cx="'+(x+size*.36)+'" cy="'+(y+size*.86)+'" r="'+(size*.05)+'" fill="'+accent+'"/><circle cx="'+(x+size*.62)+'" cy="'+(y+size*.86)+'" r="'+(size*.05)+'" fill="'+accent+'"/>';
   return cloud;
@@ -124,18 +149,15 @@ function tasksForDay(data,day){
   const key=dateKey(day);return(data.agendaTasks||data.plannerTasks||data.tasks||[]).filter(t=>t.status!=='done'&&t.due&&dateKey(t.due)===key);
 }
 function eventAccent(event,palette){
-  if(palette==='mono')return HEX.black;
-  const v=String(event.eventColor||event.calendarColor||'').toLowerCase();
-  if(/^#[0-9a-f]{6}$/.test(v))return v;
-  return HEX.blue;
+  return einkAccent(event.eventColor||event.calendarColor,palette,'blue');
 }
 function money(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2):'N/A'}
 
-export function renderDisplaySvg(data,width=800,height=480){
-  const w=clamp(Math.round(num(width,800)),300,2000),h=clamp(Math.round(num(height,480)),300,2000),palette=data.display?.palette||'spectra6';
-  const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black='#111111',muted='#666660',rule='#c9c9c2';
+export function renderDisplaySvg(data,width=600,height=400){
+  const w=clamp(Math.round(num(width,600)),300,2000),h=clamp(Math.round(num(height,400)),300,2000),palette=data.display?.palette||'spectra6';
+  const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black=HEX.black,muted=HEX.black,rule=HEX.black;
   const now=new Date(),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
-  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#fff"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1}</style>';
+  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1}</style>';
   svg+='<text x="'+pad+'" y="'+(pad+15)+'" font-size="12" font-weight="800" letter-spacing="1">'+esc(now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase())+'</text>';
   svg+='<text x="'+(w-pad)+'" y="'+(pad+15)+'" text-anchor="end" font-size="11" font-weight="800" letter-spacing="1">'+esc(modeLabel+' · '+now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text>';
   svg+='<line x1="'+pad+'" y1="'+(pad+23)+'" x2="'+(w-pad)+'" y2="'+(pad+23)+'" class="line"/>';
@@ -230,7 +252,7 @@ export function renderDisplaySvg(data,width=800,height=480){
         if(weather.location)svg+='<text x="'+x+'" y="'+Math.min(y+bh-3,cy+9)+'" font-size="8.5" class="muted">'+esc(short(weather.location,Math.floor(bw/5)))+'</text>';
       }
     }else if(kind==='tasks'){
-      for(const task of items.slice(0,cfg.limit||4)){if(cy+28>y+bh)break;const due=task.due?new Date(task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'';svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';if(cfg.style!=='compact')svg+='<rect x="'+x+'" y="'+(cy+9)+'" width="10" height="10" rx="2" fill="#fff" stroke="'+black+'"/>';svg+='<text x="'+(x+(cfg.style==='compact'?0:18))+'" y="'+(cy+19)+'" font-size="'+(cfg.style==='compact'?11:13)+'" font-weight="700">'+esc(short(task.title,Math.max(12,Math.floor((bw-(due?72:18))/7))))+'</text>';if(due)svg+='<text x="'+(x+bw)+'" y="'+(cy+19)+'" text-anchor="end" font-size="10" class="muted">'+esc(due)+'</text>';cy+=27}
+      for(const task of items.slice(0,cfg.limit||4)){if(cy+28>y+bh)break;const due=task.due?new Date(task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'';svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';if(cfg.style!=='compact')svg+='<rect x="'+x+'" y="'+(cy+9)+'" width="10" height="10" rx="2" fill="#FFFFFF" stroke="'+black+'"/>';svg+='<text x="'+(x+(cfg.style==='compact'?0:18))+'" y="'+(cy+19)+'" font-size="'+(cfg.style==='compact'?11:13)+'" font-weight="700">'+esc(short(task.title,Math.max(12,Math.floor((bw-(due?72:18))/7))))+'</text>';if(due)svg+='<text x="'+(x+bw)+'" y="'+(cy+19)+'" text-anchor="end" font-size="10" class="muted">'+esc(due)+'</text>';cy+=27}
     }else if(kind==='goals'){
       for(const goal of items.slice(0,cfg.limit||2)){if(cy+42>y+bh)break;const accent=color(goal.accentColor,palette);svg+='<text x="'+x+'" y="'+(cy+14)+'" font-size="13" font-weight="700">'+esc(short(goal.title,Math.max(12,Math.floor((bw-50)/7))))+'</text><text x="'+(x+bw)+'" y="'+(cy+14)+'" text-anchor="end" font-size="11" font-weight="700">'+Math.round(num(goal.progress,0))+'%</text>';if(cfg.style!=='compact')svg+=bar(goal.progress,x,cy+23,bw,7,accent);cy+=cfg.style==='compact'?25:42}
     }else if(kind==='countdowns'){
