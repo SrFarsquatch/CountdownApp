@@ -44,10 +44,10 @@ If both runtimes are connected to the same external service, such as the same Go
 
 ### Markets
 
-- Alpha Vantage-backed stock/ETF watchlist.
+- Tickerbot-backed US stock/ETF watchlist with batched quote requests.
 - Today dashboard summary, dedicated Markets view, and e-ink Markets widget.
-- Server-side caching and quota-aware refresh behavior.
-- Provider-qualified symbols are retained so Canadian listings can be tracked correctly.
+- Server-side shared caching so Today, Markets, Navi, and e-ink views reuse the same provider snapshot.
+- Tickerbot currently covers US-listed equities plus its documented non-equity classes; Canadian-only listings are not supplied by this provider.
 
 ### Navi AI assistant
 
@@ -107,7 +107,7 @@ The cloud local-model connector is only an AI endpoint. It does not connect the 
 | `cloudflare/state.js` | D1-backed cloud state adapter |
 | `cloudflare/google.js` | Cloud Google Calendar/Tasks integration |
 | `cloudflare/agent.js` | Cloud Navi integration |
-| `cloudflare/markets.js` | Cloud Alpha Vantage integration |
+| `cloudflare/markets.js` | Cloud Tickerbot integration |
 | `cloudflare/display.js` | Cloud e-ink feed/SVG renderer |
 | `cloudflare/migrations/` | D1 schema |
 | `wrangler.jsonc` | Cloudflare Worker + D1 configuration |
@@ -239,7 +239,7 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
 | `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
 | `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
-| `ALPHA_VANTAGE_API_KEY` | For Markets | Alpha Vantage API key |
+| `TICKERBOT_API_KEY` | Optional fallback | Shared Tickerbot API key; normally saved in-app and encrypted with `APP_SECRET` |
 | `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
 | `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
 | `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
@@ -276,7 +276,7 @@ Quest Log Worker
    +-- D1
    +-- Google Calendar / Tasks
    +-- Open-Meteo
-   +-- Alpha Vantage
+   +-- Tickerbot
    +-- OpenAI or secure HTTPS local-model endpoint
 ~~~
 
@@ -355,7 +355,7 @@ Core/integration secrets:
 | --- | --- | --- |
 | `APP_SECRET` | Secret | Google token encryption and OAuth state signing |
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
-| `ALPHA_VANTAGE_API_KEY` | Secret | Markets |
+| `TICKERBOT_API_KEY` | Secret | Markets |
 | `OPENAI_API_KEY` | Secret | Optional fallback for Cloud Navi OpenAI |
 | `ANTHROPIC_API_KEY` | Secret | Optional fallback for Cloud Navi Anthropic |
 | `GEMINI_API_KEY` | Secret | Optional fallback for Cloud Navi Gemini |
@@ -468,8 +468,8 @@ Google Tasks exposes a due **date**, not a due time. Quest Log retains its local
 ## Alpha Vantage Markets
 
 1. Create an Alpha Vantage API key.
-2. Self-hosted: set `ALPHA_VANTAGE_API_KEY` in the container environment and restart/recreate the container.
-3. Cloud: store `ALPHA_VANTAGE_API_KEY` as a Worker secret and redeploy if required.
+2. Self-hosted: set `TICKERBOT_API_KEY` in the container environment and restart/recreate the container.
+3. Cloud: store `TICKERBOT_API_KEY` as a Worker secret and redeploy if required.
 4. Open **Markets** and use the in-app symbol search to add securities.
 
 Using the in-app search is recommended for Canadian listings so Quest Log stores the provider-qualified symbol returned by Alpha Vantage.
