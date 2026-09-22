@@ -475,12 +475,12 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 </section>
 
 <section class="view" id="view-markets">
-  <div class="hero"><div><h2>Markets</h2><p>Shared US market data from Tickerbot, cached once for everyone using this Quest Log.</p></div><span class="pill" id="marketProviderStatus">Tickerbot</span></div>
+  <div class="hero"><div><h2>Markets</h2><p>Market data from Yahoo Finance, cached by Quest Log.</p></div><span class="pill" id="marketProviderStatus">Yahoo Finance</span></div>
   <div id="marketStatus" class="notice" style="display:none"></div>
   <div id="marketGrid" class="market-grid"></div>
   <div class="settings-grid" style="margin-top:14px">
     <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Quest Log to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
-    <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Tickerbot</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
+    <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Yahoo Finance</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
   </div>
 </section>
 
@@ -566,7 +566,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
     </div>
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><input id="settingsWeatherCountryCode" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" id="settingsWeatherProvider" style="margin-top:8px">Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.</div></div>
-    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Tickerbot</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div><div class="meta" style="margin-top:8px">Tickerbot credentials are managed outside the app. Cloud deployments use the <code>TICKERBOT_API_KEY</code> Worker secret; self-hosted deployments use the same environment variable.</div></div>
+    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Yahoo Finance</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div><div class="meta" style="margin-top:8px">Yahoo Finance is accessed server-side and does not require an API key. Quest Log caches responses to reduce repeated requests.</div></div>
     <div class="card setting-card" id="pwaInstallCard">
       <div class="eyebrow">Install</div><h3>Quest Log app</h3>
       <p class="meta">Install Quest Log on this device for a standalone app window while keeping the normal browser version available.</p>
@@ -1546,15 +1546,15 @@ async function searchMarkets(){
   root.querySelectorAll('[data-market-result]').forEach(btn=>btn.onclick=async()=>{
    const r=results[Number(btn.dataset.marketResult)],watchlist=[...(state.markets?.watchlist||[])];if(!r)return;
    if(watchlist.some(item=>item.symbol===r.symbol&&String(item.exchange||'')===String(r.exchange||'')))return;
-   if(watchlist.length>=50){alert('Tickerbot supports up to 50 symbols in one batched watchlist request.');return}
+   if(watchlist.length>=50){alert('Quest Log supports up to 50 symbols in the watchlist.');return}
    await saveMarketWatchlist([...watchlist,{symbol:r.symbol,providerSymbol:r.providerSymbol,name:r.name,exchange:r.exchange,region:r.region,type:r.type,currency:r.currency,marketOpen:r.marketOpen,marketClose:r.marketClose,timezone:r.timezone,matchScore:r.matchScore}]);root.innerHTML='';$('marketSearchInput').value='';
   });
  }catch(error){root.innerHTML='<div class="notice">'+esc(error.message)+'</div>'}
 }
 function renderMarkets(){
  const configured=state.markets?.configured;
- $('marketProviderStatus').textContent=configured?'Tickerbot connected':'Tickerbot not configured';
- const status=$('marketStatus'),unavailable=(marketData?.quotes||[]).filter(q=>q.available===false);const statusText=marketError||(unavailable.length?unavailable.length+' watchlist symbol'+(unavailable.length===1?' is':'s are')+' unavailable from Tickerbot.':'');status.style.display=statusText?'block':'none';status.textContent=statusText;
+ $('marketProviderStatus').textContent=configured?'Yahoo Finance connected':'Yahoo Finance unavailable';
+ const status=$('marketStatus'),unavailable=(marketData?.quotes||[]).filter(q=>q.available===false);const statusText=marketError||(unavailable.length?unavailable.length+' watchlist symbol'+(unavailable.length===1?' is':'s are')+' unavailable from Yahoo Finance.':'');status.style.display=statusText?'block':'none';status.textContent=statusText;
  renderMarketSummary('marketGrid');
  const watchlist=state.markets?.watchlist||[],quotes=marketData?.quotes||[];
  $('marketWatchlist').innerHTML=watchlist.length?watchlist.map((item,index)=>{
@@ -1564,7 +1564,7 @@ function renderMarkets(){
  }).join(''):'<div class="empty">No symbols selected.</div>';
  $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketWatchlist(watchlist.filter((_,i)=>i!==Number(btn.dataset.removeMarket))));
  $('marketSearchInput').disabled=!configured;$('marketSearchButton').disabled=!configured;
- if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Add the shared Tickerbot API key in Settings → Markets first.</div>';
+ if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Yahoo Finance market data is temporarily unavailable.</div>';
 }
 $('marketSearchButton').onclick=searchMarkets;
 $('marketSearchInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMarkets()}};
@@ -1599,10 +1599,10 @@ $('saveWeatherSettings').onclick=async()=>{
 function renderMarketSettings(){
  const mc=state.markets||{},refresh=mc.effectiveRefreshMinutes||mc.refreshMinutes||15,message=$('settingsMarketMessage');
  $('settingsMarketStatus').textContent=mc.configured
-   ?'Tickerbot is configured. Quest Log batches up to '+(mc.batchSize||50)+' watchlist symbols into one provider request and caches the result for '+refresh+' minute'+(refresh===1?'':'s')+'.'
+   ?'Yahoo Finance is enabled. Quest Log can request up to '+(mc.batchSize||50)+' watchlist symbols together and caches the result for '+refresh+' minute'+(refresh===1?'':'s')+'.'
    :(runtimeInfo?.runtime==='cloudflare'
-     ?'Tickerbot is not configured. Add TICKERBOT_API_KEY as a Cloudflare Worker secret.'
-     :'Tickerbot is not configured. Add TICKERBOT_API_KEY to the server/container environment.');
+     ?'Yahoo Finance does not require an API key.'
+     :'Yahoo Finance does not require an API key.');
  $('settingsMarketRefresh').value=String(mc.refreshMinutes||15);
  $('testMarketSettings').disabled=!mc.configured;
  if(message)message.style.display='none';
@@ -1612,12 +1612,12 @@ $('saveMarketSettings').onclick=async()=>{
  try{
   await api('/api/settings',{method:'PUT',body:JSON.stringify({marketRefreshMinutes:Number($('settingsMarketRefresh').value)})});
   state=await api('/api/state');await loadMarkets();renderMarketSettings();renderMarkets();renderToday();
-  message.style.display='block';message.textContent='Tickerbot refresh settings saved.';
+  message.style.display='block';message.textContent='Yahoo Finance refresh settings saved.';
  }catch(error){message.textContent=error.message}
 };
 $('testMarketSettings').onclick=async()=>{
- const message=$('settingsMarketMessage');message.style.display='block';message.textContent='Testing Tickerbot…';
- try{const result=await api('/api/markets/test',{method:'POST'});message.textContent=result.ok?'Tickerbot connection successful'+(result.name?' · '+result.name:'')+'.':'Tickerbot connection failed.'}
+ const message=$('settingsMarketMessage');message.style.display='block';message.textContent='Testing Yahoo Finance…';
+ try{const result=await api('/api/markets/test',{method:'POST'});message.textContent=result.ok?'Yahoo Finance connection successful'+(result.name?' · '+result.name:'')+'.':'Yahoo Finance connection failed.'}
  catch(error){message.textContent=error.message}
 };
 function renderAppearanceSettings(){
