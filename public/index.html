@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f5f4f1">
 <title>Quest Log</title>
 <link id="appFavicon" rel="icon" type="image/svg+xml" href="/branding/icon-quest.svg">
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">\n<link rel="apple-touch-icon" href="/branding/apple-touch-icon.png">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n<meta name="apple-mobile-web-app-title" content="Quest Log">
 <script>
 (()=>{try{
   const cached=JSON.parse(localStorage.getItem('questlog-appearance')||'{}');
@@ -439,6 +439,13 @@
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><input id="settingsWeatherCountryCode" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" id="settingsWeatherProvider" style="margin-top:8px">Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.</div></div>
     <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Alpha Vantage</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="720">12 hours</option><option value="1440">Once daily — recommended</option></select></div><div class="modal-actions"><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="meta" style="margin-top:8px">API key stays server-side in <code>ALPHA_VANTAGE_API_KEY</code>.</div></div>
+    <div class="card setting-card" id="pwaInstallCard">
+      <div class="eyebrow">Install</div><h3>Quest Log app</h3>
+      <p class="meta">Install Quest Log on this device for a standalone app window while keeping the normal browser version available.</p>
+      <div class="setting-row"><span>Status</span><strong id="pwaInstallStatus">Checking install support…</strong></div>
+      <div class="modal-actions"><button class="btn primary" id="installPwaNow" type="button" disabled>Install Quest Log</button></div>
+      <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
+    </div>
     <div class="card setting-card update-card">
       <div class="update-head">
         <div><div class="eyebrow">Maintenance</div><h3 style="margin-bottom:2px">Application updates</h3></div>
@@ -494,9 +501,65 @@
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false;
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
+function pwaStandalone(){
+ return window.matchMedia?.('(display-mode: standalone)').matches===true||window.navigator.standalone===true;
+}
+function updatePwaInstallUi(){
+ const button=$('installPwaNow'),status=$('pwaInstallStatus'),hint=$('pwaInstallHint');
+ if(!button||!status||!hint)return;
+ if(pwaStandalone()){
+   status.textContent='Installed';
+   hint.textContent='Quest Log is running as an installed app. You can still open the same URL normally in your browser.';
+   button.textContent='Installed';
+   button.disabled=true;
+   return;
+ }
+ if(!window.isSecureContext){
+   status.textContent='Web view only on HTTP';
+   hint.textContent='PWA installation requires HTTPS (or localhost). The regular self-hosted web view continues to work normally.';
+   button.disabled=true;
+   return;
+ }
+ if(deferredPwaInstallPrompt){
+   status.textContent='Ready to install';
+   hint.textContent='Install adds Quest Log to your home screen/app launcher and opens it without normal browser chrome.';
+   button.textContent='Install Quest Log';
+   button.disabled=false;
+   return;
+ }
+ status.textContent='Install from browser';
+ hint.textContent=/iphone|ipad|ipod/i.test(navigator.userAgent)?'Use Share → Add to Home Screen.':'Chrome may offer Install app/Add to Home screen from its menu after the site has been used briefly.';
+ button.textContent='Install Quest Log';
+ button.disabled=true;
+}
+async function installQuestLog(){
+ if(!deferredPwaInstallPrompt)return updatePwaInstallUi();
+ const prompt=deferredPwaInstallPrompt;
+ deferredPwaInstallPrompt=null;
+ await prompt.prompt();
+ try{await prompt.userChoice}catch{}
+ updatePwaInstallUi();
+}
+window.addEventListener('beforeinstallprompt',event=>{
+ event.preventDefault();
+ deferredPwaInstallPrompt=event;
+ updatePwaInstallUi();
+});
+window.addEventListener('appinstalled',()=>{
+ deferredPwaInstallPrompt=null;
+ updatePwaInstallUi();
+});
+if('serviceWorker' in navigator&&window.isSecureContext){
+ window.addEventListener('load',()=>{
+   navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).then(registration=>registration.update()).catch(error=>console.warn('Quest Log service worker registration failed:',error));
+ });
+}
+$('installPwaNow').onclick=installQuestLog;
+updatePwaInstallUi();
+
 function renderRuntimeSession(){
  const foot=$('sideFoot');if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
