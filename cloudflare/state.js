@@ -95,9 +95,7 @@ export function normalizeModeSections(input){
       const raw=rawMode[key]&&typeof rawMode[key]==='object'?rawMode[key]:{},fallback=base[key];
       sections[key]={...fallback,...raw,enabled:raw.enabled===undefined?fallback.enabled:Boolean(raw.enabled),style:en(raw.style,styles[key],fallback.style),limit:clamp(Math.round(num(raw.limit,fallback.limit)),1,20)};
       if(key==='agenda'){
-        sections[key].scope=en(raw.scope,['today','week','month','upcoming'],fallback.scope);
-        if(sections[key].style==='calendar')sections[key].scope='month';
-        if(sections[key].style==='week')sections[key].scope='week';
+        sections[key].scope=sections[key].style==='timeline'?'today':sections[key].style==='week'?'week':sections[key].style==='calendar'?'month':'upcoming';
       }
     }
     out[mode]=sections;
