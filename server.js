@@ -71,8 +71,8 @@ const AGENT_PROVIDER_PRESETS = {
 };
 const AGENT_ACTION_TYPES = ['create_task', 'update_task', 'create_goal', 'update_goal', 'create_countdown', 'update_countdown', 'create_event', 'update_event'];
 const HEX = {
-  black: '#111111', red: '#d62828', blue: '#1769aa', green: '#2f7d32',
-  yellow: '#e0a800', purple: '#6d4aff'
+  black: '#000000', white: '#FFFFFF', red: '#FF0000',
+  blue: '#0000FF', green: '#00FF00', yellow: '#FFFF00'
 };
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -1448,7 +1448,7 @@ async function eventsBetween(from, to) {
           calendarName: calendar.summary || 'Calendar',
           accessRole: calendar.accessRole || 'reader',
           calendarColor: calendar.backgroundColor || '#6c5ce7',
-          calendarForeground: calendar.foregroundColor || '#ffffff',
+          calendarForeground: calendar.foregroundColor || HEX.white,
           eventColor: specificColor?.background || '',
           eventForeground: specificColor?.foreground || '',
           colorId: event.colorId || '',
@@ -2547,7 +2547,7 @@ async function feed() {
   };
 }
 
-function color(name, palette) { return palette === 'mono' ? '#111111' : (HEX[name] || HEX.black); }
+function color(name, palette) { return palette === 'mono' ? HEX.black : (HEX[name] || HEX.black); }
 function formatDateServer(value, style) {
   const d = new Date(value);
   if (style === 'numeric') return d.toLocaleDateString('en-CA');
@@ -2569,7 +2569,7 @@ function timeLabel(c) {
 }
 function svgBar(percent, x, y, width, height, fill) {
   const p = clamp(num(percent, 0), 0, 100);
-  return '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="' + height / 2 + '" fill="#deded8"/>' +
+  return '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="' + height / 2 + '" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>' +
     '<rect x="' + x + '" y="' + y + '" width="' + (width * p / 100).toFixed(1) + '" height="' + height + '" rx="' + height / 2 + '" fill="' + fill + '"/>';
 }
 function sectionTitle(label, x, y) {
@@ -2622,11 +2622,13 @@ function parseHex(value) {
 }
 function einkAccent(value, palette, fallback = 'blue') {
   if (palette === 'mono') return HEX.black;
-  if (HEX[value]) return HEX[value];
+  const named = String(value || '').toLowerCase();
+  if (named === 'purple') return HEX.blue;
+  if (HEX[named] && named !== 'white') return HEX[named];
   const rgb = parseHex(value);
   if (!rgb) return HEX[fallback] || HEX.blue;
   let best = HEX[fallback] || HEX.blue, bestDistance = Infinity;
-  for (const candidate of Object.values(HEX)) {
+  for (const candidate of [HEX.black, HEX.red, HEX.blue, HEX.green, HEX.yellow]) {
     const c = parseHex(candidate);
     const distance = Math.pow(rgb.r - c.r, 2) + Math.pow(rgb.g - c.g, 2) + Math.pow(rgb.b - c.b, 2);
     if (distance < bestDistance) { bestDistance = distance; best = candidate; }
@@ -2639,7 +2641,7 @@ function plannerEventAccent(event, palette) {
 function plannerWeatherAccent(type, palette) {
   if (palette === 'mono') return HEX.black;
   const t = String(type || '').toUpperCase();
-  if (/THUNDER|STORM/.test(t)) return HEX.purple;
+  if (/THUNDER|STORM/.test(t)) return HEX.red;
   if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return HEX.blue;
   if (/SNOW|ICE|SLEET/.test(t)) return HEX.blue;
   if (/CLEAR|SUN/.test(t)) return HEX.yellow;
@@ -2648,14 +2650,14 @@ function plannerWeatherAccent(type, palette) {
 }
 function svgWeatherIcon(type, x, y, size, palette) {
   const t = String(type || '').toUpperCase();
-  const accent = plannerWeatherAccent(t, palette), black = '#111111';
+  const accent = plannerWeatherAccent(t, palette), black = HEX.black;
   const sun = '<circle cx="' + (x + size * .42) + '" cy="' + (y + size * .42) + '" r="' + (size * .18) + '" fill="' + accent + '"/>' +
     '<path d="M' + (x + size * .42) + ' ' + y + 'v' + (size * .14) + 'M' + (x + size * .42) + ' ' + (y + size * .70) + 'v' + (size * .14) +
     'M' + x + ' ' + (y + size * .42) + 'h' + (size * .14) + 'M' + (x + size * .70) + ' ' + (y + size * .42) + 'h' + (size * .14) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5, size * .055) + '" stroke-linecap="round"/>';
   const cloud = '<path d="M' + (x + size * .18) + ' ' + (y + size * .57) + 'c0-' + (size * .12) + ' ' + (size * .10) + '-' + (size * .22) + ' ' + (size * .23) + '-' + (size * .22) +
     ' ' + (size * .05) + '-' + (size * .13) + ' ' + (size * .17) + '-' + (size * .21) + ' ' + (size * .31) + '-' + (size * .21) + ' ' + (size * .20) +
     ' 0 ' + (size * .36) + ' ' + (size * .16) + ' ' + (size * .36) + ' ' + (size * .35) + ' 0 ' + (size * .13) + '-' + (size * .10) + ' ' + (size * .24) +
-    '-' + (size * .23) + ' ' + (size * .24) + 'H' + (x + size * .38) + 'c-' + (size * .11) + ' 0-' + (size * .20) + '-' + (size * .09) + '-' + (size * .20) + '-' + (size * .20) + 'z" fill="' + (palette === 'mono' ? black : '#777777') + '"/>';
+    '-' + (size * .23) + ' ' + (size * .24) + 'H' + (x + size * .38) + 'c-' + (size * .11) + ' 0-' + (size * .20) + '-' + (size * .09) + '-' + (size * .20) + '-' + (size * .20) + 'z" fill="' + black + '"/>';
   if (/CLEAR|SUN/.test(t) && !/CLOUD/.test(t)) return sun;
   if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return cloud + '<path d="M' + (x + size*.34) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.54) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.74) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5,size*.055) + '" stroke-linecap="round"/>';
   if (/SNOW|ICE|SLEET/.test(t)) return cloud + '<g fill="' + accent + '"><circle cx="' + (x+size*.34) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.55) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.76) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/></g>';
@@ -2664,15 +2666,15 @@ function svgWeatherIcon(type, x, y, size, palette) {
   return cloud;
 }
 function plannerFooter(svg, data, w, h, pad, scale, label) {
-  const muted = '#666660';
+  const muted = HEX.black;
   svg += '<text x="' + pad + '" y="' + (h - 10 * scale) + '" font-size="' + (9 * scale) + '" fill="' + muted + '">' + esc(label) + '</text>';
   svg += '<text x="' + (w - pad) + '" y="' + (h - 10 * scale) + '" text-anchor="end" font-size="' + (9 * scale) + '" fill="' + muted + '">Updated ' + esc(new Date(data.generatedAt).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })) + '</text>';
   return svg;
 }
 function renderPlannerSvg(data, w, h, mode) {
   const palette = data.display.palette, landscape = w >= h;
-  const scale = Math.max(.62, Math.min(1.45, Math.min(w / 800, h / 480)));
-  const pad = Math.max(12, Math.round(22 * scale)), black = '#111111', muted = '#666660', rule = '#d1d1ca', paper = '#ffffff';
+  const scale = Math.max(.62, Math.min(1.45, Math.min(w / 600, h / 400)));
+  const pad = Math.max(12, Math.round(22 * scale)), black = HEX.black, muted = HEX.black, rule = HEX.black, paper = HEX.white;
   const now = new Date();
   const currentWeather = data.display.showWeather !== false ? data.weather?.current : null;
   const todayWeather = data.display.showWeather !== false ? plannerWeatherForDay(data, now) : null;
@@ -2727,7 +2729,7 @@ function renderPlannerSvg(data, w, h, mode) {
       if (data.display.showTasks !== false) {
         svg += '<text x="' + rightX + '" y="' + ry + '" font-size="' + (10*scale) + '" font-weight="800" letter-spacing="' + (1.5*scale) + '">TASKS</text>'; ry += 18*scale;
         for (const task of (data.tasks||[]).slice(0,3)) {
-          svg += '<rect x="' + rightX + '" y="' + (ry-9*scale) + '" width="' + (10*scale) + '" height="' + (10*scale) + '" rx="' + (1.5*scale) + '" fill="#fff" stroke="' + black + '"/>';
+          svg += '<rect x="' + rightX + '" y="' + (ry-9*scale) + '" width="' + (10*scale) + '" height="' + (10*scale) + '" rx="' + (1.5*scale) + '" fill="#FFFFFF" stroke="' + black + '"/>';
           svg += '<text x="' + (rightX+18*scale) + '" y="' + ry + '" font-size="' + (11.5*scale) + '">' + esc(truncateForWidth(task.title,rightW-20*scale,11.5*scale)) + '</text>'; ry += 24*scale;
         }
       }
@@ -2758,7 +2760,7 @@ function renderPlannerSvg(data, w, h, mode) {
     if (currentWeather && landscape) {
       const wy = h - (weatherStyle === 'compact' ? 60*scale : 82*scale);
       const wh = weatherStyle === 'compact' ? 36*scale : 58*scale;
-      svg += '<rect x="' + pad + '" y="' + wy + '" width="' + (w-pad*2) + '" height="' + wh + '" rx="' + (6*scale) + '" fill="#f1f1ed"/>';
+      svg += '<rect x="' + pad + '" y="' + wy + '" width="' + (w-pad*2) + '" height="' + wh + '" rx="' + (6*scale) + '" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>';
       if (weatherStyle === 'forecast') {
         const days = (data.weather?.days || []).slice(0,5);
         const left = pad + 10*scale;
@@ -2791,7 +2793,7 @@ function renderPlannerSvg(data, w, h, mode) {
       const day = new Date(monday); day.setDate(day.getDate()+i);
       const isToday = plannerDateKey(day) === plannerDateKey(now);
       const y = top + i*rowH, weather = data.display.showWeather !== false ? plannerWeatherForDay(data,day) : null;
-      if (isToday) svg += '<rect x="' + pad + '" y="' + y + '" width="' + (w-pad*2) + '" height="' + rowH + '" rx="' + (5*scale) + '" fill="#f0f0ec"/>';
+      if (isToday) svg += '<rect x="' + pad + '" y="' + y + '" width="' + (w-pad*2) + '" height="' + rowH + '" rx="' + (5*scale) + '" fill="#FFFFFF"/>';
       svg += '<line x1="' + pad + '" y1="' + (y+rowH) + '" x2="' + (w-pad) + '" y2="' + (y+rowH) + '" class="rule"/>';
       svg += '<text x="' + (pad+4*scale) + '" y="' + (y+17*scale) + '" font-size="' + (8.5*scale) + '" font-weight="800">' + esc(day.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
       svg += '<text x="' + (pad+4*scale) + '" y="' + (y+38*scale) + '" font-size="' + (18*scale) + '" font-weight="800">' + day.getDate() + '</text>';
@@ -2809,7 +2811,7 @@ function renderPlannerSvg(data, w, h, mode) {
         ey += 20*scale;
       }
       for (const task of tasks) {
-        svg += '<rect x="' + eventX + '" y="' + (ey-11*scale) + '" width="' + (8*scale) + '" height="' + (8*scale) + '" fill="#fff" stroke="' + black + '"/>';
+        svg += '<rect x="' + eventX + '" y="' + (ey-11*scale) + '" width="' + (8*scale) + '" height="' + (8*scale) + '" fill="#FFFFFF" stroke="' + black + '"/>';
         svg += '<text x="' + (eventX+12*scale) + '" y="' + (ey-3*scale) + '" font-size="' + (10.5*scale) + '" class="muted">' + esc(truncateForWidth(task.title,w-eventX-pad,10.5*scale)) + '</text>';
       }
     }
@@ -2829,8 +2831,8 @@ function renderPlannerSvg(data, w, h, mode) {
   for(let i=0;i<42;i++){
     const day=new Date(gridStart);day.setDate(day.getDate()+i);
     const row=Math.floor(i/7),col=i%7,x=gridX+col*cellW,y=gridTop+dayHeadH+row*cellH,isMonth=day.getMonth()===now.getMonth(),isToday=plannerDateKey(day)===plannerDateKey(now);
-    svg += '<rect x="' + x + '" y="' + y + '" width="' + cellW + '" height="' + cellH + '" fill="' + (isToday?black:'#fff') + '" stroke="' + rule + '" stroke-width="1"/>';
-    svg += '<text x="' + (x+6*scale) + '" y="' + (y+14*scale) + '" font-size="' + (9.5*scale) + '" font-weight="' + (isToday?'800':'600') + '" fill="' + (isToday?'#ffffff':(isMonth?black:'#999999')) + '">' + day.getDate() + '</text>';
+    svg += '<rect x="' + x + '" y="' + y + '" width="' + cellW + '" height="' + cellH + '" fill="' + (isToday?black:HEX.white) + '" stroke="' + rule + '" stroke-width="1"/>';
+    svg += '<text x="' + (x+6*scale) + '" y="' + (y+14*scale) + '" font-size="' + (9.5*scale) + '" font-weight="' + (isToday?'800':'600') + '" fill="' + (isToday?HEX.white:(isMonth?black:HEX.black)) + '">' + day.getDate() + '</text>';
     const weather=data.display.showWeather!==false?plannerWeatherForDay(data,day):null;
     if(weather&&isMonth&&!isToday)svg += svgWeatherIcon(weather.daytime?.condition,x+cellW-24*scale,y+4*scale,18*scale,palette);
     const dots=plannerEventsForDay(data,day).slice(0,3);
@@ -2862,12 +2864,12 @@ function renderSvg(data, w, h) {
   const palette = data.display.palette;
   const portrait = data.display.layout === 'portrait' || (data.display.layout === 'auto' && h > w);
   const pad = Math.max(12, Math.round(Math.min(w, h) * 0.026));
-  const black = '#111111', muted = '#666660', rule = '#c9c9c2';
+  const black = HEX.black, muted = HEX.black, rule = HEX.black;
   const now = new Date();
   const dateText = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
   const modeLabel = ({ dashboard:'DASHBOARD', daily:'DAY', weekly:'WEEK', monthly:'MONTH', countdowns:'COUNTDOWNS' })[data.display.mode] || 'PLANNER';
   const timeText = now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#ffffff"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
 
   const headerY = pad + 15;
   svg += '<text x="' + pad + '" y="' + headerY + '" font-size="' + (portrait ? 11 : 12) + '" font-weight="800" letter-spacing="1">' + esc(dateText) + '</text>';
@@ -3025,7 +3027,7 @@ function renderSvg(data, w, h) {
         const due = task.due ? new Date(task.due).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
         const title = truncateForWidth(task.title, width - 18, 13, due ? Math.min(74, width * 0.24) : 0);
         svg += '<line x1="' + x + '" y1="' + cursor + '" x2="' + (x + width) + '" y2="' + cursor + '" class="line"/>';
-        if(taskStyle==='checklist') svg += '<rect x="' + x + '" y="' + (cursor + 9) + '" width="10" height="10" rx="2" fill="#fff" stroke="' + black + '"/>';
+        if(taskStyle==='checklist') svg += '<rect x="' + x + '" y="' + (cursor + 9) + '" width="10" height="10" rx="2" fill="#FFFFFF" stroke="' + black + '"/>';
         svg += '<text x="' + (x + (taskStyle==='checklist'?18:0)) + '" y="' + (cursor + 19) + '" font-size="' + (taskStyle==='compact'?11:13) + '" font-weight="700">' + esc(title) + '</text>';
         if (due) svg += '<text x="' + (x + width) + '" y="' + (cursor + 19) + '" text-anchor="end" font-size="11" class="muted">' + esc(due) + '</text>';
         cursor += 28;
@@ -3619,8 +3621,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/frameos/svg') {
       if (!authorized(url)) return text(res, 401, 'Invalid display token');
-      const w = clamp(num(url.searchParams.get('w'), 800), 300, 2000);
-      const h = clamp(num(url.searchParams.get('h'), 480), 300, 2000);
+      const w = clamp(num(url.searchParams.get('w'), 600), 300, 2000);
+      const h = clamp(num(url.searchParams.get('h'), 400), 300, 2000);
       const data = await feed();
       return text(res, 200, renderSvg(data, w, h), 'image/svg+xml; charset=utf-8', { 'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes) });
     }
