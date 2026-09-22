@@ -2572,8 +2572,13 @@ function svgBar(percent, x, y, width, height, fill) {
   return '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="' + height / 2 + '" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>' +
     '<rect x="' + x + '" y="' + y + '" width="' + (width * p / 100).toFixed(1) + '" height="' + height + '" rx="' + height / 2 + '" fill="' + fill + '"/>';
 }
-function sectionTitle(label, x, y) {
-  return '<text x="' + x + '" y="' + y + '" class="k">' + esc(label) + '</text>';
+function sectionAccent(kind, palette) {
+  if (palette === 'mono') return HEX.black;
+  return ({ agenda: HEX.blue, weather: HEX.yellow, tasks: HEX.green, goals: HEX.blue, countdowns: HEX.red, markets: HEX.green })[kind] || HEX.blue;
+}
+function sectionTitle(label, x, y, accent = HEX.blue) {
+  return '<rect x="' + x + '" y="' + (y - 9) + '" width="3" height="10" rx="1.5" fill="' + accent + '"/>' +
+    '<text x="' + (x + 9) + '" y="' + y + '" class="k">' + esc(label) + '</text>';
 }
 function plannerDateKey(value) {
   const d = value instanceof Date ? value : new Date(value);
@@ -2869,12 +2874,14 @@ function renderSvg(data, w, h) {
   const dateText = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
   const modeLabel = ({ dashboard:'DASHBOARD', daily:'DAY', weekly:'WEEK', monthly:'MONTH', countdowns:'COUNTDOWNS' })[data.display.mode] || 'PLANNER';
   const timeText = now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
+  const modeAccent = palette === 'mono' ? HEX.black : HEX.blue;
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:10px;font-weight:800;letter-spacing:1.35px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:.7;stroke-dasharray:1 3;stroke-linecap:round}.section-box{fill:#FFFFFF;stroke:none}</style>';
 
-  const headerY = pad + 15;
-  svg += '<text x="' + pad + '" y="' + headerY + '" font-size="' + (portrait ? 11 : 12) + '" font-weight="800" letter-spacing="1">' + esc(dateText) + '</text>';
-  svg += '<text x="' + (w - pad) + '" y="' + headerY + '" text-anchor="end" font-size="' + (portrait ? 10 : 11) + '" font-weight="800" letter-spacing="1">' + esc(modeLabel + ' · ' + timeText) + '</text>';
-  svg += '<line x1="' + pad + '" y1="' + (pad + 23) + '" x2="' + (w - pad) + '" y2="' + (pad + 23) + '" class="line"/>';
+  const headerY = pad + 14;
+  svg += '<text x="' + pad + '" y="' + headerY + '" font-size="' + (portrait ? 11 : 12) + '" font-weight="800" letter-spacing=".7">' + esc(dateText) + '</text>';
+  svg += '<rect x="' + (w - pad - 74) + '" y="' + (pad + 2) + '" width="74" height="18" rx="9" fill="' + modeAccent + '"/>';
+  svg += '<text x="' + (w - pad - 37) + '" y="' + (pad + 15) + '" text-anchor="middle" font-size="9" font-weight="800" fill="' + HEX.white + '" letter-spacing=".8">' + esc(modeLabel) + '</text>';
+  svg += '<text x="' + (w - pad - 84) + '" y="' + (pad + 15) + '" text-anchor="end" font-size="10" font-weight="700">' + esc(timeText) + '</text>';
 
   const activeSections = normalizeSectionSettings(data.display.modeSections, data.display.mode);
   const availableKinds = DISPLAY_SECTION_KEYS.filter(kind => activeSections[kind]?.enabled);
@@ -2900,7 +2907,7 @@ function renderSvg(data, w, h) {
     let cursor = y;
     const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS', markets: 'MARKETS' }[kind];
     const items = sectionData[kind] || [];
-    svg += sectionTitle(label, x, cursor + 11);
+    svg += sectionTitle(label, x, cursor + 11, options.accent || sectionAccent(kind, palette));
     cursor += 22;
 
     if (!items.length) {
@@ -3100,19 +3107,21 @@ function renderSvg(data, w, h) {
       const height = available * r.h / DISPLAY_GRID_ROWS;
       const inset = Math.max(5, Math.min(9, Math.round(Math.min(width, height) * 0.035)));
       const clipId = 'clip-' + kind;
-      defs += '<clipPath id="' + clipId + '"><rect x="' + (x + inset) + '" y="' + (y + inset) + '" width="' + Math.max(1, width - inset * 2) + '" height="' + Math.max(1, height - inset * 2) + '" rx="4"/></clipPath>';
+      defs += '<clipPath id="' + clipId + '"><rect x="' + (x + inset) + '" y="' + (y + inset + 2) + '" width="' + Math.max(1, width - inset * 2) + '" height="' + Math.max(1, height - inset * 2 - 2) + '" rx="5"/></clipPath>';
       drawQueue.push({ kind, x, y, width, height, inset, clipId });
     }
     if (defs) svg += '<defs>' + defs + '</defs>';
     for (const item of drawQueue) {
-      svg += '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.width + '" height="' + item.height + '" rx="7" class="section-box"/>';
+      const accent = sectionAccent(item.kind, palette);
+      svg += '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.width + '" height="' + item.height + '" rx="9" class="section-box"/>' +
+        '<rect x="' + (item.x + 1) + '" y="' + (item.y + 1) + '" width="' + Math.max(14, item.width - 2) + '" height="3" rx="1.5" fill="' + accent + '"/>';
       drawSection(
         item.kind,
         item.x + item.inset,
-        item.y + item.inset,
+        item.y + item.inset + 2,
         Math.max(20, item.width - item.inset * 2),
-        Math.max(20, item.height - item.inset * 2),
-        { clipId: item.clipId }
+        Math.max(20, item.height - item.inset * 2 - 2),
+        { clipId: item.clipId, accent }
       );
     }
   } else {
