@@ -451,6 +451,22 @@
       <div class="modal-actions"><button class="btn primary" id="installPwaNow" type="button" disabled>Install Quest Log</button></div>
       <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
     </div>
+    <div class="card setting-card" id="notificationSettingsCard">
+      <div class="eyebrow">Notifications</div><h3>Push reminders</h3>
+      <p class="meta">Get reminders for upcoming tasks, calendar events, goals, and countdowns even when Quest Log is not open.</p>
+      <div class="setting-row"><span>Device</span><strong id="notificationDeviceStatus">Checking support…</strong></div>
+      <label class="setting-row"><span>Task reminders</span><input id="notifyTasks" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="setting-row"><span>Task lead time</span><select id="notifyTaskLead"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option></select></div>
+      <label class="setting-row"><span>Calendar reminders</span><input id="notifyEvents" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="setting-row"><span>Event lead time</span><select id="notifyEventLead"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
+      <label class="setting-row"><span>Goal reminders</span><input id="notifyGoals" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="setting-row"><span>Goal lead time</span><select id="notifyGoalLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
+      <label class="setting-row"><span>Countdown reminders</span><input id="notifyCountdowns" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="setting-row"><span>Countdown lead time</span><select id="notifyCountdownLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
+      <div class="modal-actions"><button class="btn" id="testNotification" type="button" disabled>Send test</button><button class="btn" id="disableNotifications" type="button" disabled>Disable on this device</button><button class="btn primary" id="enableNotifications" type="button">Enable notifications</button></div>
+      <div class="notice" id="notificationStatus" style="display:none;margin-top:10px"></div>
+      <div class="meta" style="margin-top:8px">Notification preferences are stored with this Quest Log instance. Each phone/browser must be enabled separately.</div>
+    </div>
     <div class="card setting-card update-card">
       <div class="update-head">
         <div><div class="eyebrow">Maintenance</div><h3 style="margin-bottom:2px">Application updates</h3></div>
@@ -564,6 +580,109 @@ if('serviceWorker' in navigator&&window.isSecureContext){
 }
 $('installPwaNow').onclick=installQuestLog;
 updatePwaInstallUi();
+
+function urlBase64ToUint8Array(value){
+ const padding='='.repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
+ const raw=atob(base64),out=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+ return out;
+}
+async function currentPushSubscription(){
+ if(!('serviceWorker' in navigator)||!window.isSecureContext)return null;
+ const registration=await navigator.serviceWorker.ready;
+ return registration.pushManager.getSubscription();
+}
+async function renderNotificationSettings(){
+ const status=$('notificationDeviceStatus'),enable=$('enableNotifications'),disable=$('disableNotifications'),test=$('testNotification');
+ if(!status||!enable||!disable||!test)return;
+ const cfg=state?.notifications||{};
+ $('notifyTasks').checked=cfg.taskReminders!==false;
+ $('notifyEvents').checked=cfg.eventReminders!==false;
+ $('notifyGoals').checked=cfg.goalReminders!==false;
+ $('notifyCountdowns').checked=cfg.countdownReminders!==false;
+ $('notifyTaskLead').value=String(cfg.taskLeadMinutes||30);
+ $('notifyEventLead').value=String(cfg.eventLeadMinutes||15);
+ $('notifyGoalLead').value=String(cfg.goalLeadMinutes||1440);
+ $('notifyCountdownLead').value=String(cfg.countdownLeadMinutes||1440);
+ const supported=window.isSecureContext&&'Notification' in window&&'serviceWorker' in navigator&&'PushManager' in window;
+ if(!supported){
+   status.textContent=window.isSecureContext?'Push is not supported by this browser.':'HTTPS is required for push notifications.';
+   enable.disabled=true;disable.disabled=true;test.disabled=true;return;
+ }
+ if(!cfg.configured){
+   status.textContent='Server push keys are not configured.';
+   enable.disabled=true;disable.disabled=true;test.disabled=true;return;
+ }
+ let subscription=null;
+ try{subscription=await currentPushSubscription()}catch{}
+ const permission=Notification.permission;
+ if(permission==='denied'){
+   status.textContent='Blocked in browser settings';
+   enable.disabled=true;disable.disabled=!subscription;test.disabled=true;return;
+ }
+ status.textContent=subscription?'Enabled on this device':(permission==='granted'?'Ready to enable':'Permission not requested');
+ enable.textContent=subscription?'Save notification settings':'Enable notifications';
+ enable.disabled=false;disable.disabled=!subscription;test.disabled=!subscription;
+}
+async function saveNotificationPreferences(){
+ const payload={
+   enabled:true,
+   taskReminders:$('notifyTasks').checked,
+   eventReminders:$('notifyEvents').checked,
+   goalReminders:$('notifyGoals').checked,
+   countdownReminders:$('notifyCountdowns').checked,
+   taskLeadMinutes:Number($('notifyTaskLead').value),
+   eventLeadMinutes:Number($('notifyEventLead').value),
+   goalLeadMinutes:Number($('notifyGoalLead').value),
+   countdownLeadMinutes:Number($('notifyCountdownLead').value)
+ };
+ return api('/api/notifications/preferences',{method:'PUT',body:JSON.stringify(payload)});
+}
+async function enablePushNotifications(){
+ const note=$('notificationStatus');note.style.display='block';note.textContent='Enabling notifications…';
+ try{
+   if(!window.isSecureContext)throw Error('HTTPS is required for push notifications.');
+   if(Notification.permission==='denied')throw Error('Notifications are blocked in your browser settings.');
+   const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+   if(permission!=='granted')throw Error('Notification permission was not granted.');
+   const cfg=await api('/api/notifications/config');
+   if(!cfg.configured||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
+   const registration=await navigator.serviceWorker.ready;
+   let subscription=await registration.pushManager.getSubscription();
+   if(!subscription){
+     subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.publicKey)});
+   }
+   await api('/api/notifications/subscribe',{method:'POST',body:JSON.stringify({subscription:subscription.toJSON()})});
+   state.notifications=await saveNotificationPreferences();
+   note.textContent='Notifications enabled on this device.';
+   await renderNotificationSettings();
+ }catch(error){note.textContent=error.message||'Could not enable notifications.'}
+}
+async function disablePushNotifications(){
+ const note=$('notificationStatus');note.style.display='block';note.textContent='Disabling notifications…';
+ try{
+   const subscription=await currentPushSubscription();
+   if(subscription){
+     await api('/api/notifications/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
+     await subscription.unsubscribe();
+   }
+   state.notifications={...(state.notifications||{}),enabled:false};
+   note.textContent='Notifications disabled on this device.';
+   await renderNotificationSettings();
+ }catch(error){note.textContent=error.message||'Could not disable notifications.'}
+}
+async function testPushNotification(){
+ const note=$('notificationStatus');note.style.display='block';note.textContent='Sending test notification…';
+ try{
+   const subscription=await currentPushSubscription();if(!subscription)throw Error('Enable notifications on this device first.');
+   const result=await api('/api/notifications/test',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})});
+   if(!result.ok)throw Error(result.results?.find(item=>item.error)?.error||'Push service did not accept the test notification.');
+   note.textContent='Test sent. It should appear as a system notification.';
+ }catch(error){note.textContent=error.message||'Could not send test notification.'}
+}
+$('enableNotifications').onclick=enablePushNotifications;
+$('disableNotifications').onclick=disablePushNotifications;
+$('testNotification').onclick=testPushNotification;
 
 function renderRuntimeSession(){
  const foot=$('sideFoot');if(!foot)return;
@@ -1348,7 +1467,7 @@ $('saveAppearance').onclick=async()=>{
  }finally{$('saveAppearance').disabled=false}
 };
 async function renderSettings(){
- renderAppearanceSettings();renderWeatherSettings();renderMarketSettings();renderAgentSettings();
+ renderAppearanceSettings();renderWeatherSettings();renderMarketSettings();renderAgentSettings();renderNotificationSettings();
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
  const googleSetupHint=runtimeInfo?.runtime==='cloudflare'?'Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and APP_SECRET to the Worker secrets first.':'Add Google OAuth environment variables in CasaOS first.';
