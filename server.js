@@ -2965,12 +2965,11 @@ function renderSvg(data, w, h) {
       const weather = data.weather;
       const style = activeSections.weather.style;
       if (weather?.current) {
-        const current = weather.current, today = (weather.days||[])[0], unitSymbol = weather.unitSymbol || '';
+        const current = weather.current, unitSymbol = weather.unitSymbol || (weather.units==='imperial'?'°F':'°C');
         if (style === 'compact') {
           svg += svgWeatherIcon(current.condition,x,cursor+2,28,palette);
           svg += '<text x="' + (x+38) + '" y="' + (cursor+20) + '" font-size="17" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
           svg += '<text x="' + (x+86) + '" y="' + (cursor+20) + '" font-size="11" class="muted">' + esc(truncateForWidth(current.description||'',width-90,11,76)) + '</text>';
-          if(today) svg += '<text x="' + (x+width) + '" y="' + (cursor+20) + '" text-anchor="end" font-size="10" font-weight="700">H ' + esc((today.high??'—')+unitSymbol) + ' · L ' + esc((today.low??'—')+unitSymbol) + '</text>';
           cursor += 34;
         } else if (style === 'current') {
           svg += svgWeatherIcon(current.condition,x,cursor+3,40,palette);
@@ -2979,20 +2978,28 @@ function renderSvg(data, w, h) {
           svg += '<text x="' + x + '" y="' + (cursor+61) + '" font-size="9.5" class="muted">Feels ' + esc((current.feelsLike??'—')+unitSymbol) + ' · ' + Math.round(current.humidity||0) + '% humidity · ' + Math.round(current.windSpeed||0) + (weather.units==='imperial'?' mph':' km/h') + '</text>';
           cursor += 72;
         } else {
+          const days=(weather.days||weather.forecast||[]).slice(0,activeSections.weather.limit);
+          const max=Math.max(1,days.length),headerH=Math.min(42,Math.max(30,maxHeight*.24)),availableForecast=Math.max(36,maxHeight-headerH-10),cols=Math.min(max,Math.max(2,Math.floor(width/78))),rows=Math.ceil(max/cols),cellW=width/cols,cellH=Math.max(34,availableForecast/rows);
           svg += svgWeatherIcon(current.condition,x,cursor+1,30,palette);
           svg += '<text x="' + (x+40) + '" y="' + (cursor+20) + '" font-size="17" font-weight="800">' + esc((current.temperature??'—')+unitSymbol) + '</text>';
-          const days=(weather.days||[]).slice(0,activeSections.weather.limit);
-          const startY=cursor+36, cellW=Math.max(46,(width-2)/Math.max(1,days.length));
+          svg += '<text x="' + (x+100) + '" y="' + (cursor+20) + '" font-size="10" class="muted">' + esc(truncateForWidth(current.description||'',width-102,10)) + '</text>';
+          cursor += headerH;
           days.forEach((day,index)=>{
-            const dx=x+index*cellW;
-            svg += '<text x="' + dx + '" y="' + startY + '" font-size="8.5" font-weight="800" class="muted">' + esc(index===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
-            svg += svgWeatherIcon(day.daytime?.condition,dx,startY+5,20,palette);
-            svg += '<text x="' + (dx+24) + '" y="' + (startY+20) + '" font-size="9" font-weight="800">' + esc((day.high??'—')+'°/'+(day.low??'—')+'°') + '</text>';
+            const col=index%cols,row=Math.floor(index/cols),dx=x+col*cellW,dy=cursor+row*cellH;
+            if(col>0)svg += '<line x1="' + dx + '" y1="' + dy + '" x2="' + dx + '" y2="' + Math.min(y+maxHeight,dy+cellH-3) + '" class="line"/>';
+            if(row>0)svg += '<line x1="' + dx + '" y1="' + dy + '" x2="' + Math.min(x+width,dx+cellW-3) + '" y2="' + dy + '" class="line"/>';
+            const condition=day.daytime?.condition||day.condition||'',pop=Math.round(Number(day.precipitationProbability||0));
+            svg += '<text x="' + (dx+4) + '" y="' + (dy+10) + '" font-size="8.5" font-weight="800" class="muted">' + esc(index===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
+            svg += svgWeatherIcon(condition,dx+4,dy+14,22,palette);
+            svg += '<text x="' + (dx+31) + '" y="' + (dy+28) + '" font-size="11" font-weight="800">' + esc((day.high??'—')+'°') + '</text>';
+            svg += '<text x="' + (dx+31) + '" y="' + (dy+41) + '" font-size="9" class="muted">' + esc((day.low??'—')+'° low') + '</text>';
+            if(cellH>=58&&pop)svg += '<text x="' + (dx+4) + '" y="' + Math.min(dy+cellH-5,dy+56) + '" font-size="8.5" class="muted">' + esc(pop+'% precip') + '</text>';
           });
-          cursor += 68;
+          cursor += rows*cellH;
         }
-        if (weather.locationLabel && cursor + 12 <= y + maxHeight) {
-          svg += '<text x="' + x + '" y="' + Math.min(y+maxHeight-2,cursor+2) + '" font-size="8.5" class="muted">' + esc(truncateForWidth(weather.locationLabel,width,8.5)) + '</text>';
+        const location=weather.locationLabel||weather.location||'';
+        if (location && cursor + 12 <= y + maxHeight) {
+          svg += '<text x="' + x + '" y="' + Math.min(y+maxHeight-2,cursor+2) + '" font-size="8.5" class="muted">' + esc(truncateForWidth(location,width,8.5)) + '</text>';
         }
       }
     }
