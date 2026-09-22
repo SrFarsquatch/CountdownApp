@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const webpush = require('web-push');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 8080);
@@ -13,6 +14,9 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || '';
 const APP_BASE_URL = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
 const APP_SECRET = process.env.APP_SECRET || '';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:questlog@localhost';
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const TARGET_CONTAINER = process.env.TARGET_CONTAINER || 'countdownapp';
 const TARGET_IMAGE = process.env.TARGET_IMAGE || 'ghcr.io/srfarsquatch/countdownapp:edge';
@@ -239,6 +243,7 @@ function defaults() {
     markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 1440 },
     marketCache: null,
     agent: { enabled: false, provider: 'hermes', baseUrl: '', model: 'hermes-agent', credential: null, requireConfirmation: true, contextDays: 14 },
+    notifications: normalizeNotifications({}),
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
@@ -332,6 +337,29 @@ function normalizeWeather(x = {}) {
     locationLabel: cleanText(x.locationLabel, 100),
     countryCode: cleanText(x.countryCode, 8).toUpperCase(),
     units: en(x.units, WEATHER_UNITS, 'metric')
+  };
+}
+
+function normalizeNotifications(x = {}) {
+  const subscriptions = Array.isArray(x.subscriptions) ? x.subscriptions.map(item => ({
+    endpoint: cleanText(item?.endpoint, 2000),
+    keys: { p256dh: cleanText(item?.keys?.p256dh, 500), auth: cleanText(item?.keys?.auth, 500) },
+    userAgent: cleanText(item?.userAgent, 300),
+    createdAt: iso(item?.createdAt) || new Date().toISOString(),
+    lastSeen: iso(item?.lastSeen) || new Date().toISOString()
+  })).filter(item => item.endpoint && item.keys.p256dh && item.keys.auth).slice(0, 20) : [];
+  return {
+    enabled: Boolean(x.enabled),
+    taskReminders: x.taskReminders !== false,
+    eventReminders: x.eventReminders !== false,
+    goalReminders: x.goalReminders !== false,
+    countdownReminders: x.countdownReminders !== false,
+    taskLeadMinutes: clamp(Math.round(num(x.taskLeadMinutes, 30)), 1, 10080),
+    eventLeadMinutes: clamp(Math.round(num(x.eventLeadMinutes, 15)), 1, 1440),
+    goalLeadMinutes: clamp(Math.round(num(x.goalLeadMinutes, 1440)), 15, 43200),
+    countdownLeadMinutes: clamp(Math.round(num(x.countdownLeadMinutes, 1440)), 15, 43200),
+    subscriptions,
+    sent: x.sent && typeof x.sent === 'object' ? x.sent : {}
   };
 }
 
@@ -460,6 +488,7 @@ function load() {
       appearance: normalizeAppearance(parsed.appearance || base.appearance),
       markets: normalizeMarkets(parsed.markets || base.markets),
       agent: normalizeAgent(parsed.agent || base.agent),
+      notifications: normalizeNotifications(parsed.notifications || base.notifications),
       display: (() => {
         const legacyDisplay = parsed.display || {};
         const legacyVersion = num(legacyDisplay.plannerLayoutVersion, 0);
@@ -581,6 +610,152 @@ function validOauthState(value) {
   } catch {
     return false;
   }
+}
+
+function pushConfigured() {
+  return Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+}
+if (pushConfigured()) {
+  try { webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY); }
+  catch (error) { console.warn('Web Push VAPID configuration is invalid:', error.message); }
+}
+function publicNotificationConfig() {
+  const cfg = normalizeNotifications(db.notifications);
+  return {
+    configured: pushConfigured(),
+    publicKey: pushConfigured() ? VAPID_PUBLIC_KEY : '',
+    enabled: cfg.enabled,
+    taskReminders: cfg.taskReminders,
+    eventReminders: cfg.eventReminders,
+    goalReminders: cfg.goalReminders,
+    countdownReminders: cfg.countdownReminders,
+    taskLeadMinutes: cfg.taskLeadMinutes,
+    eventLeadMinutes: cfg.eventLeadMinutes,
+    goalLeadMinutes: cfg.goalLeadMinutes,
+    countdownLeadMinutes: cfg.countdownLeadMinutes,
+    subscriptionCount: cfg.subscriptions.length,
+    scheduler: 'self-hosted'
+  };
+}
+function updateNotificationPreferences(incoming = {}) {
+  db.notifications = normalizeNotifications({
+    ...db.notifications,
+    enabled: incoming.enabled !== undefined ? incoming.enabled : db.notifications?.enabled,
+    taskReminders: incoming.taskReminders !== undefined ? incoming.taskReminders : db.notifications?.taskReminders,
+    eventReminders: incoming.eventReminders !== undefined ? incoming.eventReminders : db.notifications?.eventReminders,
+    goalReminders: incoming.goalReminders !== undefined ? incoming.goalReminders : db.notifications?.goalReminders,
+    countdownReminders: incoming.countdownReminders !== undefined ? incoming.countdownReminders : db.notifications?.countdownReminders,
+    taskLeadMinutes: incoming.taskLeadMinutes !== undefined ? incoming.taskLeadMinutes : db.notifications?.taskLeadMinutes,
+    eventLeadMinutes: incoming.eventLeadMinutes !== undefined ? incoming.eventLeadMinutes : db.notifications?.eventLeadMinutes,
+    goalLeadMinutes: incoming.goalLeadMinutes !== undefined ? incoming.goalLeadMinutes : db.notifications?.goalLeadMinutes,
+    countdownLeadMinutes: incoming.countdownLeadMinutes !== undefined ? incoming.countdownLeadMinutes : db.notifications?.countdownLeadMinutes
+  });
+}
+function registerPushSubscription(raw, userAgent = '') {
+  const endpoint = cleanText(raw?.endpoint, 2000);
+  const p256dh = cleanText(raw?.keys?.p256dh, 500);
+  const auth = cleanText(raw?.keys?.auth, 500);
+  if (!/^https:\/\//i.test(endpoint) || !p256dh || !auth) throw new Error('Invalid push subscription.');
+  const cfg = normalizeNotifications(db.notifications);
+  const existing = cfg.subscriptions.find(item => item.endpoint === endpoint);
+  const now = new Date().toISOString();
+  cfg.subscriptions = cfg.subscriptions.filter(item => item.endpoint !== endpoint);
+  cfg.subscriptions.push({
+    endpoint,
+    keys: { p256dh, auth },
+    userAgent: cleanText(userAgent, 300),
+    createdAt: existing?.createdAt || now,
+    lastSeen: now
+  });
+  cfg.enabled = true;
+  db.notifications = normalizeNotifications(cfg);
+}
+function unregisterPushSubscription(endpoint) {
+  const cfg = normalizeNotifications(db.notifications);
+  cfg.subscriptions = cfg.subscriptions.filter(item => item.endpoint !== cleanText(endpoint, 2000));
+  if (!cfg.subscriptions.length) cfg.enabled = false;
+  db.notifications = normalizeNotifications(cfg);
+}
+async function sendPushPayload(payload, onlyEndpoint = '') {
+  if (!pushConfigured()) throw new Error('Push notifications need VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.');
+  const cfg = normalizeNotifications(db.notifications);
+  const keep = [], results = [];
+  for (const subscription of cfg.subscriptions) {
+    if (onlyEndpoint && subscription.endpoint !== onlyEndpoint) { keep.push(subscription); continue; }
+    try {
+      await webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: 300, urgency: 'high' });
+      keep.push(subscription);
+      results.push({ ok: true, endpoint: subscription.endpoint });
+    } catch (error) {
+      const code = Number(error?.statusCode || error?.status || 0);
+      const gone = code === 404 || code === 410;
+      if (!gone) keep.push(subscription);
+      results.push({ ok: false, endpoint: subscription.endpoint, gone, error: error.message || 'Push delivery failed.' });
+    }
+  }
+  if (onlyEndpoint) {
+    const untouched = cfg.subscriptions.filter(item => item.endpoint !== onlyEndpoint);
+    cfg.subscriptions = [...untouched, ...keep.filter(item => item.endpoint === onlyEndpoint)];
+  } else cfg.subscriptions = keep;
+  db.notifications = normalizeNotifications(cfg);
+  save(db);
+  return results;
+}
+function relativeMinutes(target, now) {
+  const minutes = Math.max(0, Math.round((target - now) / 60000));
+  if (minutes < 60) return minutes <= 1 ? 'in about a minute' : 'in ' + minutes + ' minutes';
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours === 1 ? 'in about an hour' : 'in about ' + hours + ' hours';
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'tomorrow' : 'in ' + days + ' days';
+}
+async function notificationSweep(now = Date.now()) {
+  const cfg = normalizeNotifications(db.notifications);
+  db.notifications = cfg;
+  if (!cfg.enabled || !cfg.subscriptions.length || !pushConfigured()) return { sent: 0, skipped: true };
+  let events = [];
+  if (cfg.eventReminders && googleAccounts().length) {
+    const end = new Date(now + Math.max(cfg.eventLeadMinutes, 5) * 60000);
+    try { events = await eventsBetween(new Date(now - 5 * 60000).toISOString(), end.toISOString()); }
+    catch (error) { console.warn('Notification calendar context failed:', error.message); }
+  }
+  const items = [];
+  const add = (kind, itemId, target, lead, title, bodyText, url) => {
+    if (!Number.isFinite(target)) return;
+    if (target < now - 5 * 60000 || target > now + lead * 60000) return;
+    const key = [kind, itemId, new Date(target).toISOString(), lead].join(':');
+    if (cfg.sent[key]) return;
+    items.push({ key, payload: { title, body: bodyText, tag: 'questlog-' + kind + '-' + itemId, url, kind, timestamp: new Date(now).toISOString() } });
+  };
+  if (cfg.taskReminders) for (const task of db.tasks || []) {
+    if (task.status === 'done' || !task.due) continue;
+    const target = new Date(task.due).getTime();
+    add('task', task.id, target, cfg.taskLeadMinutes, 'Task due soon', task.title + ' is due ' + relativeMinutes(target, now) + '.', '/?view=tasks');
+  }
+  if (cfg.goalReminders) for (const goal of db.goals || []) {
+    if (goal.status === 'complete' || !goal.deadline) continue;
+    const target = new Date(goal.deadline).getTime();
+    add('goal', goal.id, target, cfg.goalLeadMinutes, 'Goal deadline approaching', goal.title + ' is due ' + relativeMinutes(target, now) + '.', '/?view=goals');
+  }
+  if (cfg.countdownReminders) for (const item of db.countdowns || []) {
+    const target = new Date(item.end).getTime();
+    if (target <= now) continue;
+    add('countdown', item.id, target, cfg.countdownLeadMinutes, 'Countdown approaching', item.name + ' is ' + relativeMinutes(target, now) + '.', '/?view=countdowns');
+  }
+  if (cfg.eventReminders) for (const event of events) {
+    if (event.allDay || !event.start) continue;
+    const target = new Date(event.start).getTime();
+    add('event', [event.accountId || '', event.calendarId || '', event.id].join('-'), target, cfg.eventLeadMinutes, 'Calendar event soon', event.title + ' starts ' + relativeMinutes(target, now) + '.', '/?view=planner');
+  }
+  let sent = 0;
+  for (const item of items) {
+    const results = await sendPushPayload(item.payload);
+    if (results.some(result => result.ok)) { db.notifications.sent[item.key] = new Date(now).toISOString(); sent++; }
+  }
+  const cutoff = now - 45 * 86400000;
+  db.notifications.sent = Object.fromEntries(Object.entries(db.notifications.sent || {}).filter(([, value]) => new Date(value).getTime() >= cutoff).slice(-600));
+  save(db);
+  return { sent, checked: items.length, subscriptions: db.notifications.subscriptions.length };
 }
 
 function updaterConfigured() {
@@ -3004,6 +3179,7 @@ function state() {
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
     markets: (() => { const config = normalizeMarkets(db.markets); return { ...config, configured: marketConfigured(), provider: 'Alpha Vantage', effectiveRefreshMinutes: alphaEffectiveRefreshMinutes(config), freeDailyRequestLimit: 25 }; })(),
     agent: agentPublicConfig(),
+    notifications: publicNotificationConfig(),
     options: { colors: COLORS, progressModes: PROGRESS_MODES, progressStyles: PROGRESS_STYLES, dateStyles: DATE_STYLES, timeStyles: TIME_STYLES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, goalTypes: GOAL_TYPES },
     google: {
       configured: googleConfigured(),
@@ -3036,6 +3212,24 @@ const server = http.createServer(async (req, res) => {
       version: cleanText(process.env.APP_VERSION, 80) || 'edge'
     });
     if (p === '/api/state' && req.method === 'GET') return json(res, 200, state());
+
+    if (p === '/api/notifications/config' && req.method === 'GET') return json(res, 200, publicNotificationConfig());
+    if (p === '/api/notifications/preferences' && req.method === 'PUT') {
+      updateNotificationPreferences(await body(req)); save(db); return json(res, 200, publicNotificationConfig());
+    }
+    if (p === '/api/notifications/subscribe' && req.method === 'POST') {
+      const incoming = await body(req); registerPushSubscription(incoming.subscription || incoming, req.headers['user-agent'] || ''); save(db);
+      return json(res, 201, publicNotificationConfig());
+    }
+    if (p === '/api/notifications/unsubscribe' && req.method === 'POST') {
+      const incoming = await body(req); unregisterPushSubscription(incoming.endpoint || ''); save(db);
+      return json(res, 200, publicNotificationConfig());
+    }
+    if (p === '/api/notifications/test' && req.method === 'POST') {
+      const incoming = await body(req);
+      const results = await sendPushPayload({ title: 'Quest Log notifications are on', body: 'Push notifications are working on this device.', tag: 'questlog-test', url: '/?view=today', kind: 'test', timestamp: new Date().toISOString() }, cleanText(incoming.endpoint, 2000));
+      return json(res, 200, { ok: results.some(item => item.ok), results: results.map(item => ({ ok: item.ok, gone: item.gone || false, error: item.error || '' })) });
+    }
 
     if (p === '/api/countdowns' && req.method === 'POST') {
       const incoming = await body(req);
@@ -3442,3 +3636,5 @@ server.listen(PORT, '0.0.0.0', () => {
   setTimeout(() => syncGoogleTasks().catch(error => console.warn('Google Tasks startup sync failed:', error.message)), 5000);
 });
 setInterval(() => syncGoogleTasks().catch(error => console.warn('Google Tasks background sync failed:', error.message)), 5 * 60 * 1000);
+setTimeout(() => notificationSweep().catch(error => console.warn('Notification startup sweep failed:', error.message)), 15000);
+setInterval(() => notificationSweep().catch(error => console.warn('Notification sweep failed:', error.message)), 5 * 60 * 1000);
