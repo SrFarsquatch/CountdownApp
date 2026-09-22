@@ -107,6 +107,49 @@ The cloud local-model connector is only an AI endpoint. It does not connect the 
 
 ---
 
+## Push notifications
+
+Quest Log supports standards-based Web Push notifications for tasks, timed Google Calendar events, goal deadlines, and countdowns. Push subscriptions are created per device/browser and are stored only in the Quest Log runtime that the device is connected to.
+
+Generate one VAPID key pair:
+
+~~~bash
+npm install
+npm run generate:vapid
+~~~
+
+Keep the generated **private key secret**. The public key is safe to expose to the browser.
+
+### Self-hosted
+
+Add these environment variables to the CasaOS/Docker deployment:
+
+~~~text
+VAPID_PUBLIC_KEY=<public key>
+VAPID_PRIVATE_KEY=<private key>
+VAPID_SUBJECT=mailto:you@example.com
+~~~
+
+The self-hosted runtime checks reminders every five minutes while the container is running.
+
+Web Push requires a secure browser context. A plain LAN URL such as `http://192.168.x.x:8088` can still use Quest Log normally, but push subscription/service-worker features require HTTPS (or localhost). Use an HTTPS reverse proxy or trusted HTTPS VPN hostname for self-hosted push.
+
+### Cloudflare
+
+Configure:
+
+- `VAPID_PUBLIC_KEY` as a Worker variable;
+- `VAPID_PRIVATE_KEY` as a Worker secret;
+- `VAPID_SUBJECT` as a Worker variable such as `mailto:you@example.com`.
+
+The Worker has a `*/5 * * * *` Cron Trigger in `wrangler.jsonc` and checks due reminders every five minutes. Push delivery comes directly from the Worker to the browser's push service; it does not require the PWA to be open.
+
+### Enable a device
+
+Open **Settings → Push reminders → Enable notifications**. Approve the browser/Android permission prompt, choose the desired reminder types/lead times, and use **Send test** to verify delivery.
+
+Each phone, tablet, or browser profile must be enabled separately. Removing a subscription on one device does not remove subscriptions on other devices.
+
 ## Install as a PWA
 
 Quest Log can be used three ways without maintaining separate frontends:
@@ -190,6 +233,9 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
 | `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
 | `ALPHA_VANTAGE_API_KEY` | For Markets | Alpha Vantage API key |
+| `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
+| `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
+| `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
 | `TZ` | Optional | Container timezone |
 | `DOCKER_SOCKET` | Updater only | Defaults to `/var/run/docker.sock` |
 | `TARGET_CONTAINER` | Updater only | Defaults to `countdownapp` |
@@ -304,6 +350,7 @@ Core/integration secrets:
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
 | `ALPHA_VANTAGE_API_KEY` | Secret | Markets |
 | `OPENAI_API_KEY` | Secret | Cloud Navi with OpenAI |
+| `VAPID_PRIVATE_KEY` | Secret | Web Push private key |
 | `LOCAL_AGENT_API_KEY` | Secret | Optional bearer token for a private local-model endpoint |
 | `LOCAL_AGENT_ACCESS_CLIENT_ID` | Secret | Optional Cloudflare Access service-token client ID |
 | `LOCAL_AGENT_ACCESS_CLIENT_SECRET` | Secret | Optional Cloudflare Access service-token client secret |
@@ -313,6 +360,8 @@ Useful non-secret variables:
 | Name | Used for |
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `VAPID_PUBLIC_KEY` | Web Push public key |
+| `VAPID_SUBJECT` | Web Push contact URI |
 | `OPENAI_MODEL` | Optional OpenAI model override |
 | `LOCAL_AGENT_BASE_URL` | Optional default HTTPS local-model base URL |
 | `LOCAL_AGENT_MODEL` | Optional local-model override |
