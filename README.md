@@ -107,6 +107,24 @@ The cloud local-model connector is only an AI endpoint. It does not connect the 
 
 ---
 
+## Install as a PWA
+
+Quest Log can be used three ways without maintaining separate frontends:
+
+- normal browser view;
+- installed Progressive Web App (PWA);
+- the same self-hosted or Cloudflare backend described below.
+
+On Android/Chrome, open the HTTPS Quest Log URL and use **Settings → Install → Install Quest Log** when the install prompt is available. The installed app opens in a standalone window and uses the exact same Quest Log data/API as the regular browser view for that URL.
+
+Cloudflare Access-protected deployments load the manifest with credentials so authenticated users can install the PWA without making the manifest public.
+
+For a self-hosted LAN URL such as `http://192.168.x.x:8088`, the normal web view works but browsers do not allow service workers/PWA installation on an insecure LAN origin. Put the self-hosted instance behind HTTPS (for example a trusted reverse proxy or HTTPS VPN hostname) if you want that self-hosted URL to be installable.
+
+The PWA service worker deliberately does not cache `/api/*`, Cloudflare Access routes, login routes, or FrameOS endpoints. Planner data continues to come from the selected Quest Log backend.
+
+---
+
 # Self-hosted deployment
 
 ## Option A — CasaOS
