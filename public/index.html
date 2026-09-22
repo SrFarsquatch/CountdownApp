@@ -304,7 +304,14 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 #view-planner .mini-grid .selected{outline:1px solid var(--accent);background:var(--accent-soft);color:var(--text)}
 #view-planner .mini-grid .today{outline-color:var(--text)}
 #view-planner .calendar-stage{height:100%;min-height:0;max-height:none;border-radius:14px}
-#calendarStage[data-calendar-mode="day"],#calendarStage[data-calendar-mode="week"],#calendarStage[data-calendar-mode="week-mobile"]{overflow:auto;scrollbar-gutter:stable}
+#calendarStage[data-calendar-mode="day"],#calendarStage[data-calendar-mode="week"],#calendarStage[data-calendar-mode="week-mobile"]{overflow:hidden}
+#calendarStage[data-calendar-mode="day"] .calendar-day-root,
+#calendarStage[data-calendar-mode="week"] .calendar-week-root{height:100%;min-height:0}
+#calendarStage[data-calendar-mode="day"] .calendar-day-root{display:grid;grid-template-rows:auto minmax(0,1fr)}
+#calendarStage[data-calendar-mode="week"] .calendar-week-root{display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+#calendarStage[data-calendar-mode="week-mobile"]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+#calendarStage[data-calendar-mode="week-mobile"] .calendar-day-root{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr)}
+.timeline-scroll{min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;overscroll-behavior:contain}
 #calendarStage[data-timeline-dense="true"] .timeline-hour-label{font-size:7px;transform:translateY(-4px)}
 #calendarStage[data-timeline-dense="true"] .calendar-event-block{padding:1px 3px;border-left-width:2px;border-radius:4px}
 #calendarStage[data-timeline-dense="true"] .cal-block-title{font-size:8px;line-height:1}
@@ -320,7 +327,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 .timeline-lane{background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--timeline-hour-height,26px) - 1px),var(--line) var(--timeline-hour-height,26px))}
 .timeline-lane.today-lane{background:repeating-linear-gradient(to bottom,color-mix(in srgb,var(--accent) 2%,transparent) 0,color-mix(in srgb,var(--accent) 2%,transparent) calc(var(--timeline-hour-height,26px) - 1px),var(--line) var(--timeline-hour-height,26px))}
 .timeline-day-all-day,.day-time-grid{grid-template-columns:64px minmax(0,1fr)}
-.week-day-heads,.week-all-day,.week-time-grid{grid-template-columns:64px repeat(7,minmax(88px,1fr));min-width:700px}
+.week-day-heads,.week-all-day,.week-time-grid{grid-template-columns:64px repeat(7,minmax(0,1fr));min-width:0}
 .week-day-heads>div{padding:5px 4px;display:grid;place-items:center;min-width:0}
 .week-zone-spacer{align-content:end!important;justify-items:end!important;padding:0 7px 6px!important;color:var(--muted);font-size:8px;font-weight:800;white-space:nowrap}
 .week-day-button{width:100%;height:100%;min-height:44px;padding:3px 2px;border:0;border-radius:9px;background:transparent;color:var(--text);display:grid;place-items:center;align-content:center;gap:1px}
@@ -331,11 +338,9 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 .week-day-button:hover{background:var(--panel2)}
 .all-day-label{min-height:30px;padding:7px 7px 5px;align-items:center;justify-content:flex-end;overflow:hidden;white-space:nowrap}
 .all-day-cell{min-height:30px;max-height:58px;padding:3px 4px;gap:3px;overflow:auto}
-.timeline-day-all-day,.week-all-day{min-height:30px;background:var(--panel)}
-.timeline-day-all-day{position:sticky;top:0;z-index:11}
-.week-day-heads{height:54px}
-.week-all-day{position:sticky;top:54px;z-index:11}
-#calendarStage[data-calendar-mode="week-mobile"] .timeline-day-all-day{top:55px}
+.timeline-day-all-day,.week-all-day{min-height:30px;background:var(--panel);position:relative;z-index:11}
+.week-day-heads{height:54px;position:relative;top:auto;z-index:12}
+.week-all-day{position:relative;top:auto;z-index:11}
 .day-time-grid,.week-time-grid{border-top:1px solid var(--line)}
 .timeline-hour-label{padding-right:1px}
 .all-day-chip{padding:3px 5px}
@@ -368,7 +373,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
   #plannerViews button{width:auto;min-width:58px;min-height:40px;padding:5px 8px}
   #connectInline{width:auto;min-height:40px;padding:6px 9px;font-size:11px}
   #view-planner .calendar-shell{display:block;height:100%;min-height:0;margin:0!important}
-  #view-planner .calendar-stage{height:100%;width:100%;min-width:0;max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-gutter:stable}
+  #view-planner .calendar-stage{height:100%;width:100%;min-width:0;max-width:100%;overflow:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .timeline-day-all-day,.day-time-grid{grid-template-columns:52px minmax(0,1fr)}
   .all-day-label{font-size:8px;padding:6px 4px}
   .timeline-hour-label{right:5px;font-size:9px}
@@ -1264,9 +1269,10 @@ function timelineFocusDate(range){
 function scrollTimeline(range){
  requestAnimationFrame(()=>{
    const stage=$('calendarStage');if(!stage)return;
+   const scroller=stage.querySelector('.timeline-scroll');if(!scroller)return;
    const focus=timelineFocusDate(range),hour=focus.getHours()+focus.getMinutes()/60;
    const target=Math.max(0,(hour-2)*HOUR_HEIGHT);
-   stage.scrollTop=target;
+   scroller.scrollTop=target;
  });
 }
 function bindCalendarInteractions(){
@@ -1306,9 +1312,9 @@ function renderDay(range){
  fitTimelineToStage('day');
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
  const items=calendarItemsForDay(day,next);
- let h='<div class="timeline-root">';
+ let h='<div class="timeline-root calendar-day-root">';
  h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div></div>';
- h+='<div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
+ h+='<div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div></div>';
  stage.dataset.calendarMode='day';stage.innerHTML=h;bindCalendarInteractions();scrollTimeline(range);
 }
 function renderMobileWeek(range){
@@ -1320,7 +1326,7 @@ function renderMobileWeek(range){
  for(let i=0;i<7;i++){const day=new Date(range.start);day.setDate(range.start.getDate()+i);const key=dateKeyLocal(day);picker+='<button type="button" class="mobile-week-day '+(key===selectedKey?'on ':'')+(key===todayKey?'today':'')+'" data-week-day="'+key+'"><small>'+day.toLocaleDateString([],{weekday:'narrow'})+'</small><strong>'+day.getDate()+'</strong></button>'}
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next);
  stage.dataset.calendarMode='week-mobile';
- stage.innerHTML='<div class="mobile-week-strip">'+picker+'</div><div class="timeline-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div>';
+ stage.innerHTML='<div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div>';
  stage.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=()=>{plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  bindCalendarInteractions();scrollTimeline({start:selected,end:next});
 }
@@ -1337,8 +1343,8 @@ function renderWeek(range){
    const items=calendarItemsForDay(day,next);
    body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
  }
- stage.dataset.calendarMode='week';stage.innerHTML='<div class="timeline-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="week-time-grid">'+body+'</div></div>';
- bindCalendarInteractions();scrollTimeline();
+ stage.dataset.calendarMode='week';stage.innerHTML='<div class="timeline-root calendar-week-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="timeline-scroll"><div class="week-time-grid">'+body+'</div></div></div>';
+ bindCalendarInteractions();scrollTimeline(range);
 }
 function monthEventChip(e){
  const prefix=e.allDay?'':fmtTime(e.start)+' ';
