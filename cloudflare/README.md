@@ -165,9 +165,9 @@ When both Access service-token values are present, the Worker sends the standard
 
 ### Markets
 
-Quest Log uses Tickerbot as the shared market-data provider. Configure `APP_SECRET` once, then paste the shared Tickerbot API key into **Settings → Markets**. The Worker encrypts the key with AES-GCM before storing it in D1 and never returns the plaintext key to the browser.
+Quest Log uses Tickerbot as the shared market-data provider. Store `TICKERBOT_API_KEY` as a **Cloudflare Worker secret**. It is not entered or managed from the Quest Log UI and is never returned to the browser.
 
-`TICKERBOT_API_KEY` remains supported as an optional Worker-secret fallback. Quest Log batches up to 50 watchlist symbols in one Tickerbot state request and caches the result for the configured refresh interval.
+Quest Log batches up to 50 watchlist symbols in one Tickerbot state request and caches the result for the configured refresh interval.
 
 ### Weather
 
