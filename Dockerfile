@@ -5,6 +5,8 @@ ENV NODE_ENV=production \
     DATA_DIR=/data
 
 WORKDIR /app
+COPY package.json ./package.json
+RUN npm install --omit=dev --no-audit --no-fund
 COPY server.js ./server.js
 COPY updater.js ./updater.js
 COPY casaos-update.js ./casaos-update.js
