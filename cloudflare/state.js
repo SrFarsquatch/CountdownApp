@@ -53,7 +53,7 @@ function defaultLayout(mode='dashboard'){
   if(mode==='daily'||mode==='weekly')return{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
   if(mode==='monthly')return{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4},markets:{x:18,y:12,w:6,h:4}};
   if(mode==='countdowns')return{agenda:{x:0,y:0,w:12,h:8},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:0,y:0,w:24,h:16},markets:{x:12,y:8,w:12,h:8}};
-  return{weather:{x:0,y:0,w:10,h:8},agenda:{x:10,y:0,w:14,h:8},tasks:{x:0,y:8,w:8,h:8},goals:{x:8,y:8,w:8,h:8},countdowns:{x:16,y:8,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
+  return{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
 }
 export function normalizeSectionLayout(input,mode='dashboard'){
   const base=defaultLayout(mode),source=input&&typeof input==='object'?input:{},out={};

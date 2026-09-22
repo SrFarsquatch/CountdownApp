@@ -116,12 +116,12 @@ function defaultSectionLayout(mode = 'dashboard') {
     markets: { x: 12, y: 8, w: 12, h: 8 }
   };
   return {
-    weather: { x: 0, y: 0, w: 10, h: 8 },
-    agenda: { x: 10, y: 0, w: 14, h: 8 },
-    tasks: { x: 0, y: 8, w: 8, h: 8 },
-    goals: { x: 8, y: 8, w: 8, h: 8 },
-    countdowns: { x: 16, y: 8, w: 8, h: 4 },
-    markets: { x: 16, y: 12, w: 8, h: 4 }
+    agenda: { x: 0, y: 0, w: 14, h: 8 },
+    weather: { x: 14, y: 0, w: 10, h: 4 },
+    tasks: { x: 14, y: 4, w: 10, h: 4 },
+    goals: { x: 0, y: 8, w: 8, h: 8 },
+    countdowns: { x: 8, y: 8, w: 8, h: 8 },
+    markets: { x: 16, y: 8, w: 8, h: 8 }
   };
 }
 function normalizeSectionLayout(input, mode = 'dashboard') {
@@ -2880,133 +2880,7 @@ function renderPlannerSvg(data, w, h, mode) {
   return plannerFooter(svg,data,w,h,pad,scale,(location?location+' · ':'')+'MONTHLY · 10-day forecast' + (data.weather ? ' · Open-Meteo' : '')) + '</svg>';
 }
 
-
-function renderDashboardSvg(data, w, h) {
-  const palette = data.display.palette, black = HEX.black, white = HEX.white, rule = HEX.black;
-  const pad = Math.max(13, Math.round(Math.min(w, h) * .028)), headerH = Math.max(47, Math.round(h * .105)), top = pad + headerH, contentW = w - pad * 2, contentH = h - top - pad - 3;
-  const sections = normalizeSectionSettings(data.display.modeSections, 'dashboard'), layout = normalizeSectionLayout(data.display.modeLayout, 'dashboard'), order = normalizeSectionOrder(data.display.sectionOrder);
-  const sectionData = { agenda: plannerAgendaEntries(data), weather: data.weather ? [data.weather] : [], tasks: data.tasks || [], goals: data.goals || [], countdowns: data.countdowns || [], markets: data.markets?.quotes || [] };
-  const labels = { agenda:'AGENDA', weather:'WEATHER', tasks:'TASKS', goals:'GOALS', countdowns:'COUNTDOWNS', markets:'MARKETS' };
-  const now = new Date(), location = data.weather?.locationLabel || data.weather?.location || '', dateText = now.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric' }), timeText = now.toLocaleTimeString('en-CA', { hour:'numeric', minute:'2-digit' });
-  const density = (bw, bh) => bw >= 255 && bh >= 145 ? 'hero' : bw >= 155 && bh >= 86 ? 'standard' : 'compact';
-  const taskAccent = task => palette === 'mono' ? black : ({ urgent:HEX.red, high:HEX.red, medium:HEX.yellow, low:HEX.green })[String(task?.priority || '').toLowerCase()] || HEX.black;
-  const goalMetric = goal => {
-    if (goal?.type === 'checklist') { const total = goal.checklist?.length || 0, done = (goal.checklist || []).filter(item => item.done).length; return done + '/' + total + ' steps'; }
-    if (goal?.type === 'deadline' && goal.deadline) return 'Due ' + new Date(goal.deadline).toLocaleDateString('en-CA', { month:'short', day:'numeric' });
-    if (num(goal?.target, 0) > 0) return num(goal.current, 0) + '/' + num(goal.target, 0) + (goal.unit ? ' ' + goal.unit : '');
-    return '';
-  };
-  const metric = (label, value, x, y, maxW) => {
-    if (value === undefined || value === null || value === '') return '';
-    const text = String(value), ww = Math.min(maxW, Math.max(42, (label.length + text.length) * 4.8 + 14));
-    return '<text x="' + x + '" y="' + y + '" font-size="6.8" font-weight="800" letter-spacing=".7">' + esc(label.toUpperCase()) + '</text><text x="' + x + '" y="' + (y+12) + '" font-size="9.5" font-weight="800">' + esc(text) + '</text><line x1="' + x + '" y1="' + (y+17) + '" x2="' + (x+ww) + '" y2="' + (y+17) + '" stroke="' + rule + '" stroke-width=".7"/>';
-  };
-  const trend = (days, x, y, bw, bh) => {
-    const vals = days.flatMap(day => [num(day.high, NaN), num(day.low, NaN)]).filter(Number.isFinite);
-    if (days.length < 2 || !vals.length) return '';
-    const min = Math.min(...vals), max = Math.max(...vals), span = Math.max(1, max-min), step = bw / Math.max(1, days.length-1);
-    const points = key => days.map((day, i) => { const v = num(day[key], min); return (x+i*step).toFixed(1) + ',' + (y+bh-(v-min)/span*bh).toFixed(1); }).join(' ');
-    return '<polyline points="' + points('high') + '" fill="none" stroke="' + (palette === 'mono' ? black : HEX.red) + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="' + points('low') + '" fill="none" stroke="' + (palette === 'mono' ? black : HEX.blue) + '" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
-  };
-
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="' + white + '"/><style>text{font-family:Arial,Helvetica,sans-serif}.dash-card{fill:#fff;stroke:#000;stroke-width:1}.dash-rule{stroke:#000;stroke-width:.8}.dash-label{font-size:9px;font-weight:800;letter-spacing:1.2px}</style>';
-  svg += '<rect x="5" y="5" width="' + (w-10) + '" height="' + (h-10) + '" rx="11" fill="none" stroke="' + black + '" stroke-width="1"/>';
-  svg += '<text x="' + pad + '" y="' + (pad+11) + '" font-size="8" font-weight="900" letter-spacing="1.6">QUEST LOG</text>';
-  svg += '<text x="' + pad + '" y="' + (pad+30) + '" font-size="' + Math.max(15, Math.min(20, w*.023)) + '" font-weight="900">' + esc(dateText) + '</text>';
-  if (location) svg += '<text x="' + (w-pad) + '" y="' + (pad+11) + '" text-anchor="end" font-size="8.5" font-weight="700">' + esc(truncateForWidth(location, 190, 8.5)) + '</text>';
-  svg += '<text x="' + (w-pad) + '" y="' + (pad+31) + '" text-anchor="end" font-size="' + Math.max(15, Math.min(20, w*.022)) + '" font-weight="900">' + esc(timeText) + '</text>';
-  svg += '<line x1="' + pad + '" y1="' + (top-8) + '" x2="' + (w-pad) + '" y2="' + (top-8) + '" stroke="' + black + '" stroke-width="1"/>';
-  if (palette !== 'mono') svg += '<line x1="' + pad + '" y1="' + (top-8) + '" x2="' + (pad+52) + '" y2="' + (top-8) + '" stroke="' + HEX.blue + '" stroke-width="3"/><line x1="' + (pad+57) + '" y1="' + (top-8) + '" x2="' + (pad+82) + '" y2="' + (top-8) + '" stroke="' + HEX.yellow + '" stroke-width="3"/>';
-
-  let defs = '', queue = [];
-  for (const kind of order) {
-    if (!DISPLAY_SECTION_KEYS.includes(kind) || sections[kind]?.enabled === false) continue;
-    const r = layout[kind], x = pad + contentW*r.x/DISPLAY_GRID_COLS, y = top + contentH*r.y/DISPLAY_GRID_ROWS, bw = contentW*r.w/DISPLAY_GRID_COLS, bh = contentH*r.h/DISPLAY_GRID_ROWS, inset = Math.max(7, Math.min(11, Math.round(Math.min(bw,bh)*.045))), clip = 'dash-' + kind;
-    defs += '<clipPath id="' + clip + '"><rect x="' + (x+1) + '" y="' + (y+1) + '" width="' + Math.max(1,bw-2) + '" height="' + Math.max(1,bh-2) + '" rx="8"/></clipPath>';
-    queue.push({ kind, x, y, bw, bh, inset, clip, density:density(bw,bh) });
-  }
-  if (defs) svg += '<defs>' + defs + '</defs>';
-
-  for (const box of queue) {
-    const kind = box.kind, items = sectionData[kind] || [], cfg = sections[kind] || {}, accent = sectionAccent(kind,palette), x = box.x+box.inset, y = box.y+box.inset, bw = Math.max(20,box.bw-box.inset*2), bh = Math.max(20,box.bh-box.inset*2), level = box.density;
-    svg += '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.bw + '" height="' + box.bh + '" rx="8" class="dash-card"/>';
-    svg += '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.bw + '" height="22" rx="7" fill="' + black + '"/>';
-    svg += '<circle cx="' + (box.x+11) + '" cy="' + (box.y+11) + '" r="3.2" fill="' + accent + '" stroke="' + white + '" stroke-width=".8"/>';
-    svg += '<text x="' + (box.x+20) + '" y="' + (box.y+14.8) + '" font-size="8.2" font-weight="900" letter-spacing="1.25" fill="' + white + '">' + labels[kind] + '</text>';
-    if (box.bw > 120) svg += '<text x="' + (box.x+box.bw-9) + '" y="' + (box.y+14.8) + '" text-anchor="end" font-size="7" font-weight="750" fill="' + white + '">' + esc(kind === 'weather' ? ((data.weather?.days || data.weather?.forecast || []).length || 0) + ' DAY' : items.length + ' ' + (items.length === 1 ? 'ITEM' : 'ITEMS')) + '</text>';
-    svg += '<g clip-path="url(#' + box.clip + ')">';
-    let cy = box.y+26;
-    const bottom = box.y+box.bh-box.inset;
-
-    if (!items.length) {
-      const empty = { agenda:['OPEN SCHEDULE','No upcoming calendar events'], tasks:['ALL CLEAR','No open tasks'], goals:['NO ACTIVE GOALS','Add a goal to track progress'], countdowns:['NOTHING COUNTING DOWN','Add a date worth watching'], markets:['NO MARKET DATA','Add symbols to your watchlist'], weather:['WEATHER UNAVAILABLE','Check the configured location'] }[kind] || ['NOTHING HERE',''];
-      svg += '<text x="' + x + '" y="' + (cy+17) + '" font-size="12" font-weight="900">' + esc(empty[0]) + '</text><text x="' + x + '" y="' + (cy+31) + '" font-size="8" font-weight="650">' + esc(empty[1]) + '</text></g>';
-      continue;
-    }
-
-    if (kind === 'weather') {
-      const weather = data.weather, current = weather?.current, days = (weather?.days || weather?.forecast || []).slice(0, Math.min(cfg.limit || 5, 5)), unit = weather?.unitSymbol || (weather?.units === 'imperial' ? '°F' : '°C');
-      if (current) {
-        if (level === 'hero') {
-          const iconSize = Math.min(60, Math.max(46, bh*.28)), tempX = x+iconSize+12;
-          svg += svgWeatherIcon(current.condition,x,cy+5,iconSize,palette);
-          svg += '<text x="' + tempX + '" y="' + (cy+39) + '" font-size="' + Math.min(40,Math.max(30,bw*.105)) + '" font-weight="300">' + esc(Math.round(num(current.temperature,0))+unit) + '</text>';
-          svg += '<text x="' + tempX + '" y="' + (cy+56) + '" font-size="10" font-weight="700">' + esc(truncateForWidth(current.description||'',Math.max(30,bw-iconSize-15),10)) + '</text>';
-          let mx = Math.max(tempX+bw*.22,x+bw*.52), my = cy+10;
-          svg += metric('Feels',Math.round(num(current.feelsLike,current.temperature))+unit,mx,my,70);
-          svg += metric('Humidity',Math.round(num(current.humidity,0))+'%',mx+82,my,76);
-          svg += metric('Wind',Math.round(num(current.windSpeed,0))+(weather.units==='imperial'?' mph':' km/h'),mx,my+35,74);
-          if (days.length >= 2 && bottom-cy > 125) svg += trend(days,x,cy+76,bw,22);
-          const fy = Math.min(bottom-53,cy+105), cellW = bw/Math.max(1,days.length);
-          days.forEach((day,i)=>{
-            const dx=x+i*cellW,condition=day.daytime?.condition||day.condition||'';
-            if(i)svg += '<line x1="' + dx + '" y1="' + fy + '" x2="' + dx + '" y2="' + (fy+46) + '" class="dash-rule"/>';
-            svg += '<text x="' + (dx+cellW/2) + '" y="' + (fy+9) + '" text-anchor="middle" font-size="7.5" font-weight="800">' + esc(i===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()) + '</text>';
-            svg += svgWeatherIcon(condition,dx+cellW/2-11,fy+13,22,palette);
-            svg += '<text x="' + (dx+cellW/2) + '" y="' + (fy+43) + '" text-anchor="middle" font-size="9" font-weight="800">' + esc(Math.round(num(day.high,0))+'° / '+Math.round(num(day.low,0))+'°') + '</text>';
-          });
-        } else if (level === 'standard') {
-          svg += svgWeatherIcon(current.condition,x,cy+4,38,palette) + '<text x="' + (x+47) + '" y="' + (cy+29) + '" font-size="26" font-weight="350">' + esc(Math.round(num(current.temperature,0))+unit) + '</text><text x="' + (x+47) + '" y="' + (cy+44) + '" font-size="8.5" font-weight="700">' + esc(truncateForWidth(current.description||'',Math.max(25,bw-50),8.5)) + '</text>';
-          const fy=cy+56,cellW=bw/Math.max(1,Math.min(3,days.length));
-          days.slice(0,3).forEach((day,i)=>{const dx=x+i*cellW,condition=day.daytime?.condition||day.condition||'';if(i)svg+='<line x1="'+dx+'" y1="'+fy+'" x2="'+dx+'" y2="'+Math.min(bottom,fy+35)+'" class="dash-rule"/>';svg+='<text x="'+(dx+cellW/2)+'" y="'+(fy+9)+'" text-anchor="middle" font-size="7" font-weight="800">'+esc(i===0?'TODAY':new Date(day.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>'+svgWeatherIcon(condition,dx+cellW/2-8,fy+12,16,palette)+'<text x="'+(dx+cellW/2)+'" y="'+(fy+34)+'" text-anchor="middle" font-size="8">'+esc(Math.round(num(day.high,0))+'° / '+Math.round(num(day.low,0))+'°')+'</text>'});
-        } else {
-          const wide=bw>=300,iconSize=wide?31:27,tempSize=wide?27:20;
-          svg += svgWeatherIcon(current.condition,x,cy+1,iconSize,palette);
-          svg += '<text x="' + (x+iconSize+8) + '" y="' + (cy+22) + '" font-size="' + tempSize + '" font-weight="300">' + esc(Math.round(num(current.temperature,0))+unit) + '</text>';
-          svg += '<text x="' + (x+iconSize+(wide?70:60)) + '" y="' + (cy+19) + '" font-size="8.5" font-weight="800">' + esc(truncateForWidth(current.description||'',wide?130:Math.max(18,bw-90),8.5)) + '</text>';
-          if(wide){
-            const mx=x+bw-214;
-            svg += metric('Feels',Math.round(num(current.feelsLike,current.temperature))+unit,mx,cy+1,58);
-            svg += metric('Humidity',Math.round(num(current.humidity,0))+'%',mx+72,cy+1,62);
-            svg += metric('Wind',Math.round(num(current.windSpeed,0))+(weather.units==='imperial'?' mph':' km/h'),mx+145,cy+1,66);
-          }
-        }
-      }
-    } else if (kind === 'agenda') {
-      const max=cfg.limit||12;
-      if (cfg.style === 'week' || cfg.style === 'calendar') {
-        for (const entry of items.slice(0,Math.min(max,level==='compact'?3:level==='standard'?5:7))) { if(cy+26>bottom)break; const event=entry.event,d=new Date(event.start),when=event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),a=plannerEventAccent(event,palette); svg += '<text x="'+x+'" y="'+(cy+15)+'" font-size="8.5" font-weight="800">'+esc(when)+'</text><circle cx="'+(x+48)+'" cy="'+(cy+11)+'" r="3" fill="'+a+'" stroke="'+black+'" stroke-width=".55"/><text x="'+(x+58)+'" y="'+(cy+15)+'" font-size="10.5" font-weight="750">'+esc(truncateForWidth(event.title,bw-60,10.5))+'</text>';cy+=25; }
-      } else {
-        if(level==='hero')svg += '<line x1="'+(x+55)+'" y1="'+(cy+3)+'" x2="'+(x+55)+'" y2="'+(bottom-3)+'" class="dash-rule"/>';
-        for(const entry of items.slice(0,max)){const row=level==='hero'?36:level==='standard'?29:24;if(cy+row>bottom)break;const event=entry.event,d=new Date(event.start),when=event.allDay?'ALL DAY':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),a=plannerEventAccent(event,palette);if(level==='hero'){svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="8.5" font-weight="800">'+esc(when)+'</text><circle cx="'+(x+55)+'" cy="'+(cy+11)+'" r="3.2" fill="'+a+'" stroke="'+black+'" stroke-width=".55"/><text x="'+(x+66)+'" y="'+(cy+14)+'" font-size="11.5" font-weight="800">'+esc(truncateForWidth(event.title,bw-68,11.5))+'</text>';const detail=cleanText(event.location||event.calendarName||event.calendarSummary||'',100);if(detail)svg+='<text x="'+(x+66)+'" y="'+(cy+27)+'" font-size="7.7">'+esc(truncateForWidth(detail,bw-68,7.7))+'</text>';}else{svg+='<circle cx="'+(x+3)+'" cy="'+(cy+11)+'" r="2.6" fill="'+a+'" stroke="'+black+'" stroke-width=".5"/><text x="'+(x+11)+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="750">'+esc(truncateForWidth(event.title,bw-64,level==='compact'?9:10.5))+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="8">'+esc(when)+'</text>';}cy+=row;}
-      }
-    } else if (kind === 'tasks') {
-      for (const task of items.slice(0,cfg.limit||4)){const row=level==='hero'?36:level==='standard'?28:23;if(cy+row>bottom)break;const due=task.due?new Date(task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'',a=taskAccent(task);svg+='<rect x="'+x+'" y="'+(cy+5)+'" width="10" height="10" rx="2.5" fill="'+white+'" stroke="'+black+'" stroke-width=".9"/><rect x="'+(x+17)+'" y="'+(cy+6)+'" width="3" height="9" rx="1.5" fill="'+a+'"/><text x="'+(x+27)+'" y="'+(cy+14)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="750">'+esc(truncateForWidth(task.title,bw-(due?64:30),level==='compact'?9:10.5))+'</text>';if(due)svg+='<text x="'+(x+bw)+'" y="'+(cy+14)+'" text-anchor="end" font-size="8" font-weight="700">'+esc(due)+'</text>';if(level==='hero'&&task.project)svg+='<text x="'+(x+27)+'" y="'+(cy+27)+'" font-size="7.5">'+esc(truncateForWidth(task.project,bw-28,7.5))+'</text>';cy+=row;}
-    } else if (kind === 'goals') {
-      for (const goal of items.slice(0,cfg.limit||2)){const row=level==='hero'?50:level==='standard'?39:28;if(cy+row>bottom)break;const p=Math.round(num(goal.progress,0)),a=color(goal.accentColor,palette),m=goalMetric(goal);svg+='<text x="'+x+'" y="'+(cy+14)+'" font-size="'+(level==='compact'?9.5:10.5)+'" font-weight="800">'+esc(truncateForWidth(goal.title,bw-46,level==='compact'?9.5:10.5))+'</text><text x="'+(x+bw)+'" y="'+(cy+14)+'" text-anchor="end" font-size="'+(level==='hero'?20:level==='standard'?15:11)+'" font-weight="900">'+p+'%</text>';if(level!=='compact'){if(m)svg+='<text x="'+x+'" y="'+(cy+27)+'" font-size="7.5">'+esc(truncateForWidth(m,bw,7.5))+'</text>';svg+=svgBar(p,x,cy+(level==='hero'?35:27),bw,level==='hero'?6:5,a);}cy+=row;}
-    } else if (kind === 'countdowns') {
-      for (const c of items.slice(0,cfg.limit||3)){const row=level==='hero'?48:level==='standard'?36:25;if(cy+row>bottom)break;const a=color(c.accentColor,palette),label=timeLabel(c);if(level==='hero'){svg+='<text x="'+x+'" y="'+(cy+17)+'" font-size="10.5" font-weight="800">'+esc(truncateForWidth(c.name,bw-90,10.5))+'</text><text x="'+(x+bw)+'" y="'+(cy+19)+'" text-anchor="end" font-size="18" font-weight="300" fill="'+a+'">'+esc(label)+'</text>';if(c.showExactDate!==false)svg+='<text x="'+x+'" y="'+(cy+31)+'" font-size="7.5">'+esc(formatDateServer(c.end,c.dateDisplayStyle))+'</text>';if(c.showProgressBar!==false)svg+=svgBar(c.progress,x,cy+38,bw,4,a);}else{svg+='<rect x="'+x+'" y="'+(cy+5)+'" width="3" height="'+(row-10)+'" rx="1.5" fill="'+a+'"/><text x="'+(x+10)+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="800">'+esc(truncateForWidth(c.name,bw-72,level==='compact'?9:10.5))+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?9:11)+'" font-weight="900">'+esc(label)+'</text>';}cy+=row;}
-    } else if (kind === 'markets') {
-      for (const q of items.slice(0,cfg.limit||4)){const row=level==='hero'?32:level==='standard'?27:22;if(cy+row>bottom)break;const pct=Number(q.percentChange),ok=q.available!==false&&q.close!=null,change=ok&&Number.isFinite(pct)?pct:null,a=palette==='mono'?black:(change>0?HEX.green:change<0?HEX.red:black),arrow=change>0?'▲':change<0?'▼':'•';svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="900">'+esc(q.symbol)+'</text>';if(level==='hero'&&q.name)svg+='<text x="'+(x+48)+'" y="'+(cy+15)+'" font-size="7.5">'+esc(truncateForWidth(q.name,Math.max(30,bw-145),7.5))+'</text>';svg+='<text x="'+(x+bw-55)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?8.5:10)+'" font-weight="750">'+esc(ok?Number(q.close).toFixed(2):'N/A')+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?8:9.5)+'" font-weight="900" fill="'+a+'">'+(ok?arrow+' '+esc(Math.abs(change||0).toFixed(2))+'%':'—')+'</text>';if(level!=='compact'){const mid=x+bw-48,span=Math.min(38,Math.abs(change||0)*10+6);svg+='<line x1="'+mid+'" y1="'+(cy+23)+'" x2="'+(mid+span)+'" y2="'+(cy+23)+'" stroke="'+a+'" stroke-width="2" stroke-linecap="round"/>';}cy+=row;}
-    }
-    svg += '</g>';
-  }
-  svg += '<text x="' + pad + '" y="' + (h-9) + '" font-size="7" font-weight="700">800 × 480 · SPECTRA 6 READY</text><text x="' + (w-pad) + '" y="' + (h-9) + '" text-anchor="end" font-size="7">Updated ' + esc(new Date(data.generatedAt).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'})) + '</text></svg>';
-  return svg;
-}
-
 function renderSvg(data, w, h) {
-  if (data.display?.mode === 'dashboard') return renderDashboardSvg(data, w, h);
   const palette = data.display.palette;
   const portrait = data.display.layout === 'portrait' || (data.display.layout === 'auto' && h > w);
   const pad = Math.max(12, Math.round(Math.min(w, h) * 0.026));
