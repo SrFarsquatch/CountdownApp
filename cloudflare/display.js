@@ -107,7 +107,14 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
 }
 
 function color(name,palette){return einkAccent(name,palette,'blue')}
-function sectionTitle(label,x,y){return'<text x="'+x+'" y="'+y+'" class="k">'+esc(label)+'</text>'}
+function sectionAccent(kind,palette){
+  if(palette==='mono')return HEX.black;
+  return({agenda:HEX.blue,weather:HEX.yellow,tasks:HEX.green,goals:HEX.blue,countdowns:HEX.red,markets:HEX.green})[kind]||HEX.blue;
+}
+function sectionTitle(label,x,y,kind,palette){
+  const accent=sectionAccent(kind,palette);
+  return'<circle cx="'+(x+4)+'" cy="'+(y-4)+'" r="3.5" fill="'+accent+'" stroke="'+HEX.black+'" stroke-width=".8"/><text x="'+(x+14)+'" y="'+y+'" class="k">'+esc(label)+'</text>';
+}
 function bar(percent,x,y,w,h,fill){
   const p=clamp(num(percent,0),0,100);
   return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(h/2)+'" fill="'+HEX.white+'" stroke="'+HEX.black+'" stroke-width="1"/><rect x="'+x+'" y="'+y+'" width="'+(w*p/100).toFixed(1)+'" height="'+h+'" rx="'+(h/2)+'" fill="'+einkAccent(fill,'spectra6','blue')+'"/>';
@@ -131,11 +138,21 @@ function weatherAccent(condition,palette){
   return HEX.green;
 }
 function weatherIcon(condition,x,y,size,palette){
-  const t=String(condition||'').toUpperCase(),accent=weatherAccent(t,palette),black=HEX.black;
-  if(/CLEAR|SUN/.test(t))return'<circle cx="'+(x+size*.5)+'" cy="'+(y+size*.5)+'" r="'+(size*.22)+'" fill="'+accent+'"/><path d="M'+(x+size*.5)+' '+y+'v'+(size*.18)+'M'+(x+size*.5)+' '+(y+size*.82)+'v'+(size*.18)+'M'+x+' '+(y+size*.5)+'h'+(size*.18)+'M'+(x+size*.82)+' '+(y+size*.5)+'h'+(size*.18)+'" stroke="'+accent+'" stroke-width="'+Math.max(1.5,size*.06)+'"/>';
-  const cloud='<path d="M'+(x+size*.12)+' '+(y+size*.62)+'c0-'+(size*.16)+' '+(size*.13)+'-'+(size*.27)+' '+(size*.29)+'-'+(size*.27)+' '+(size*.07)+'-'+(size*.17)+' '+(size*.22)+'-'+(size*.27)+' '+(size*.4)+'-'+(size*.27)+' '+(size*.23)+' 0 '+(size*.42)+' '+(size*.18)+' '+(size*.42)+' '+(size*.4)+' 0 '+(size*.16)+'-'+(size*.13)+' '+(size*.29)+'-'+(size*.29)+' '+(size*.29)+'H'+(x+size*.36)+'c-'+(size*.13)+' 0-'+(size*.24)+'-'+(size*.11)+'-'+(size*.24)+'-'+(size*.24)+'z" fill="'+black+'"/>';
-  if(/RAIN|DRIZZLE|SHOWER/.test(t))return cloud+'<path d="M'+(x+size*.35)+' '+(y+size*.78)+'l-'+(size*.06)+' '+(size*.13)+'M'+(x+size*.58)+' '+(y+size*.78)+'l-'+(size*.06)+' '+(size*.13)+'" stroke="'+accent+'" stroke-width="'+Math.max(1.5,size*.055)+'"/>';
-  if(/SNOW|ICE/.test(t))return cloud+'<circle cx="'+(x+size*.36)+'" cy="'+(y+size*.86)+'" r="'+(size*.05)+'" fill="'+accent+'"/><circle cx="'+(x+size*.62)+'" cy="'+(y+size*.86)+'" r="'+(size*.05)+'" fill="'+accent+'"/>';
+  const t=String(condition||'').toUpperCase(),black=HEX.black,white=HEX.white;
+  const sunColor=palette==='mono'?black:HEX.yellow,rainColor=palette==='mono'?black:HEX.blue,stormColor=palette==='mono'?black:HEX.red,fogColor=palette==='mono'?black:HEX.green;
+  const sw=Math.max(1.2,size*.045),ray=Math.max(1.3,size*.05);
+  const cx=x+size*.36,cy=y+size*.34;
+  const sun='<circle cx="'+cx+'" cy="'+cy+'" r="'+(size*.18)+'" fill="'+sunColor+'" stroke="'+black+'" stroke-width="'+sw+'"/><path d="M'+cx+' '+y+'v'+(size*.11)+'M'+cx+' '+(y+size*.57)+'v'+(size*.11)+'M'+x+' '+cy+'h'+(size*.11)+'M'+(x+size*.57)+' '+cy+'h'+(size*.11)+'M'+(x+size*.09)+' '+(y+size*.09)+'l'+(size*.08)+' '+(size*.08)+'M'+(x+size*.55)+' '+(y+size*.55)+'l'+(size*.08)+' '+(size*.08)+'M'+(x+size*.55)+' '+(y+size*.09)+'l-'+(size*.08)+' '+(size*.08)+'M'+(x+size*.09)+' '+(y+size*.55)+'l'+(size*.08)+'-'+(size*.08)+'" stroke="'+black+'" stroke-width="'+ray+'" stroke-linecap="round"/>';
+  const cloud='<path d="M'+(x+size*.13)+' '+(y+size*.61)+'c0-'+(size*.13)+' '+(size*.10)+'-'+(size*.23)+' '+(size*.24)+'-'+(size*.24)+' '+(size*.05)+'-'+(size*.14)+' '+(size*.17)+'-'+(size*.22)+' '+(size*.32)+'-'+(size*.22)+' '+(size*.20)+' 0 '+(size*.37)+' '+(size*.15)+' '+(size*.39)+' '+(size*.34)+' '+(size*.15)+' '+(size*.02)+' '+(size*.27)+' '+(size*.14)+' '+(size*.27)+' '+(size*.29)+' 0 '+(size*.17)+'-'+(size*.14)+' '+(size*.30)+'-'+(size*.31)+' '+(size*.30)+'H'+(x+size*.35)+'c-'+(size*.12)+' 0-'+(size*.22)+'-'+(size*.10)+'-'+(size*.22)+'-'+(size*.22)+'z" fill="'+white+'" stroke="'+black+'" stroke-width="'+sw+'" stroke-linejoin="round"/>';
+  if(/CLEAR|SUN/.test(t)&&!/CLOUD|PARTLY|MOSTLY/.test(t))return sun;
+  if(/THUNDER|STORM/.test(t))return cloud+'<path d="M'+(x+size*.48)+' '+(y+size*.72)+'h'+(size*.14)+'l-'+(size*.10)+' '+(size*.16)+'h'+(size*.11)+'l-'+(size*.22)+' '+(size*.23)+' '+(size*.06)+'-'+(size*.19)+'h-'+(size*.11)+'z" fill="'+stormColor+'" stroke="'+black+'" stroke-width="'+Math.max(.7,size*.025)+'" stroke-linejoin="round"/>';
+  if(/RAIN|DRIZZLE|SHOWER/.test(t))return cloud+'<path d="M'+(x+size*.30)+' '+(y+size*.78)+'l-'+(size*.035)+' '+(size*.10)+'M'+(x+size*.50)+' '+(y+size*.78)+'l-'+(size*.035)+' '+(size*.10)+'M'+(x+size*.70)+' '+(y+size*.78)+'l-'+(size*.035)+' '+(size*.10)+'" stroke="'+rainColor+'" stroke-width="'+Math.max(1.5,size*.055)+'" stroke-linecap="round"/>';
+  if(/SNOW|ICE|SLEET/.test(t)){
+    const r=size*.045,yy=y+size*.86;
+    return cloud+'<g stroke="'+rainColor+'" stroke-width="'+Math.max(1,size*.035)+'" stroke-linecap="round"><path d="M'+(x+size*.30-r)+' '+yy+'h'+(r*2)+'M'+(x+size*.30)+' '+(yy-r)+'v'+(r*2)+'M'+(x+size*.50-r)+' '+yy+'h'+(r*2)+'M'+(x+size*.50)+' '+(yy-r)+'v'+(r*2)+'M'+(x+size*.70-r)+' '+yy+'h'+(r*2)+'M'+(x+size*.70)+' '+(yy-r)+'v'+(r*2)+'"/></g>';
+  }
+  if(/FOG|HAZE|MIST/.test(t))return cloud+'<path d="M'+(x+size*.20)+' '+(y+size*.80)+'h'+(size*.55)+'M'+(x+size*.27)+' '+(y+size*.90)+'h'+(size*.45)+'" stroke="'+fogColor+'" stroke-width="'+Math.max(1.3,size*.045)+'" stroke-linecap="round"/>';
+  if(/PARTLY|MOSTLY.*CLOUD|CLOUD.*SUN/.test(t))return sun+cloud;
   return cloud;
 }
 function agendaEntries(data){
@@ -157,7 +174,11 @@ export function renderDisplaySvg(data,width=800,height=480){
   const w=clamp(Math.round(num(width,800)),300,2000),h=clamp(Math.round(num(height,480)),300,2000),palette=data.display?.palette||'spectra6';
   const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black=HEX.black,muted=HEX.black,rule=HEX.black;
   const now=new Date(),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
-  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1}</style>';
+  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:750;letter-spacing:1.35px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1.1}</style>';
+  const frameA=palette==='mono'?black:HEX.blue,frameB=palette==='mono'?black:HEX.yellow;
+  svg+='<rect x="4.5" y="4.5" width="'+(w-9)+'" height="'+(h-9)+'" rx="13" fill="none" stroke="'+black+'" stroke-width="1.2"/>';
+  svg+='<path d="M9 18V9h9M'+(w-18)+' 9h9v9M9 '+(h-18)+'v9h9M'+(w-18)+' '+(h-9)+'h9v-9" fill="none" stroke="'+frameA+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  svg+='<circle cx="9" cy="'+(h/2)+'" r="2.1" fill="'+frameB+'" stroke="'+black+'" stroke-width=".7"/><circle cx="'+(w-9)+'" cy="'+(h/2)+'" r="2.1" fill="'+frameB+'" stroke="'+black+'" stroke-width=".7"/>';
   svg+='<text x="'+pad+'" y="'+(pad+15)+'" font-size="12" font-weight="800" letter-spacing="1">'+esc(now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase())+'</text>';
   svg+='<text x="'+(w-pad)+'" y="'+(pad+15)+'" text-anchor="end" font-size="11" font-weight="800" letter-spacing="1">'+esc(modeLabel+' · '+now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text>';
   svg+='<line x1="'+pad+'" y1="'+(pad+23)+'" x2="'+(w-pad)+'" y2="'+(pad+23)+'" class="line"/>';
@@ -174,9 +195,10 @@ export function renderDisplaySvg(data,width=800,height=480){
   if(defs.length)svg+='<defs>'+defs.join('')+'</defs>';
 
   for(const box of queue){
-    svg+='<rect x="'+box.x+'" y="'+box.y+'" width="'+box.bw+'" height="'+box.bh+'" rx="7" class="section-box"/><g clip-path="url(#'+box.clip+')">';
+    const cardAccent=sectionAccent(box.kind,palette),cardDetail=Math.min(30,Math.max(14,box.bw*.13));
+    svg+='<rect x="'+box.x+'" y="'+box.y+'" width="'+box.bw+'" height="'+box.bh+'" rx="9" class="section-box"/><path d="M'+(box.x+11)+' '+(box.y+1.2)+'h'+cardDetail+'" stroke="'+cardAccent+'" stroke-width="2.4" stroke-linecap="round"/><g clip-path="url(#'+box.clip+')">';
     const x=box.x+box.inset,y=box.y+box.inset,bw=Math.max(20,box.bw-box.inset*2),bh=Math.max(20,box.bh-box.inset*2),kind=box.kind,items=sectionData[kind]||[],cfg=sections[kind]||{};
-    svg+=sectionTitle(({agenda:'AGENDA',weather:'WEATHER',tasks:'TASKS',goals:'GOALS',countdowns:'COUNTDOWNS',markets:'MARKETS'})[kind],x,y+11);
+    svg+=sectionTitle(({agenda:'AGENDA',weather:'WEATHER',tasks:'TASKS',goals:'GOALS',countdowns:'COUNTDOWNS',markets:'MARKETS'})[kind],x,y+11,kind,palette);
     let cy=y+22;
     if(!items.length){svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="12" class="muted">'+esc(kind==='weather'&&data.weatherError?data.weatherError:kind==='markets'&&data.marketError?data.marketError:kind==='agenda'&&data.calendarError?data.calendarError:'Nothing to show.')+'</text>';svg+='</g>';continue}
 

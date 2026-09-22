@@ -2572,8 +2572,14 @@ function svgBar(percent, x, y, width, height, fill) {
   return '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="' + height / 2 + '" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>' +
     '<rect x="' + x + '" y="' + y + '" width="' + (width * p / 100).toFixed(1) + '" height="' + height + '" rx="' + height / 2 + '" fill="' + fill + '"/>';
 }
-function sectionTitle(label, x, y) {
-  return '<text x="' + x + '" y="' + y + '" class="k">' + esc(label) + '</text>';
+function sectionAccent(kind, palette) {
+  if (palette === 'mono') return HEX.black;
+  return ({ agenda: HEX.blue, weather: HEX.yellow, tasks: HEX.green, goals: HEX.blue, countdowns: HEX.red, markets: HEX.green })[kind] || HEX.blue;
+}
+function sectionTitle(label, x, y, kind, palette) {
+  const accent = sectionAccent(kind, palette);
+  return '<circle cx="' + (x + 4) + '" cy="' + (y - 4) + '" r="3.5" fill="' + accent + '" stroke="' + HEX.black + '" stroke-width=".8"/>' +
+    '<text x="' + (x + 14) + '" y="' + y + '" class="k">' + esc(label) + '</text>';
 }
 function plannerDateKey(value) {
   const d = value instanceof Date ? value : new Date(value);
@@ -2649,20 +2655,34 @@ function plannerWeatherAccent(type, palette) {
   return HEX.green;
 }
 function svgWeatherIcon(type, x, y, size, palette) {
-  const t = String(type || '').toUpperCase();
-  const accent = plannerWeatherAccent(t, palette), black = HEX.black;
-  const sun = '<circle cx="' + (x + size * .42) + '" cy="' + (y + size * .42) + '" r="' + (size * .18) + '" fill="' + accent + '"/>' +
-    '<path d="M' + (x + size * .42) + ' ' + y + 'v' + (size * .14) + 'M' + (x + size * .42) + ' ' + (y + size * .70) + 'v' + (size * .14) +
-    'M' + x + ' ' + (y + size * .42) + 'h' + (size * .14) + 'M' + (x + size * .70) + ' ' + (y + size * .42) + 'h' + (size * .14) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5, size * .055) + '" stroke-linecap="round"/>';
-  const cloud = '<path d="M' + (x + size * .18) + ' ' + (y + size * .57) + 'c0-' + (size * .12) + ' ' + (size * .10) + '-' + (size * .22) + ' ' + (size * .23) + '-' + (size * .22) +
-    ' ' + (size * .05) + '-' + (size * .13) + ' ' + (size * .17) + '-' + (size * .21) + ' ' + (size * .31) + '-' + (size * .21) + ' ' + (size * .20) +
-    ' 0 ' + (size * .36) + ' ' + (size * .16) + ' ' + (size * .36) + ' ' + (size * .35) + ' 0 ' + (size * .13) + '-' + (size * .10) + ' ' + (size * .24) +
-    '-' + (size * .23) + ' ' + (size * .24) + 'H' + (x + size * .38) + 'c-' + (size * .11) + ' 0-' + (size * .20) + '-' + (size * .09) + '-' + (size * .20) + '-' + (size * .20) + 'z" fill="' + black + '"/>';
-  if (/CLEAR|SUN/.test(t) && !/CLOUD/.test(t)) return sun;
-  if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return cloud + '<path d="M' + (x + size*.34) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.54) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + 'M' + (x+size*.74) + ' ' + (y+size*.78) + 'l-' + (size*.06) + ' ' + (size*.13) + '" stroke="' + accent + '" stroke-width="' + Math.max(1.5,size*.055) + '" stroke-linecap="round"/>';
-  if (/SNOW|ICE|SLEET/.test(t)) return cloud + '<g fill="' + accent + '"><circle cx="' + (x+size*.34) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.55) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/><circle cx="' + (x+size*.76) + '" cy="' + (y+size*.86) + '" r="' + (size*.045) + '"/></g>';
-  if (/THUNDER|STORM/.test(t)) return cloud + '<path d="M' + (x+size*.52) + ' ' + (y+size*.73) + 'h' + (size*.13) + 'l-' + (size*.12) + ' ' + (size*.20) + 'h' + (size*.12) + 'l-' + (size*.22) + ' ' + (size*.25) + ' ' + (size*.07) + '-' + (size*.22) + 'h-' + (size*.12) + 'z" fill="' + accent + '"/>';
-  if (/PARTLY/.test(t)) return sun + cloud;
+  const t = String(type || '').toUpperCase(), black = HEX.black, white = HEX.white;
+  const sunColor = palette === 'mono' ? black : HEX.yellow;
+  const rainColor = palette === 'mono' ? black : HEX.blue;
+  const stormColor = palette === 'mono' ? black : HEX.red;
+  const fogColor = palette === 'mono' ? black : HEX.green;
+  const sw = Math.max(1.2, size * .045), ray = Math.max(1.3, size * .05);
+  const cx = x + size * .36, cy = y + size * .34;
+  const sun = '<circle cx="' + cx + '" cy="' + cy + '" r="' + (size * .18) + '" fill="' + sunColor + '" stroke="' + black + '" stroke-width="' + sw + '"/>' +
+    '<path d="M' + cx + ' ' + y + 'v' + (size*.11) + 'M' + cx + ' ' + (y+size*.57) + 'v' + (size*.11) +
+    'M' + x + ' ' + cy + 'h' + (size*.11) + 'M' + (x+size*.57) + ' ' + cy + 'h' + (size*.11) +
+    'M' + (x+size*.09) + ' ' + (y+size*.09) + 'l' + (size*.08) + ' ' + (size*.08) +
+    'M' + (x+size*.55) + ' ' + (y+size*.55) + 'l' + (size*.08) + ' ' + (size*.08) +
+    'M' + (x+size*.55) + ' ' + (y+size*.09) + 'l-' + (size*.08) + ' ' + (size*.08) +
+    'M' + (x+size*.09) + ' ' + (y+size*.55) + 'l' + (size*.08) + '-' + (size*.08) + '" stroke="' + black + '" stroke-width="' + ray + '" stroke-linecap="round"/>';
+  const cloud = '<path d="M' + (x+size*.13) + ' ' + (y+size*.61) + 'c0-' + (size*.13) + ' ' + (size*.10) + '-' + (size*.23) + ' ' + (size*.24) + '-' + (size*.24) +
+    ' ' + (size*.05) + '-' + (size*.14) + ' ' + (size*.17) + '-' + (size*.22) + ' ' + (size*.32) + '-' + (size*.22) + ' ' + (size*.20) +
+    ' 0 ' + (size*.37) + ' ' + (size*.15) + ' ' + (size*.39) + ' ' + (size*.34) + ' ' + (size*.15) + ' ' + (size*.02) + ' ' + (size*.27) + ' ' + (size*.14) +
+    ' ' + (size*.27) + ' ' + (size*.29) + ' 0 ' + (size*.17) + '-' + (size*.14) + ' ' + (size*.30) + '-' + (size*.31) + ' ' + (size*.30) +
+    'H' + (x+size*.35) + 'c-' + (size*.12) + ' 0-' + (size*.22) + '-' + (size*.10) + '-' + (size*.22) + '-' + (size*.22) + 'z" fill="' + white + '" stroke="' + black + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
+  if (/CLEAR|SUN/.test(t) && !/CLOUD|PARTLY|MOSTLY/.test(t)) return sun;
+  if (/THUNDER|STORM/.test(t)) return cloud + '<path d="M' + (x+size*.48) + ' ' + (y+size*.72) + 'h' + (size*.14) + 'l-' + (size*.10) + ' ' + (size*.16) + 'h' + (size*.11) + 'l-' + (size*.22) + ' ' + (size*.23) + ' ' + (size*.06) + '-' + (size*.19) + 'h-' + (size*.11) + 'z" fill="' + stormColor + '" stroke="' + black + '" stroke-width="' + Math.max(.7,size*.025) + '" stroke-linejoin="round"/>';
+  if (/RAIN|DRIZZLE|SHOWERS/.test(t)) return cloud + '<path d="M' + (x+size*.30) + ' ' + (y+size*.78) + 'l-' + (size*.035) + ' ' + (size*.10) + 'M' + (x+size*.50) + ' ' + (y+size*.78) + 'l-' + (size*.035) + ' ' + (size*.10) + 'M' + (x+size*.70) + ' ' + (y+size*.78) + 'l-' + (size*.035) + ' ' + (size*.10) + '" stroke="' + rainColor + '" stroke-width="' + Math.max(1.5,size*.055) + '" stroke-linecap="round"/>';
+  if (/SNOW|ICE|SLEET/.test(t)) {
+    const r = size * .045, yy = y + size * .86;
+    return cloud + '<g stroke="' + rainColor + '" stroke-width="' + Math.max(1,size*.035) + '" stroke-linecap="round"><path d="M' + (x+size*.30-r) + ' ' + yy + 'h' + (r*2) + 'M' + (x+size*.30) + ' ' + (yy-r) + 'v' + (r*2) + 'M' + (x+size*.50-r) + ' ' + yy + 'h' + (r*2) + 'M' + (x+size*.50) + ' ' + (yy-r) + 'v' + (r*2) + 'M' + (x+size*.70-r) + ' ' + yy + 'h' + (r*2) + 'M' + (x+size*.70) + ' ' + (yy-r) + 'v' + (r*2) + '"/></g>';
+  }
+  if (/FOG|HAZE|MIST/.test(t)) return cloud + '<path d="M' + (x+size*.20) + ' ' + (y+size*.80) + 'h' + (size*.55) + 'M' + (x+size*.27) + ' ' + (y+size*.90) + 'h' + (size*.45) + '" stroke="' + fogColor + '" stroke-width="' + Math.max(1.3,size*.045) + '" stroke-linecap="round"/>';
+  if (/PARTLY|MOSTLY.*CLOUD|CLOUD.*SUN/.test(t)) return sun + cloud;
   return cloud;
 }
 function plannerFooter(svg, data, w, h, pad, scale, label) {
@@ -2869,7 +2889,11 @@ function renderSvg(data, w, h) {
   const dateText = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
   const modeLabel = ({ dashboard:'DASHBOARD', daily:'DAY', weekly:'WEEK', monthly:'MONTH', countdowns:'COUNTDOWNS' })[data.display.mode] || 'PLANNER';
   const timeText = now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:700;letter-spacing:1.5px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1}</style>';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:750;letter-spacing:1.35px}.muted{fill:' + muted + '}.line{stroke:' + rule + ';stroke-width:1}.section-box{fill:#fff;stroke:' + rule + ';stroke-width:1.1}</style>';
+  const frameA = palette === 'mono' ? black : HEX.blue, frameB = palette === 'mono' ? black : HEX.yellow;
+  svg += '<rect x="4.5" y="4.5" width="' + (w-9) + '" height="' + (h-9) + '" rx="13" fill="none" stroke="' + black + '" stroke-width="1.2"/>';
+  svg += '<path d="M9 18V9h9M' + (w-18) + ' 9h9v9M9 ' + (h-18) + 'v9h9M' + (w-18) + ' ' + (h-9) + 'h9v-9" fill="none" stroke="' + frameA + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  svg += '<circle cx="9" cy="' + (h/2) + '" r="2.1" fill="' + frameB + '" stroke="' + black + '" stroke-width=".7"/><circle cx="' + (w-9) + '" cy="' + (h/2) + '" r="2.1" fill="' + frameB + '" stroke="' + black + '" stroke-width=".7"/>';
 
   const headerY = pad + 15;
   svg += '<text x="' + pad + '" y="' + headerY + '" font-size="' + (portrait ? 11 : 12) + '" font-weight="800" letter-spacing="1">' + esc(dateText) + '</text>';
@@ -2890,7 +2914,7 @@ function renderSvg(data, w, h) {
 
   function drawEmptySection(kind, x, y, width) {
     const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS', markets: 'MARKETS' }[kind];
-    svg += sectionTitle(label, x, y + 11);
+    svg += sectionTitle(label, x, y + 11, kind, palette);
     svg += '<text x="' + x + '" y="' + (y + 37) + '" font-size="12" class="muted">Nothing to show.</text>';
   }
 
@@ -2900,7 +2924,7 @@ function renderSvg(data, w, h) {
     let cursor = y;
     const label = { agenda: 'AGENDA', weather: 'WEATHER', tasks: 'TASKS', goals: 'GOALS', countdowns: 'COUNTDOWNS', markets: 'MARKETS' }[kind];
     const items = sectionData[kind] || [];
-    svg += sectionTitle(label, x, cursor + 11);
+    svg += sectionTitle(label, x, cursor + 11, kind, palette);
     cursor += 22;
 
     if (!items.length) {
@@ -3105,7 +3129,9 @@ function renderSvg(data, w, h) {
     }
     if (defs) svg += '<defs>' + defs + '</defs>';
     for (const item of drawQueue) {
-      svg += '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.width + '" height="' + item.height + '" rx="7" class="section-box"/>';
+      const cardAccent = sectionAccent(item.kind, palette), cardDetail = Math.min(30, Math.max(14, item.width * .13));
+      svg += '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.width + '" height="' + item.height + '" rx="9" class="section-box"/>' +
+        '<path d="M' + (item.x+11) + ' ' + (item.y+1.2) + 'h' + cardDetail + '" stroke="' + cardAccent + '" stroke-width="2.4" stroke-linecap="round"/>';
       drawSection(
         item.kind,
         item.x + item.inset,
