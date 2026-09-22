@@ -557,11 +557,11 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
       <label class="setting-row"><span>Enabled</span><input id="agentEnabled" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row" id="agentProviderRow"><span>Provider</span><select id="agentProvider"><option value="openai">OpenAI</option><option value="anthropic">Anthropic Claude</option><option value="gemini">Google Gemini</option><option value="openrouter">OpenRouter</option><option value="groq">Groq</option><option value="mistral">Mistral AI</option><option value="deepseek">DeepSeek</option><option value="xai">xAI</option><option value="ollama">Ollama</option><option value="lmstudio">LM Studio</option><option value="hermes">Hermes Agent</option><option value="openclaw">OpenClaw</option><option value="openai-compatible">Custom OpenAI-compatible</option></select></div>
       <div class="field" id="agentBaseUrlField"><label>API base URL</label><input id="agentBaseUrl" placeholder="http://192.168.1.50:8642/v1"><div class="meta" id="agentEndpointHint">Use an address reachable from the Quest Log server/container.</div></div>
-      <div class="field"><label>Model / agent</label><input id="agentModel" placeholder="hermes-agent"></div>
+      <div class="field"><label>Model / agent</label><div style="display:flex;gap:6px;align-items:center"><select id="agentModelSelect" style="flex:1"><option value="">Enter model ID manually</option></select><button class="btn tiny" id="loadAgentModels" type="button">Load models</button></div><input id="agentModel" placeholder="hermes-agent" style="margin-top:6px"><div class="meta" id="agentModelHint" style="margin-top:5px">Choose a discovered model or enter a model ID manually.</div></div>
       <div class="field" id="agentApiKeyField"><label>Bearer token / API key</label><input id="agentApiKey" type="password" autocomplete="new-password" placeholder="Leave blank to keep the saved key"></div>
       <label class="setting-row"><span>Planner context</span><select id="agentContextDays"><option value="7">7 days</option><option value="14">14 days</option><option value="21">21 days</option><option value="30">30 days</option></select></label>
       <div class="meta" id="agentKeyStatus" style="margin-top:6px"></div>
-      <div class="modal-actions"><button class="btn" id="testAgent" type="button">Test connection</button><button class="btn primary" id="saveAgent" type="button">Save Navi</button></div>
+      <div class="modal-actions"><button class="btn" id="loadAgentModelsAction" type="button">Load models</button><button class="btn" id="testAgent" type="button">Test connection</button><button class="btn" id="clearAgentKey" type="button">Clear key</button><button class="btn primary" id="saveAgent" type="button">Save Navi</button></div>
       <div class="notice" id="agentSettingsStatus" style="display:none;margin-top:10px"></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
@@ -1908,6 +1908,28 @@ async function applyAgentActions(index){
  try{const result=await api('/api/agent/actions',{method:'POST',body:JSON.stringify({actions:message.actions})});message.applied=true;const results=result.results||[],ok=results.filter(r=>r.ok),failed=results.filter(r=>!r.ok);message.content+=(ok.length?'\n\nApplied: '+ok.map(r=>r.label).join('; '):'')+(failed.length?'\n\nCould not apply: '+failed.map(r=>r.label).join('; '):'');saveAgentHistory();await loadAll(true);renderAgent()}
  catch(error){alert(error.message||'Could not apply agent changes.');renderAgent()}
 }
+let agentModelChoices=[];
+function renderAgentModelChoices(models=[],selected=''){
+ agentModelChoices=[...new Set((models||[]).map(x=>String(x||'').trim()).filter(Boolean))];
+ const select=$('agentModelSelect'),input=$('agentModel');
+ const options=['<option value="">Enter model ID manually</option>',...agentModelChoices.map(model=>'<option value="'+esc(model)+'">'+esc(model)+'</option>')];
+ select.innerHTML=options.join('');
+ if(selected&&agentModelChoices.includes(selected)){select.value=selected;input.value=selected;input.style.display='none'}
+ else{select.value='';input.value=selected||input.value||'';input.style.display=''}
+ $('agentModelHint').textContent=agentModelChoices.length?'Select a discovered model, or choose “Enter model ID manually”.':'No model list loaded yet. You can still enter a model ID manually.';
+}
+async function loadAgentModels(showStatus=true){
+ const status=$('agentSettingsStatus'),provider=$('agentProvider').value,current=$('agentModel').value.trim();
+ if(showStatus){status.style.display='block';status.textContent='Loading models…'}
+ try{
+  const result=await api('/api/agent/models?provider='+encodeURIComponent(provider));
+  renderAgentModelChoices(result.models||[],current||result.configuredModel||'');
+  if(showStatus)status.textContent=(result.models||[]).length?'Models loaded. Choose one, then save Navi.':(result.warning||'This provider did not return a model list. Enter the model ID manually.');
+ }catch(error){
+  renderAgentModelChoices([],current);
+  if(showStatus){status.style.display='block';status.textContent=error.message}
+ }
+}
 function renderAgentSettings(){
  const cfg=state?.agent||{},cloud=runtimeInfo?.runtime==='cloudflare',provider=cfg.provider||(cloud?'openai':'hermes');
  $('agentEnabled').checked=Boolean(cfg.enabled);
@@ -1915,24 +1937,27 @@ function renderAgentSettings(){
  $('agentProvider').value=AGENT_PROVIDER_UI[provider]?provider:(cloud?'openai':'openai-compatible');
  $('agentBaseUrl').value=cfg.baseUrl||'';
  $('agentModel').value=cfg.model||'';
+ renderAgentModelChoices([],cfg.model||'');
  $('agentContextDays').value=String(cfg.contextDays||14);
  $('agentApiKey').value='';
  $('agentProviderRow').style.display='';
+ $('agentApiKeyField').style.display='';
+ $('clearAgentKey').style.display=cfg.hasApiKey?'':'none';
+ $('loadAgentModels').style.display='none';
+ $('loadAgentModelsAction').style.display='';
  if(cloud){
-   $('agentApiKeyField').style.display='none';
    applyAgentProviderDefaults(false);
    const selected=$('agentProvider').value,local=selected==='local',meta=AGENT_PROVIDER_UI[selected]||AGENT_PROVIDER_UI.openai;
    $('agentBaseUrlField').style.display=local?'':'none';
    $('agentSettingsIntro').textContent=local
      ?'Cloud Navi can call your own OpenAI-compatible model through an HTTPS endpoint.'
-     :'Cloud Navi supports multiple hosted AI providers through Worker secrets. API keys never reach the browser.';
+     :'Cloud Navi stores provider API keys encrypted in D1 using APP_SECRET. Keys are never returned to the browser after saving.';
    $('agentEndpointHint').textContent=local?meta.hint:'Endpoint is managed automatically for '+meta.label+'.';
-   const secretName={openai:'OPENAI_API_KEY',anthropic:'ANTHROPIC_API_KEY',gemini:'GEMINI_API_KEY',openrouter:'OPENROUTER_API_KEY',groq:'GROQ_API_KEY',mistral:'MISTRAL_API_KEY',deepseek:'DEEPSEEK_API_KEY',xai:'XAI_API_KEY'}[selected];
    $('agentKeyStatus').textContent=cfg.hasApiKey
-     ?(local?'Local endpoint authentication is configured in Cloudflare.':secretName+' is configured in Cloudflare.')
-     :(local?'Add LOCAL_AGENT_API_KEY or a Cloudflare Access service token if your endpoint requires authentication.':('Add '+secretName+' as a Cloudflare Worker secret.'));
+     ?'A saved key is available for '+meta.label+'.'
+     :(cfg.canStoreApiKey?'No saved key for '+meta.label+'. Enter one below and save Navi.':'APP_SECRET must be configured once in Cloudflare before Quest Log can encrypt API keys.');
+   if((cfg.configuredProviders||[]).includes(selected))setTimeout(()=>loadAgentModels(false),0);
  }else{
-   $('agentApiKeyField').style.display='';
    $('agentSettingsIntro').textContent='Connect Navi to a hosted AI service, a local model, or any OpenAI-compatible endpoint.';
    $('agentKeyStatus').textContent=cfg.hasApiKey?'An API key / bearer token is saved securely on the server.':(cfg.canStoreApiKey?'No API key saved. Local endpoints can work without one if authentication is disabled.':'Set APP_SECRET before saving an API key.');
    applyAgentProviderDefaults(false);
@@ -1954,20 +1979,29 @@ function applyAgentProviderDefaults(force=false){
  }
  if(force){
    model.value=meta.model||'';
+   renderAgentModelChoices([],model.value);
  }else if(!currentModel&&meta.model){
    model.value=meta.model;
  }
 }
+$('agentModelSelect').onchange=()=>{
+ const value=$('agentModelSelect').value;
+ if(value){$('agentModel').value=value;$('agentModel').style.display='none'}
+ else{$('agentModel').style.display='';$('agentModel').focus()}
+};
 $('agentProvider').onchange=()=>{
  applyAgentProviderDefaults(true);
- const cloud=runtimeInfo?.runtime==='cloudflare',provider=$('agentProvider').value,meta=AGENT_PROVIDER_UI[provider];
+ const cloud=runtimeInfo?.runtime==='cloudflare',provider=$('agentProvider').value,meta=AGENT_PROVIDER_UI[provider],cfg=state?.agent||{};
+ $('agentApiKey').value='';
+ $('clearAgentKey').style.display=(cfg.configuredProviders||[]).includes(provider)?'':'none';
  if(cloud){
    $('agentSettingsIntro').textContent=provider==='local'
      ?'Cloud Navi can call your own OpenAI-compatible model through an HTTPS endpoint.'
-     :'Cloud Navi uses '+meta.label+' through a Worker secret. The API key is never exposed to the browser.';
-   $('agentKeyStatus').textContent=provider==='local'
-     ?'Configure LOCAL_AGENT_API_KEY or a Cloudflare Access service token if needed.'
-     :'Save the provider selection, then configure its Worker secret if it is not already present.';
+     :'Paste your '+meta.label+' API key here. Quest Log will encrypt it before storing it in D1.';
+   $('agentKeyStatus').textContent=(cfg.configuredProviders||[]).includes(provider)
+     ?'A saved key is available for '+meta.label+'.'
+     :(cfg.canStoreApiKey?'No saved key for '+meta.label+'.':'APP_SECRET must be configured once in Cloudflare before API keys can be stored.');
+   if((cfg.configuredProviders||[]).includes(provider))loadAgentModels(false);
  }
 };
 $('saveAgent').onclick=async()=>{
@@ -1976,19 +2010,31 @@ $('saveAgent').onclick=async()=>{
   const cloud=runtimeInfo?.runtime==='cloudflare',provider=$('agentProvider').value,meta=AGENT_PROVIDER_UI[provider]||{};
   const payload={agentEnabled:$('agentEnabled').checked,agentProvider:provider,agentModel:$('agentModel').value.trim(),agentContextDays:Number($('agentContextDays').value)};
   if(cloud)payload.agentBaseUrl=provider==='local'?$('agentBaseUrl').value.trim():'';
-  else{
-   payload.agentBaseUrl=meta.hosted?(meta.base||$('agentBaseUrl').value.trim()):$('agentBaseUrl').value.trim();
-   if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();
-  }
+  else payload.agentBaseUrl=meta.hosted?(meta.base||$('agentBaseUrl').value.trim()):$('agentBaseUrl').value.trim();
+  if($('agentApiKey').value.trim())payload.agentApiKey=$('agentApiKey').value.trim();
   await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});
-  state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Navi settings saved.';
+  state=await api('/api/state');renderAgentSettings();renderAgent();
+  status.textContent='Navi settings saved.';
+  if(runtimeInfo?.runtime==='cloudflare'&&state.agent?.hasApiKey)await loadAgentModels(false);
  }catch(error){status.textContent=error.message}
 };
+$('clearAgentKey').onclick=async()=>{
+ const provider=$('agentProvider').value,meta=AGENT_PROVIDER_UI[provider]||{};
+ if(!confirm('Clear the saved '+(meta.label||provider)+' API key?'))return;
+ const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Clearing saved key…';
+ try{
+  await api('/api/settings',{method:'PUT',body:JSON.stringify({agentProvider:provider,agentClearApiKey:true})});
+  state=await api('/api/state');renderAgentSettings();renderAgent();status.textContent='Saved key cleared.';
+ }catch(error){status.textContent=error.message}
+};
+$('loadAgentModels').onclick=()=>loadAgentModels(true);
+$('loadAgentModelsAction').onclick=()=>loadAgentModels(true);
 $('testAgent').onclick=async()=>{
  const status=$('agentSettingsStatus');status.style.display='block';status.textContent='Testing saved connection…';
  try{
   const result=await api('/api/agent/test',{method:'POST'}),models=result.models||[];
-  status.textContent='Connection successful'+(models.length?' · Models: '+models.slice(0,8).join(', '):'.');
+  if(models.length)renderAgentModelChoices(models,$('agentModel').value.trim()||result.configuredModel||'');
+  status.textContent='Connection successful'+(models.length?' · '+models.length+' model'+(models.length===1?'':'s')+' available.':'.');
  }catch(error){status.textContent=error.message}
 };
 $('agentSend').onclick=()=>sendAgentMessage();
