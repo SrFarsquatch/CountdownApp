@@ -1382,7 +1382,7 @@ let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-plann
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
 const DISPLAY_SECTION_STYLES={
- agenda:[['list','List'],['timeline','Timeline'],['week','Week rows'],['calendar','Calendar grid']],
+ agenda:[['list','Upcoming list'],['timeline','Today timeline'],['week','This week'],['calendar','This month']],
  weather:[['compact','Compact'],['current','Current conditions'],['forecast','Forecast strip']],
  tasks:[['checklist','Checklist'],['compact','Compact list']],
  goals:[['bars','Progress bars'],['compact','Compact']],
@@ -1447,18 +1447,19 @@ function renderWidgetSettings(kind=selectedDisplayWidget){
  const root=$('widgetSettings'),settings=activeSectionDraft()[kind];if(!root||!settings){if(root)root.hidden=true;return}
  const styles=DISPLAY_SECTION_STYLES[kind]||[];
  root.hidden=false;
- const scopeField=kind==='agenda'?'<div class="field"><label>Date range</label><select id="widgetScope"><option value="today">Today only</option><option value="week">This week</option><option value="month">This month</option><option value="upcoming">Upcoming</option></select></div>':'';
+ const limitField=kind==='agenda'
+   ?'<div class="field" id="agendaLimitField"><label>Maximum events</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"><div class="meta">Used by Upcoming list and Today timeline.</div></div>'
+   :'<div class="field"><label>Items / forecast days</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"></div>';
  root.innerHTML='<div class="widget-settings-head"><h4>'+DISPLAY_SECTION_LABELS[kind]+' settings</h4><button class="btn tiny ghost" id="closeWidgetSettings">Close</button></div>'+
  '<div class="widget-settings-grid">'+
  '<div class="field"><label>Show widget</label><select id="widgetEnabled"><option value="true">Shown</option><option value="false">Hidden</option></select></div>'+
- '<div class="field"><label>Display style</label><select id="widgetStyle">'+styles.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div>'+
- scopeField+
- '<div class="field"><label>Items / forecast days</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"></div></div>'+
- '<div class="meta" style="margin-top:8px">These settings apply only to <strong>'+currentDisplayMode()+'</strong> mode.</div>';
+ '<div class="field"><label>'+(kind==='agenda'?'Calendar view':'Display style')+'</label><select id="widgetStyle">'+styles.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></div>'+
+ limitField+'</div>'+
+ '<div class="meta" style="margin-top:8px">'+(kind==='agenda'?'Agenda shows Google Calendar events only. The selected view chooses its own date range automatically.':'These settings apply only to <strong>'+currentDisplayMode()+'</strong> mode.')+'</div>';
  $('widgetEnabled').value=String(settings.enabled!==false);$('widgetStyle').value=settings.style;$('widgetLimit').value=settings.limit;
- if(kind==='agenda'&&$('widgetScope'))$('widgetScope').value=settings.scope||'upcoming';
- const update=()=>{settings.enabled=$('widgetEnabled').value==='true';settings.style=$('widgetStyle').value;if(kind==='agenda'&&$('widgetScope'))settings.scope=$('widgetScope').value;settings.limit=Math.max(1,Math.min(20,Number($('widgetLimit').value)||1));renderSectionLayoutEditor(false);setLayoutStatus('Unsaved '+DISPLAY_SECTION_LABELS[kind]+' settings.');};
- $('widgetEnabled').onchange=update;$('widgetStyle').onchange=update;$('widgetLimit').onchange=update;if(kind==='agenda'&&$('widgetScope'))$('widgetScope').onchange=update;$('closeWidgetSettings').onclick=()=>{root.hidden=true};
+ const syncAgendaLimit=()=>{const field=$('agendaLimitField');if(field)field.style.display=['list','timeline'].includes($('widgetStyle').value)?'':'none'};
+ const update=()=>{settings.enabled=$('widgetEnabled').value==='true';settings.style=$('widgetStyle').value;settings.scope=settings.style==='timeline'?'today':settings.style==='week'?'week':settings.style==='calendar'?'month':'upcoming';settings.limit=Math.max(1,Math.min(20,Number($('widgetLimit').value)||1));syncAgendaLimit();renderSectionLayoutEditor(false);setLayoutStatus('Unsaved '+DISPLAY_SECTION_LABELS[kind]+' settings.');};
+ syncAgendaLimit();$('widgetEnabled').onchange=update;$('widgetStyle').onchange=update;$('widgetLimit').onchange=update;$('closeWidgetSettings').onclick=()=>{root.hidden=true};
 }
 function renderSectionLayoutEditor(renderSettings=true){
  if(!state)return;
