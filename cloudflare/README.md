@@ -326,4 +326,4 @@ Do not bypass Access for the rest of the Quest Log hostname.
 
 ### Spectra 6 display target
 
-The default Quest Log e-ink target is the Pimoroni Inky Impression 4.0" Spectra 6 panel at 600×400. The rendered SVG uses only black, white, red, green, blue, and yellow so FrameOS does not need to approximate unsupported gray or purple shades.
+The default Quest Log e-ink target is a 6-color Spectra 6 panel at **800×480**. The rendered SVG uses only black, white, red, green, blue, and yellow so FrameOS does not need to approximate unsupported gray or purple shades.
