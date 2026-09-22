@@ -57,8 +57,17 @@ function defaultLayout(mode='dashboard'){
   return{weather:{x:0,y:0,w:42,h:42},agenda:{x:42,y:0,w:58,h:62},tasks:{x:0,y:42,w:42,h:26},goals:{x:0,y:68,w:42,h:32},countdowns:{x:42,y:62,w:29,h:38},markets:{x:71,y:62,w:29,h:38}};
 }
 const roundLayout=v=>Math.round(num(v,0)*100)/100;
+function looksLikeLegacyGridLayout(input){
+  if(!input||typeof input!=='object')return false;
+  const rects=DISPLAY_KEYS.map(key=>input[key]).filter(rect=>rect&&typeof rect==='object');
+  if(rects.length<2)return false;
+  const maxRight=Math.max(...rects.map(rect=>num(rect.x,0)+num(rect.w,0))),maxBottom=Math.max(...rects.map(rect=>num(rect.y,0)+num(rect.h,0)));
+  return maxRight<=24.001&&maxBottom<=16.001;
+}
 export function normalizeSectionLayout(input,mode='dashboard'){
-  const base=defaultLayout(mode),source=input&&typeof input==='object'?input:{},out={};
+  const base=defaultLayout(mode);let source=input&&typeof input==='object'?input:{};
+  if(looksLikeLegacyGridLayout(source))source=migrateGridLayoutToPercent(source,mode);
+  const out={};
   for(const key of DISPLAY_KEYS){
     const raw=source[key]&&typeof source[key]==='object'?source[key]:base[key],w=clamp(roundLayout(raw.w||base[key].w),5,100),h=clamp(roundLayout(raw.h||base[key].h),5,100);
     out[key]={x:clamp(roundLayout(raw.x),0,100-w),y:clamp(roundLayout(raw.y),0,100-h),w,h};
@@ -72,7 +81,9 @@ function migrateGridLayoutToPercent(input,mode='dashboard'){
     const raw=input[key];if(!raw||typeof raw!=='object'){out[key]=base[key];continue}
     out[key]={x:roundLayout(num(raw.x,0)/24*100),y:roundLayout(num(raw.y,0)/16*100),w:roundLayout(num(raw.w,6)/24*100),h:roundLayout(num(raw.h,4)/16*100)};
   }
-  return normalizeSectionLayout(out,mode);
+  const normalized={};
+  for(const key of DISPLAY_KEYS){const raw=out[key]||base[key],w=clamp(roundLayout(raw.w||base[key].w),5,100),h=clamp(roundLayout(raw.h||base[key].h),5,100);normalized[key]={x:clamp(roundLayout(raw.x),0,100-w),y:clamp(roundLayout(raw.y),0,100-h),w,h}}
+  return normalized;
 }
 function defaultSections(mode='dashboard'){
   const countdownOnly=mode==='countdowns';

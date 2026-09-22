@@ -126,8 +126,19 @@ function defaultSectionLayout(mode = 'dashboard') {
   };
 }
 function roundLayout(value) { return Math.round(num(value, 0) * 100) / 100; }
+function looksLikeLegacyGridLayout(input) {
+  if (!input || typeof input !== 'object') return false;
+  const rects = DISPLAY_SECTION_KEYS.map(key => input[key]).filter(rect => rect && typeof rect === 'object');
+  if (rects.length < 2) return false;
+  const maxRight = Math.max(...rects.map(rect => num(rect.x, 0) + num(rect.w, 0)));
+  const maxBottom = Math.max(...rects.map(rect => num(rect.y, 0) + num(rect.h, 0)));
+  return maxRight <= 24.001 && maxBottom <= 16.001;
+}
 function normalizeSectionLayout(input, mode = 'dashboard') {
-  const base = defaultSectionLayout(mode), source = input && typeof input === 'object' ? input : {}, out = {};
+  const base = defaultSectionLayout(mode);
+  let source = input && typeof input === 'object' ? input : {};
+  if (looksLikeLegacyGridLayout(source)) source = migrateGridLayoutToPercent(source, mode);
+  const out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
     const raw = source[key] && typeof source[key] === 'object' ? source[key] : base[key];
     const w = clamp(roundLayout(raw.w || base[key].w), 5, 100);
@@ -161,7 +172,12 @@ function migrateGridLayoutToPercent(input, mode = 'dashboard') {
       h: roundLayout(num(raw.h,4) / 16 * 100)
     };
   }
-  return normalizeSectionLayout(out, mode);
+  const normalized = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = out[key] || base[key], w = clamp(roundLayout(raw.w || base[key].w), 5, 100), h = clamp(roundLayout(raw.h || base[key].h), 5, 100);
+    normalized[key] = { x: clamp(roundLayout(raw.x), 0, 100-w), y: clamp(roundLayout(raw.y), 0, 100-h), w, h };
+  }
+  return normalized;
 }
 
 function defaultSectionSettings(mode = 'dashboard') {
