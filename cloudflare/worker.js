@@ -14,6 +14,7 @@ import {
 import { marketData, marketSearch } from './markets.js';
 import { testAgent, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
+import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -154,6 +155,7 @@ async function handleApi(request,env,identity){
   let state=await loadState(env);
   if(p==='/api/state'&&method==='GET'){
     const view=publicState(state,env);
+    view.notifications=notificationConfig(state,env);
     view.google.accounts=await Promise.all((state.google.accounts||[]).map(async a=>{
       const caps=await accountCapabilities(a,env);
       return{id:a.id,googleId:a.googleId,label:a.label,selectedCalendarIds:a.selectedCalendarIds||[],selectedTaskListIds:a.selectedTaskListIds||[],defaultTaskListId:a.defaultTaskListId||'',connectedAt:a.connectedAt,canWrite:caps.canWrite,canTasks:caps.canTasks};
@@ -161,6 +163,32 @@ async function handleApi(request,env,identity){
     view.google.connected=view.google.accounts.length>0;
     view.google.configured=googleConfigured(env);
     return json(view);
+  }
+
+  if(p==='/api/notifications/config'&&method==='GET')return json(notificationConfig(state,env));
+  if(p==='/api/notifications/preferences'&&method==='PUT'){
+    const incoming=await body(request);
+    updateNotificationPreferences(state,incoming);
+    await saveState(env,state);
+    return json(notificationConfig(state,env));
+  }
+  if(p==='/api/notifications/subscribe'&&method==='POST'){
+    const incoming=await body(request);
+    registerSubscription(state,incoming.subscription||incoming,request.headers.get('user-agent')||'');
+    state.notifications.enabled=true;
+    await saveState(env,state);
+    return json(notificationConfig(state,env),201);
+  }
+  if(p==='/api/notifications/unsubscribe'&&method==='POST'){
+    const incoming=await body(request);
+    unregisterSubscription(state,incoming.endpoint||'');
+    if(!state.notifications.subscriptions.length)state.notifications.enabled=false;
+    await saveState(env,state);
+    return json(notificationConfig(state,env));
+  }
+  if(p==='/api/notifications/test'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await sendTestNotification(state,env,incoming.endpoint||''));
   }
 
   if(p==='/api/countdowns'&&method==='POST'){
@@ -366,6 +394,16 @@ async function handleApi(request,env,identity){
 }
 
 export default{
+  async scheduled(controller,env,ctx){
+    ctx.waitUntil((async()=>{
+      try{
+        const state=await loadState(env);
+        await runNotificationSweep(state,env,controller?.scheduledTime||Date.now());
+      }catch(error){
+        console.error('Quest Log notification sweep failed:',error);
+      }
+    })());
+  },
   async fetch(request,env){
     const url=new URL(request.url);
     if(url.pathname==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
