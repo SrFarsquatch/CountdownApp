@@ -1710,9 +1710,9 @@ async function agentPlannerContext() {
       },
       markets: {
         configured: marketConfigured(),
-        provider: 'Alpha Vantage',
+        provider: 'Yahoo Finance',
         refreshMinutes: markets.refreshMinutes,
-        watchlist: (markets.watchlist || []).slice(0, 8).map(item => ({
+        watchlist: (markets.watchlist || []).slice(0, 50).map(item => ({
           symbol: item.symbol, providerSymbol: item.providerSymbol, name: item.name,
           exchange: item.exchange, region: item.region, currency: item.currency
         }))
@@ -3523,7 +3523,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/markets/test' && req.method === 'POST') {
       try { return json(res, 200, await testMarketConnection()); }
-      catch (error) { return json(res, 400, { ok: false, error: error.message || 'Tickerbot connection failed.' }); }
+      catch (error) { return json(res, 400, { ok: false, error: error.message || 'Yahoo Finance connection failed.' }); }
     }
 
     if (p === '/api/settings' && req.method === 'PUT') {
