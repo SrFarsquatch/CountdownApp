@@ -199,20 +199,33 @@ export function renderDisplaySvg(data,width=800,height=480){
           svg+='<text x="'+x+'" y="'+(cy+61)+'" font-size="9.5" class="muted">Feels '+esc(Math.round(num(current.feelsLike,current.temperature))+unit)+' · '+Math.round(num(current.humidity,0))+'% humidity · '+Math.round(num(current.windSpeed,0))+(weather.units==='imperial'?' mph':' km/h')+'</text>';
           cy+=70;
         }else{
-          const max=Math.max(1,Math.min(cfg.limit||7,forecast.length));
-          const headerH=Math.min(42,Math.max(30,bh*.24)),availableForecast=Math.max(36,bh-headerH-10),cols=Math.min(max,Math.max(2,Math.floor(bw/78))),rows=Math.ceil(max/cols),cellW=bw/cols,cellH=Math.max(34,availableForecast/rows);
-          svg+=weatherIcon(current.condition,x,cy,30,palette)+'<text x="'+(x+38)+'" y="'+(cy+20)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+98)+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-100)/6))))+'</text>';
-          cy+=headerH;
-          forecast.slice(0,max).forEach((d,i)=>{
-            const col=i%cols,row=Math.floor(i/cols),dx=x+col*cellW,dy=cy+row*cellH,pop=Math.round(num(d.precipitationProbability,0));
-            if(col>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+dx+'" y2="'+Math.min(y+bh,dy+cellH-3)+'" class="line"/>';
-            if(row>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+Math.min(x+bw,dx+cellW-3)+'" y2="'+dy+'" class="line"/>';
-            svg+='<text x="'+(dx+4)+'" y="'+(dy+10)+'" font-size="8.5" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
-            svg+=weatherIcon(d.condition,dx+4,dy+14,22,palette);
-            svg+='<text x="'+(dx+31)+'" y="'+(dy+28)+'" font-size="11" font-weight="800">'+esc(Math.round(num(d.high,0))+'°')+'</text><text x="'+(dx+31)+'" y="'+(dy+41)+'" font-size="9" class="muted">'+esc(Math.round(num(d.low,0))+'° low')+'</text>';
-            if(cellH>=58)svg+='<text x="'+(dx+4)+'" y="'+Math.min(dy+cellH-5,dy+56)+'" font-size="8.5" class="muted">'+(pop?esc(pop+'% precip'):'')+'</text>';
-          });
-          cy+=rows*cellH;
+          const max=Math.max(1,Math.min(cfg.limit||7,forecast.length)),shortBox=bh<105;
+          if(shortBox){
+            const currentW=Math.min(112,Math.max(88,bw*.18)),days=forecast.slice(0,max),cellW=Math.max(52,(bw-currentW)/Math.max(1,days.length));
+            svg+=weatherIcon(current.condition,x,cy+2,26,palette)+'<text x="'+(x+34)+'" y="'+(cy+19)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text>';
+            days.forEach((d,i)=>{
+              const dx=x+currentW+i*cellW;
+              if(i===0)svg+='<line x1="'+(dx-5)+'" y1="'+cy+'" x2="'+(dx-5)+'" y2="'+Math.min(y+bh-3,cy+48)+'" class="line"/>';
+              svg+='<text x="'+dx+'" y="'+(cy+10)+'" font-size="8" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
+              svg+=weatherIcon(d.condition,dx,cy+14,17,palette);
+              svg+='<text x="'+(dx+21)+'" y="'+(cy+27)+'" font-size="9.5" font-weight="800">'+esc(Math.round(num(d.high,0))+'°')+'</text><text x="'+(dx+21)+'" y="'+(cy+39)+'" font-size="8" class="muted">'+esc(Math.round(num(d.low,0))+'°')+'</text>';
+            });
+            cy+=48;
+          }else{
+            const headerH=Math.min(42,Math.max(30,bh*.24)),availableForecast=Math.max(36,bh-headerH-10),cols=Math.min(max,Math.max(2,Math.floor(bw/92))),rows=Math.ceil(max/cols),cellW=bw/cols,cellH=Math.max(46,availableForecast/rows);
+            svg+=weatherIcon(current.condition,x,cy,30,palette)+'<text x="'+(x+38)+'" y="'+(cy+20)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+98)+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-100)/6))))+'</text>';
+            cy+=headerH;
+            forecast.slice(0,max).forEach((d,i)=>{
+              const col=i%cols,row=Math.floor(i/cols),dx=x+col*cellW,dy=cy+row*cellH,pop=Math.round(num(d.precipitationProbability,0));
+              if(col>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+dx+'" y2="'+Math.min(y+bh,dy+cellH-3)+'" class="line"/>';
+              if(row>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+Math.min(x+bw,dx+cellW-3)+'" y2="'+dy+'" class="line"/>';
+              svg+='<text x="'+(dx+4)+'" y="'+(dy+10)+'" font-size="8.5" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
+              svg+=weatherIcon(d.condition,dx+4,dy+14,22,palette);
+              svg+='<text x="'+(dx+31)+'" y="'+(dy+28)+'" font-size="11" font-weight="800">'+esc(Math.round(num(d.high,0))+'°')+'</text><text x="'+(dx+31)+'" y="'+(dy+41)+'" font-size="9" class="muted">'+esc(Math.round(num(d.low,0))+'° low')+'</text>';
+              if(cellH>=60&&pop)svg+='<text x="'+(dx+4)+'" y="'+Math.min(dy+cellH-5,dy+57)+'" font-size="8.5" class="muted">'+esc(pop+'% precip')+'</text>';
+            });
+            cy+=rows*cellH;
+          }
         }
         if(weather.location)svg+='<text x="'+x+'" y="'+Math.min(y+bh-3,cy+9)+'" font-size="8.5" class="muted">'+esc(short(weather.location,Math.floor(bw/5)))+'</text>';
       }
