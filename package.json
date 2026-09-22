@@ -8,7 +8,8 @@
     "dev:selfhosted": "node server.js",
     "dev:cloudflare": "wrangler dev",
     "deploy:cloudflare": "wrangler deploy",
-    "cloudflare:types": "wrangler types"
+    "cloudflare:types": "wrangler types",
+    "generate:vapid": "web-push generate-vapid-keys"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
