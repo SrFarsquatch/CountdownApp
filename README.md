@@ -62,16 +62,23 @@ Supported actions currently include:
 
 Navi does **not** silently execute planner changes. Proposed actions are shown to the user for approval first, and delete actions are intentionally not exposed.
 
-Self-hosted Navi supports:
+Self-hosted Navi supports direct presets for:
 
+- OpenAI;
+- Anthropic Claude;
+- Google Gemini;
+- OpenRouter;
+- Groq;
+- Mistral AI;
+- DeepSeek;
+- xAI;
+- Ollama;
+- LM Studio;
 - Hermes Agent;
 - OpenClaw;
-- any OpenAI-compatible HTTP API.
+- any custom OpenAI-compatible HTTP API.
 
-Cloud Navi supports:
-
-- OpenAI using a Worker secret;
-- a local/private OpenAI-compatible model exposed through a secure **HTTPS** endpoint.
+Cloud Navi supports the hosted providers above through Worker secrets, plus a local/private OpenAI-compatible model exposed through a secure **HTTPS** endpoint.
 
 The cloud local-model connector is only an AI endpoint. It does not connect the cloud Quest Log application to the self-hosted Quest Log application or its data.
 
@@ -350,6 +357,13 @@ Core/integration secrets:
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
 | `ALPHA_VANTAGE_API_KEY` | Secret | Markets |
 | `OPENAI_API_KEY` | Secret | Cloud Navi with OpenAI |
+| `ANTHROPIC_API_KEY` | Secret | Cloud Navi with Anthropic |
+| `GEMINI_API_KEY` | Secret | Cloud Navi with Gemini |
+| `OPENROUTER_API_KEY` | Secret | Cloud Navi with OpenRouter |
+| `GROQ_API_KEY` | Secret | Cloud Navi with Groq |
+| `MISTRAL_API_KEY` | Secret | Cloud Navi with Mistral |
+| `DEEPSEEK_API_KEY` | Secret | Cloud Navi with DeepSeek |
+| `XAI_API_KEY` | Secret | Cloud Navi with xAI |
 | `VAPID_PRIVATE_KEY` | Secret | Web Push private key |
 | `LOCAL_AGENT_API_KEY` | Secret | Optional bearer token for a private local-model endpoint |
 | `LOCAL_AGENT_ACCESS_CLIENT_ID` | Secret | Optional Cloudflare Access service-token client ID |
@@ -512,9 +526,19 @@ Model: openclaw/default
 API key: your Gateway token
 ~~~
 
+### Hosted providers
+
+For OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, DeepSeek, and xAI, choose the provider preset in **Settings → AI connection**, enter the model ID, and save the provider's API key. Quest Log fills the standard API endpoint automatically.
+
+Anthropic uses its native Messages API. The other hosted presets use OpenAI-compatible chat/model endpoints.
+
+### Local model presets
+
+Quest Log includes presets for Ollama and LM Studio in addition to Hermes and OpenClaw. Enter an endpoint reachable from the Quest Log container, for example an Ollama OpenAI-compatible `/v1` endpoint or LM Studio's local server.
+
 ### Other OpenAI-compatible servers
 
-Choose **OpenAI-compatible** and enter:
+Choose **Custom OpenAI-compatible** and enter:
 
 - the server's `/v1` base URL;
 - model ID;
@@ -526,14 +550,20 @@ Quest Log stores a saved self-hosted agent credential encrypted with `APP_SECRET
 
 The **Test connection** action checks the provider's `/v1/models` endpoint.
 
-## Navi — cloud OpenAI
+## Navi — cloud hosted AI
 
-Store:
+Choose the hosted provider in Quest Log, then store the matching Worker secret:
 
-- `OPENAI_API_KEY` as a Worker secret;
-- optional `OPENAI_MODEL` as a variable.
+- OpenAI: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
+- Anthropic: `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
+- Gemini: `GEMINI_API_KEY`, optional `GEMINI_MODEL`
+- OpenRouter: `OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`
+- Groq: `GROQ_API_KEY`, optional `GROQ_MODEL`
+- Mistral: `MISTRAL_API_KEY`, optional `MISTRAL_MODEL`
+- DeepSeek: `DEEPSEEK_API_KEY`, optional `DEEPSEEK_MODEL`
+- xAI: `XAI_API_KEY`, optional `XAI_MODEL`
 
-Then choose **OpenAI** in Quest Log's cloud AI settings.
+The browser never receives these cloud API keys.
 
 ## Navi — cloud to a local/private model
 
