@@ -1383,7 +1383,7 @@ let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-plann
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
 const DISPLAY_SECTION_STYLES={
  agenda:[['list','Upcoming list'],['timeline','Today timeline'],['week','This week'],['calendar','This month']],
- weather:[['compact','Compact'],['current','Current conditions'],['forecast','Forecast strip']],
+ weather:[['compact','Compact'],['current','Current conditions'],['forecast','Multi-day forecast']],
  tasks:[['checklist','Checklist'],['compact','Compact list']],
  goals:[['bars','Progress bars'],['compact','Compact']],
  countdowns:[['detailed','Detailed'],['compact','Compact']],
@@ -1401,7 +1401,7 @@ function cloneModeLayouts(source={}){
 }
 function cloneModeSections(source={}){
  const defaults={
-  agenda:{enabled:true,style:'list',scope:'upcoming',limit:12},weather:{enabled:true,style:'forecast',limit:5},
+  agenda:{enabled:true,style:'list',scope:'upcoming',limit:12},weather:{enabled:true,style:'forecast',limit:7},
   tasks:{enabled:true,style:'checklist',limit:4},goals:{enabled:true,style:'bars',limit:2},countdowns:{enabled:true,style:'detailed',limit:3},markets:{enabled:false,style:'summary',limit:4}
  };
  const out={};
@@ -1449,7 +1449,9 @@ function renderWidgetSettings(kind=selectedDisplayWidget){
  root.hidden=false;
  const limitField=kind==='agenda'
    ?'<div class="field" id="agendaLimitField"><label>Maximum events</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"><div class="meta">Used by Upcoming list and Today timeline.</div></div>'
-   :'<div class="field"><label>Items / forecast days</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"></div>';
+   :kind==='weather'
+     ?'<div class="field"><label>Forecast days</label><input id="widgetLimit" type="number" min="1" max="10" value="'+settings.limit+'"><div class="meta">The display automatically fits as many days as the widget size allows.</div></div>'
+     :'<div class="field"><label>Items</label><input id="widgetLimit" type="number" min="1" max="20" value="'+settings.limit+'"></div>';
  root.innerHTML='<div class="widget-settings-head"><h4>'+DISPLAY_SECTION_LABELS[kind]+' settings</h4><button class="btn tiny ghost" id="closeWidgetSettings">Close</button></div>'+
  '<div class="widget-settings-grid">'+
  '<div class="field"><label>Show widget</label><select id="widgetEnabled"><option value="true">Shown</option><option value="false">Hidden</option></select></div>'+
@@ -1519,7 +1521,19 @@ function previewDisplay(){
 $('previewW').onchange=$('previewH').onchange=()=>{renderSectionLayoutEditor(false);previewDisplay()};
 $('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;renderSectionLayoutEditor(false);previewDisplay()};
 $('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;renderSectionLayoutEditor(false);previewDisplay()};
-$('openFrame').onclick=()=>window.open(state.display.viewPath+'&w='+$('previewW').value+'&h='+$('previewH').value,'_blank');
+$('openFrame').onclick=async()=>{
+ const popup=window.open('about:blank','_blank');
+ try{
+   const fresh=await api('/api/state');
+   state={...state,...fresh};
+   const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
+   const target=state.display.viewPath+'&w='+w+'&h='+h;
+   if(popup)popup.location.href=target;else window.location.href=target;
+ }catch(error){
+   if(popup)popup.close();
+   alert('Could not open the display: '+error.message);
+ }
+};
 $('displayMode').onchange=()=>{displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];$('widgetSettings').hidden=true;renderSectionLayoutEditor();setLayoutStatus('Editing '+currentDisplayMode()+' mode. Save display to apply.')};
 $('autoArrangeSections').onclick=()=>{const mode=currentDisplayMode();displayLayoutsDraft[mode]=defaultDisplayLayoutForResolution(mode);displayLayoutDraft=displayLayoutsDraft[mode];renderSectionLayoutEditor(false);setLayoutStatus('Arranged '+mode+' mode for this resolution. Save to apply.')};
 $('resetSectionLayout').onclick=()=>{const mode=currentDisplayMode();displayLayoutsDraft[mode]=defaultDisplayLayoutForResolution(mode);displayLayoutDraft=displayLayoutsDraft[mode];displaySectionsDraft=cloneModeSections(state.display.modeSections);renderSectionLayoutEditor(false);$('widgetSettings').hidden=true;setLayoutStatus('Reset '+mode+' mode. Save to apply.')};
