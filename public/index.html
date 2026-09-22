@@ -566,7 +566,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
     </div>
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
     <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><input id="settingsWeatherCountryCode" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" id="settingsWeatherProvider" style="margin-top:8px">Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.</div></div>
-    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Tickerbot</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="field"><label>Shared Tickerbot API key</label><input id="settingsMarketApiKey" type="password" autocomplete="off" placeholder="Paste a Tickerbot API key"><div class="meta">Saved once for this Quest Log. On cloud it is encrypted in D1 with <code>APP_SECRET</code>; the key is never returned to the browser.</div></div><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn" id="clearMarketKey" type="button">Clear key</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div></div>
+    <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Tickerbot</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div><div class="meta" style="margin-top:8px">Tickerbot credentials are managed outside the app. Cloud deployments use the <code>TICKERBOT_API_KEY</code> Worker secret; self-hosted deployments use the same environment variable.</div></div>
     <div class="card setting-card" id="pwaInstallCard">
       <div class="eyebrow">Install</div><h3>Quest Log app</h3>
       <p class="meta">Install Quest Log on this device for a standalone app window while keeping the normal browser version available.</p>
@@ -1600,35 +1600,25 @@ function renderMarketSettings(){
  const mc=state.markets||{},refresh=mc.effectiveRefreshMinutes||mc.refreshMinutes||15,message=$('settingsMarketMessage');
  $('settingsMarketStatus').textContent=mc.configured
    ?'Tickerbot is configured. Quest Log batches up to '+(mc.batchSize||50)+' watchlist symbols into one provider request and caches the result for '+refresh+' minute'+(refresh===1?'':'s')+'.'
-   :(mc.canStoreApiKey?'Add the shared Tickerbot API key below.':'Set APP_SECRET first so Quest Log can encrypt the shared Tickerbot API key.');
+   :(runtimeInfo?.runtime==='cloudflare'
+     ?'Tickerbot is not configured. Add TICKERBOT_API_KEY as a Cloudflare Worker secret.'
+     :'Tickerbot is not configured. Add TICKERBOT_API_KEY to the server/container environment.');
  $('settingsMarketRefresh').value=String(mc.refreshMinutes||15);
- $('settingsMarketApiKey').value='';
- $('clearMarketKey').style.display=mc.hasApiKey?'':'none';
  $('testMarketSettings').disabled=!mc.configured;
  if(message)message.style.display='none';
 }
 $('saveMarketSettings').onclick=async()=>{
  const message=$('settingsMarketMessage');message.style.display='block';message.textContent='Saving…';
  try{
-  const payload={marketRefreshMinutes:Number($('settingsMarketRefresh').value)},key=$('settingsMarketApiKey').value.trim();
-  if(key)payload.marketApiKey=key;
-  await api('/api/settings',{method:'PUT',body:JSON.stringify(payload)});
+  await api('/api/settings',{method:'PUT',body:JSON.stringify({marketRefreshMinutes:Number($('settingsMarketRefresh').value)})});
   state=await api('/api/state');await loadMarkets();renderMarketSettings();renderMarkets();renderToday();
-  message.style.display='block';message.textContent='Tickerbot settings saved.';
+  message.style.display='block';message.textContent='Tickerbot refresh settings saved.';
  }catch(error){message.textContent=error.message}
 };
 $('testMarketSettings').onclick=async()=>{
  const message=$('settingsMarketMessage');message.style.display='block';message.textContent='Testing Tickerbot…';
  try{const result=await api('/api/markets/test',{method:'POST'});message.textContent=result.ok?'Tickerbot connection successful'+(result.name?' · '+result.name:'')+'.':'Tickerbot connection failed.'}
  catch(error){message.textContent=error.message}
-};
-$('clearMarketKey').onclick=async()=>{
- if(!confirm('Clear the shared Tickerbot API key for this Quest Log?'))return;
- const message=$('settingsMarketMessage');message.style.display='block';message.textContent='Clearing key…';
- try{
-  await api('/api/settings',{method:'PUT',body:JSON.stringify({marketClearApiKey:true})});
-  state=await api('/api/state');marketData=null;renderMarketSettings();renderMarkets();renderToday();message.style.display='block';message.textContent='Tickerbot key cleared.';
- }catch(error){message.textContent=error.message}
 };
 function renderAppearanceSettings(){
  const a=normalizedAppearance(appearanceDraft||state.appearance||{});
