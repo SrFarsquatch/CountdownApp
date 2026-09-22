@@ -26,6 +26,68 @@ function json(data,status=200,headers={}){
 function text(data,status=200,type='text/plain; charset=utf-8',headers={}){
   return new Response(data,{status,headers:{'content-type':type,'cache-control':'no-store',...headers}});
 }
+async function einkFingerprint(feed,width,height){
+  const stable={...feed,generatedAt:''};
+  const bytes=encoder.encode(JSON.stringify({width,height,palette:feed.display?.palette||'spectra6',data:stable}));
+  const digest=await crypto.subtle.digest('SHA-256',bytes);
+  return Array.from(new Uint8Array(digest).slice(0,12),b=>b.toString(16).padStart(2,'0')).join('');
+}
+function einkCacheRequests(url,state,feed,width,height,fingerprint){
+  const token=String(state.display?.token||'display'),palette=String(feed.display?.palette||'spectra6');
+  const root=new URL('/__questlog_eink_cache/',url.origin);
+  const prefix=root.href+encodeURIComponent(token)+'/'+width+'x'+height+'/'+encodeURIComponent(palette)+'/';
+  return{
+    exact:new Request(prefix+'exact/'+fingerprint,{method:'GET'}),
+    last:new Request(prefix+'last',{method:'GET'})
+  };
+}
+async function screenshotWithRetry(env,html,width,height){
+  let firstError=null;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      if(!env.BROWSER?.quickAction)throw new Error('Cloudflare Browser Run binding is unavailable.');
+      const response=await env.BROWSER.quickAction('screenshot',{
+        html,
+        viewport:{width,height,deviceScaleFactor:1},
+        screenshotOptions:{type:'png',fullPage:false,omitBackground:false}
+      });
+      if(!response.ok)throw new Error('Browser Run screenshot failed ('+response.status+').');
+      return await response.arrayBuffer();
+    }catch(error){
+      if(!firstError)firstError=error;
+      if(attempt===1){
+        error.firstRenderError=firstError;
+        throw error;
+      }
+    }
+  }
+}
+function pngResponse(bytes,renderer,feed,error=''){
+  const headers={
+    'content-type':'image/png',
+    'cache-control':'no-store, max-age=0',
+    'x-questlog-renderer':renderer,
+    'x-frameos-refresh-minutes':String(feed.display.refreshMinutes)
+  };
+  if(error)headers['x-questlog-renderer-error']=cleanText(error,160);
+  return new Response(bytes,{status:200,headers});
+}
+async function readCachedPng(cache,request,renderer,feed,error=''){
+  if(!cache)return null;
+  try{
+    const cached=await cache.match(request);
+    if(!cached)return null;
+    return pngResponse(await cached.arrayBuffer(),renderer,feed,error);
+  }catch{return null}
+}
+async function storeCachedPng(cache,requests,bytes){
+  if(!cache)return;
+  const stored=new Response(bytes,{status:200,headers:{'content-type':'image/png','cache-control':'public, max-age=604800'}});
+  try{
+    await Promise.all([cache.put(requests.exact,stored.clone()),cache.put(requests.last,stored.clone())]);
+  }catch{}
+}
+
 async function body(request){
   const raw=await request.text();
   if(!raw)return{};
@@ -395,23 +457,18 @@ async function handleApi(request,env,identity){
     try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
     const feed=buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError});
     const width=clamp(Math.round(num(url.searchParams.get('w'),800)),300,2000),height=clamp(Math.round(num(url.searchParams.get('h'),480)),300,2000);
+    const cache=globalThis.caches?.default||null,fingerprint=await einkFingerprint(feed,width,height),requests=einkCacheRequests(url,state,feed,width,height,fingerprint);
+    const exact=await readCachedPng(cache,requests.exact,'html-browser-run-cache',feed);
+    if(exact)return exact;
     try{
-      if(!env.BROWSER?.quickAction)throw new Error('Cloudflare Browser Run binding is unavailable.');
-      const response=await env.BROWSER.quickAction('screenshot',{
-        html:renderEinkHtml(feed,width,height),
-        viewport:{width,height,deviceScaleFactor:1},
-        screenshotOptions:{type:'png',fullPage:false,omitBackground:false}
-      });
-      if(!response.ok)throw new Error('Browser Run screenshot failed ('+response.status+').');
-      const headers=new Headers(response.headers);
-      headers.set('content-type','image/png');
-      headers.set('cache-control','no-store, max-age=0');
-      headers.set('x-questlog-renderer','html-browser-run');
-      headers.set('x-frameos-refresh-minutes',String(feed.display.refreshMinutes));
-      return new Response(response.body,{status:200,headers});
+      const bytes=await screenshotWithRetry(env,renderEinkHtml(feed,width,height),width,height);
+      await storeCachedPng(cache,requests,bytes);
+      return pngResponse(bytes,'html-browser-run',feed);
     }catch(error){
+      const stale=await readCachedPng(cache,requests.last,'html-browser-run-stale-cache',feed,error.message);
+      if(stale)return stale;
       return text(renderDisplaySvg(feed,width,height),200,'image/svg+xml; charset=utf-8',{
-        'x-questlog-renderer':'svg-fallback',
+        'x-questlog-renderer':'svg-emergency-fallback',
         'x-questlog-renderer-error':cleanText(error.message,160),
         'x-frameos-refresh-minutes':String(feed.display.refreshMinutes)
       });

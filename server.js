@@ -3214,6 +3214,9 @@ function renderSvg(data, w, h) {
 
 let einkBrowserPromise = null;
 let einkRendererPromise = null;
+const einkExactImageCache = new Map();
+const einkLastImageCache = new Map();
+const EINK_CACHE_LIMIT = 16;
 function chromiumPath() {
   const configured = cleanText(process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH, 500);
   const candidates = [configured, '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(Boolean);
@@ -3235,6 +3238,25 @@ async function einkBrowser() {
   }
   return einkBrowserPromise;
 }
+async function resetEinkBrowser() {
+  const current = einkBrowserPromise;
+  einkBrowserPromise = null;
+  if (!current) return;
+  try { const browser = await current; await browser.close(); } catch {}
+}
+function einkRenderFingerprint(data, width, height) {
+  const stable = { ...data, generatedAt: '' };
+  return crypto.createHash('sha256').update(JSON.stringify({ width, height, palette:data.display?.palette||'spectra6', data:stable })).digest('hex').slice(0, 24);
+}
+function einkCacheKeys(data, width, height) {
+  const base = width + 'x' + height + ':' + (data.display?.palette || 'spectra6');
+  return { exact: base + ':' + einkRenderFingerprint(data,width,height), last: base };
+}
+function rememberEinkImage(cacheKey, lastKey, png) {
+  einkExactImageCache.set(cacheKey, Buffer.from(png));
+  einkLastImageCache.set(lastKey, Buffer.from(png));
+  while (einkExactImageCache.size > EINK_CACHE_LIMIT) einkExactImageCache.delete(einkExactImageCache.keys().next().value);
+}
 async function renderEinkPng(data, width, height) {
   const { renderEinkHtml } = await einkRenderer();
   const browser = await einkBrowser();
@@ -3246,6 +3268,17 @@ async function renderEinkPng(data, width, height) {
     return quantizeSpectra6(raw, data.display?.palette || 'spectra6');
   } finally {
     await page.close().catch(() => {});
+  }
+}
+async function renderEinkPngReliable(data, width, height) {
+  let firstError = null;
+  try { return await renderEinkPng(data,width,height); }
+  catch (error) { firstError = error; }
+  await resetEinkBrowser();
+  try { return await renderEinkPng(data,width,height); }
+  catch (retryError) {
+    retryError.firstRenderError = firstError;
+    throw retryError;
   }
 }
 
@@ -3719,9 +3752,19 @@ const server = http.createServer(async (req, res) => {
       if (!authorized(url)) return text(res, 401, 'Invalid display token');
       const w = clamp(Math.round(num(url.searchParams.get('w'), 800)), 300, 2000);
       const h = clamp(Math.round(num(url.searchParams.get('h'), 480)), 300, 2000);
-      const data = await feed();
+      const data = await feed(), keys = einkCacheKeys(data,w,h), exact = einkExactImageCache.get(keys.exact);
+      if (exact) {
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'no-store',
+          'X-QuestLog-Renderer': 'html-chromium-cache',
+          'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes)
+        });
+        return res.end(exact);
+      }
       try {
-        const png = await renderEinkPng(data, w, h);
+        const png = await renderEinkPngReliable(data, w, h);
+        rememberEinkImage(keys.exact,keys.last,png);
         res.writeHead(200, {
           'Content-Type': 'image/png',
           'Cache-Control': 'no-store',
@@ -3730,9 +3773,21 @@ const server = http.createServer(async (req, res) => {
         });
         return res.end(png);
       } catch (error) {
-        console.warn('HTML e-ink renderer failed; serving SVG fallback:', error.message);
+        const stale = einkLastImageCache.get(keys.last);
+        if (stale) {
+          console.warn('HTML e-ink renderer failed twice; serving last successful PNG:', error.message);
+          res.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-store',
+            'X-QuestLog-Renderer': 'html-chromium-stale-cache',
+            'X-QuestLog-Renderer-Error': cleanText(error.message, 160),
+            'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes)
+          });
+          return res.end(stale);
+        }
+        console.warn('HTML e-ink renderer failed twice and no PNG cache exists; serving SVG fallback:', error.message);
         return text(res, 200, renderSvg(data, w, h), 'image/svg+xml; charset=utf-8', {
-          'X-QuestLog-Renderer': 'svg-fallback',
+          'X-QuestLog-Renderer': 'svg-emergency-fallback',
           'X-QuestLog-Renderer-Error': cleanText(error.message, 160),
           'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes)
         });
