@@ -3531,6 +3531,9 @@ const server = http.createServer(async (req, res) => {
       if (!messages.length || messages[messages.length - 1].role !== 'user') return json(res, 400, { error: 'A user message is required.' });
       return json(res, 200, await agentChat(messages));
     }
+    if (p === '/api/agent/models' && req.method === 'GET') {
+      return json(res, 200, await testAgentConnection());
+    }
     if (p === '/api/agent/test' && req.method === 'POST') {
       return json(res, 200, await testAgentConnection());
     }
