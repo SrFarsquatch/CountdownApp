@@ -1391,7 +1391,7 @@ const DISPLAY_SECTION_STYLES={
 };
 const DISPLAY_MODES=['dashboard','daily','weekly','monthly','countdowns'];
 function cloneDisplayLayout(layout){
- const fallback={agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
+ const fallback={weather:{x:0,y:0,w:10,h:8},agenda:{x:10,y:0,w:14,h:8},tasks:{x:0,y:8,w:8,h:8},goals:{x:8,y:8,w:8,h:8},countdowns:{x:16,y:8,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
@@ -1438,8 +1438,8 @@ function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
    :{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4},markets:{x:18,y:12,w:6,h:4}};
  if(mode==='countdowns') return{agenda:{x:0,y:0,w:12,h:6},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:6,w:12,h:6},countdowns:{x:0,y:0,w:24,h:16},markets:{x:12,y:8,w:12,h:8}};
  return portrait
-   ?{agenda:{x:0,y:0,w:24,h:6},weather:{x:0,y:6,w:24,h:2},tasks:{x:0,y:8,w:24,h:2},goals:{x:0,y:10,w:8,h:6},countdowns:{x:8,y:10,w:8,h:6},markets:{x:16,y:10,w:8,h:6}}
-   :{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
+   ?{weather:{x:0,y:0,w:24,h:5},agenda:{x:0,y:5,w:24,h:6},tasks:{x:0,y:11,w:8,h:3},goals:{x:8,y:11,w:8,h:3},countdowns:{x:16,y:11,w:8,h:3},markets:{x:0,y:14,w:24,h:2}}
+   :{weather:{x:0,y:0,w:10,h:8},agenda:{x:10,y:0,w:14,h:8},tasks:{x:0,y:8,w:8,h:8},goals:{x:8,y:8,w:8,h:8},countdowns:{x:16,y:8,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
 }
 function setLayoutStatus(message,error=false){const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':''}
 function renderWidgetSettings(kind=selectedDisplayWidget){
@@ -1474,7 +1474,7 @@ function renderSectionLayoutEditor(renderSettings=true){
  const now=new Date(),modeLabels={dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'};
  if($('layoutEditorDate'))$('layoutEditorDate').textContent=now.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
  if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
- if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='24 × 16 grid · '+w+' × '+h+' preview';
+ if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='24 × 16 grid · '+w+' × '+h+' preview'+(mode==='dashboard'?' · adaptive dashboard detail':'');
  $('einkLayoutCard').classList.remove('disabled');
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];

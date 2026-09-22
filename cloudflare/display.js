@@ -170,8 +170,124 @@ function eventAccent(event,palette){
 }
 function money(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2):'N/A'}
 
+
+function renderDashboardSvg(data,w,h){
+  const palette=data.display?.palette||'spectra6',black=HEX.black,white=HEX.white,rule=HEX.black;
+  const pad=Math.max(13,Math.round(Math.min(w,h)*.028)),headerH=Math.max(47,Math.round(h*.105)),top=pad+headerH,contentW=w-pad*2,contentH=h-top-pad-3;
+  const sections=data.display?.modeSections||{},layout=normalizeSectionLayout(data.display?.modeLayout,'dashboard'),order=normalizeSectionOrder(data.display?.sectionOrder);
+  const sectionData={agenda:agendaEntries(data),weather:data.weather?[data.weather]:[],tasks:data.tasks||[],goals:data.goals||[],countdowns:data.countdowns||[],markets:data.markets?.quotes||[]};
+  const labels={agenda:'AGENDA',weather:'WEATHER',tasks:'TASKS',goals:'GOALS',countdowns:'COUNTDOWNS',markets:'MARKETS'};
+  const now=new Date(),location=data.weather?.location||data.weather?.locationLabel||'',dateText=now.toLocaleDateString('en-CA',{weekday:'long',month:'long',day:'numeric'}),timeText=now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});
+  const density=(bw,bh)=>bw>=255&&bh>=145?'hero':bw>=155&&bh>=86?'standard':'compact';
+  const taskAccent=task=>palette==='mono'?black:({urgent:HEX.red,high:HEX.red,medium:HEX.yellow,low:HEX.green})[String(task?.priority||'').toLowerCase()]||HEX.black;
+  const goalMetric=goal=>{
+    if(goal?.type==='checklist'){const total=goal.checklist?.length||0,done=(goal.checklist||[]).filter(item=>item.done).length;return done+'/'+total+' steps'}
+    if(goal?.type==='deadline'&&goal.deadline)return'Due '+new Date(goal.deadline).toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+    if(num(goal?.target,0)>0)return num(goal.current,0)+'/'+num(goal.target,0)+(goal.unit?' '+goal.unit:'');
+    return'';
+  };
+  const metric=(label,value,x,y,maxW)=>{
+    if(value===undefined||value===null||value==='')return'';
+    const text=String(value),ww=Math.min(maxW,Math.max(42,(label.length+text.length)*4.8+14));
+    return'<text x="'+x+'" y="'+y+'" font-size="6.8" font-weight="800" letter-spacing=".7">'+esc(label.toUpperCase())+'</text><text x="'+x+'" y="'+(y+12)+'" font-size="9.5" font-weight="800">'+esc(text)+'</text><line x1="'+x+'" y1="'+(y+17)+'" x2="'+(x+ww)+'" y2="'+(y+17)+'" stroke="'+rule+'" stroke-width=".7"/>';
+  };
+  const trend=(days,x,y,bw,bh)=>{
+    const vals=days.flatMap(d=>[num(d.high,NaN),num(d.low,NaN)]).filter(Number.isFinite);
+    if(days.length<2||!vals.length)return'';
+    const min=Math.min(...vals),max=Math.max(...vals),span=Math.max(1,max-min),step=bw/Math.max(1,days.length-1);
+    const points=(key)=>days.map((d,i)=>{const v=num(d[key],min);return(x+i*step).toFixed(1)+','+(y+bh-(v-min)/span*bh).toFixed(1)}).join(' ');
+    return'<polyline points="'+points('high')+'" fill="none" stroke="'+(palette==='mono'?black:HEX.red)+'" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="'+points('low')+'" fill="none" stroke="'+(palette==='mono'?black:HEX.blue)+'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  };
+
+  let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="'+white+'"/><style>text{font-family:Arial,Helvetica,sans-serif}.dash-card{fill:#fff;stroke:#000;stroke-width:1}.dash-rule{stroke:#000;stroke-width:.8}.dash-muted{fill:#000}.dash-label{font-size:9px;font-weight:800;letter-spacing:1.2px}</style>';
+  svg+='<rect x="5" y="5" width="'+(w-10)+'" height="'+(h-10)+'" rx="11" fill="none" stroke="'+black+'" stroke-width="1"/>';
+  svg+='<text x="'+pad+'" y="'+(pad+11)+'" font-size="8" font-weight="900" letter-spacing="1.6">QUEST LOG</text>';
+  svg+='<text x="'+pad+'" y="'+(pad+30)+'" font-size="'+Math.max(15,Math.min(20,w*.023))+'" font-weight="900">'+esc(dateText)+'</text>';
+  if(location)svg+='<text x="'+(w-pad)+'" y="'+(pad+11)+'" text-anchor="end" font-size="8.5" font-weight="700">'+esc(short(location,36))+'</text>';
+  svg+='<text x="'+(w-pad)+'" y="'+(pad+31)+'" text-anchor="end" font-size="'+Math.max(15,Math.min(20,w*.022))+'" font-weight="900">'+esc(timeText)+'</text>';
+  svg+='<line x1="'+pad+'" y1="'+(top-8)+'" x2="'+(w-pad)+'" y2="'+(top-8)+'" stroke="'+black+'" stroke-width="1"/>';
+  if(palette!=='mono')svg+='<line x1="'+pad+'" y1="'+(top-8)+'" x2="'+(pad+52)+'" y2="'+(top-8)+'" stroke="'+HEX.blue+'" stroke-width="3"/><line x1="'+(pad+57)+'" y1="'+(top-8)+'" x2="'+(pad+82)+'" y2="'+(top-8)+'" stroke="'+HEX.yellow+'" stroke-width="3"/>';
+
+  const defs=[],queue=[];
+  for(const kind of order){
+    if(!DISPLAY_KEYS.includes(kind)||sections[kind]?.enabled===false)continue;
+    const r=layout[kind],x=pad+contentW*r.x/24,y=top+contentH*r.y/16,bw=contentW*r.w/24,bh=contentH*r.h/16,inset=Math.max(7,Math.min(11,Math.round(Math.min(bw,bh)*.045))),clip='dash-'+kind;
+    defs.push('<clipPath id="'+clip+'"><rect x="'+(x+1)+'" y="'+(y+1)+'" width="'+Math.max(1,bw-2)+'" height="'+Math.max(1,bh-2)+'" rx="8"/></clipPath>');
+    queue.push({kind,x,y,bw,bh,inset,clip,density:density(bw,bh)});
+  }
+  if(defs.length)svg+='<defs>'+defs.join('')+'</defs>';
+
+  for(const box of queue){
+    const kind=box.kind,items=sectionData[kind]||[],cfg=sections[kind]||{},accent=sectionAccent(kind,palette),x=box.x+box.inset,y=box.y+box.inset,bw=Math.max(20,box.bw-box.inset*2),bh=Math.max(20,box.bh-box.inset*2),level=box.density;
+    svg+='<rect x="'+box.x+'" y="'+box.y+'" width="'+box.bw+'" height="'+box.bh+'" rx="8" class="dash-card"/>';
+    svg+='<rect x="'+(box.x+9)+'" y="'+(box.y+10)+'" width="5" height="5" rx="1.5" fill="'+accent+'" stroke="'+black+'" stroke-width=".55"/>';
+    svg+='<text x="'+(box.x+20)+'" y="'+(box.y+16)+'" class="dash-label">'+labels[kind]+'</text>';
+    if(box.bw>120)svg+='<text x="'+(box.x+box.bw-9)+'" y="'+(box.y+16)+'" text-anchor="end" font-size="7.5" font-weight="700">'+esc(kind==='weather'?(data.weather?.forecast?.length||0)+' day':items.length+' item'+(items.length===1?'':'s'))+'</text>';
+    svg+='<line x1="'+(box.x+9)+'" y1="'+(box.y+25)+'" x2="'+(box.x+box.bw-9)+'" y2="'+(box.y+25)+'" class="dash-rule"/><g clip-path="url(#'+box.clip+')">';
+    let cy=box.y+31;
+    const bottom=box.y+box.bh-box.inset;
+
+    if(!items.length){
+      const msg=kind==='weather'&&data.weatherError?data.weatherError:kind==='markets'&&data.marketError?data.marketError:kind==='agenda'&&data.calendarError?data.calendarError:'Nothing to show.';
+      svg+='<text x="'+x+'" y="'+(cy+18)+'" font-size="10" font-weight="650">'+esc(short(msg,Math.max(12,Math.floor(bw/5.8))))+'</text></g>';continue;
+    }
+
+    if(kind==='weather'){
+      const weather=data.weather,current=weather?.current,days=(weather?.forecast||[]).slice(0,Math.min(cfg.limit||5,5)),unit=weather?.units==='imperial'?'°F':'°C';
+      if(current){
+        if(level==='hero'){
+          const iconSize=Math.min(60,Math.max(46,bh*.28)),tempX=x+iconSize+12;
+          svg+=weatherIcon(current.condition,x,cy+5,iconSize,palette);
+          svg+='<text x="'+tempX+'" y="'+(cy+39)+'" font-size="'+Math.min(40,Math.max(30,bw*.105))+'" font-weight="300">'+esc(Math.round(num(current.temperature,0))+unit)+'</text>';
+          svg+='<text x="'+tempX+'" y="'+(cy+56)+'" font-size="10" font-weight="700">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-iconSize-15)/6))))+'</text>';
+          let mx=Math.max(tempX+bw*.22,x+bw*.52),my=cy+10;
+          svg+=metric('Feels',Math.round(num(current.feelsLike,current.temperature))+unit,mx,my,70);
+          svg+=metric('Humidity',Math.round(num(current.humidity,0))+'%',mx+82,my,76);
+          svg+=metric('Wind',Math.round(num(current.windSpeed,0))+(weather.units==='imperial'?' mph':' km/h'),mx,my+35,74);
+          if(days.length>=2&&bottom-cy>125)svg+=trend(days,x,cy+76,bw,22);
+          const fy=Math.min(bottom-53,cy+105),cellW=bw/Math.max(1,days.length);
+          days.forEach((d,i)=>{
+            const dx=x+i*cellW;
+            if(i)svg+='<line x1="'+dx+'" y1="'+fy+'" x2="'+dx+'" y2="'+(fy+46)+'" class="dash-rule"/>';
+            svg+='<text x="'+(dx+cellW/2)+'" y="'+(fy+9)+'" text-anchor="middle" font-size="7.5" font-weight="800">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
+            svg+=weatherIcon(d.condition,dx+cellW/2-11,fy+13,22,palette);
+            svg+='<text x="'+(dx+cellW/2)+'" y="'+(fy+43)+'" text-anchor="middle" font-size="9" font-weight="800">'+esc(Math.round(num(d.high,0))+'° / '+Math.round(num(d.low,0))+'°')+'</text>';
+          });
+        }else if(level==='standard'){
+          svg+=weatherIcon(current.condition,x,cy+4,38,palette)+'<text x="'+(x+47)+'" y="'+(cy+29)+'" font-size="26" font-weight="350">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+47)+'" y="'+(cy+44)+'" font-size="8.5" font-weight="700">'+esc(short(current.description||'',Math.max(10,Math.floor((bw-50)/5.5))))+'</text>';
+          const fy=cy+56,cellW=bw/Math.max(1,Math.min(3,days.length));
+          days.slice(0,3).forEach((d,i)=>{const dx=x+i*cellW;if(i)svg+='<line x1="'+dx+'" y1="'+fy+'" x2="'+dx+'" y2="'+Math.min(bottom,fy+35)+'" class="dash-rule"/>';svg+='<text x="'+(dx+cellW/2)+'" y="'+(fy+9)+'" text-anchor="middle" font-size="7" font-weight="800">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>'+weatherIcon(d.condition,dx+cellW/2-8,fy+12,16,palette)+'<text x="'+(dx+cellW/2)+'" y="'+(fy+34)+'" text-anchor="middle" font-size="8">'+esc(Math.round(num(d.high,0))+'° / '+Math.round(num(d.low,0))+'°')+'</text>'});
+        }else{
+          svg+=weatherIcon(current.condition,x,cy+6,28,palette)+'<text x="'+(x+36)+'" y="'+(cy+26)+'" font-size="20" font-weight="400">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+90)+'" y="'+(cy+25)+'" font-size="8.5" font-weight="700">'+esc(short(current.description||'',Math.max(9,Math.floor((bw-92)/5.5))))+'</text>';
+        }
+      }
+    }else if(kind==='agenda'){
+      const max=cfg.limit||12,timeline=cfg.style==='timeline';
+      if(cfg.style==='week'||cfg.style==='calendar'){
+        const entries=items.slice(0,Math.min(max,level==='compact'?3:level==='standard'?5:7));
+        for(const entry of entries){if(cy+26>bottom)break;const event=entry.event,d=new Date(event.start),when=event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),a=eventAccent(event,palette);svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="8.5" font-weight="800">'+esc(when)+'</text><circle cx="'+(x+48)+'" cy="'+(cy+11)+'" r="3" fill="'+a+'" stroke="'+black+'" stroke-width=".55"/><text x="'+(x+58)+'" y="'+(cy+15)+'" font-size="10.5" font-weight="750">'+esc(short(event.title,Math.max(12,Math.floor((bw-60)/6))))+'</text>';cy+=25}
+      }else{
+        if(level==='hero')svg+='<line x1="'+(x+55)+'" y1="'+(cy+3)+'" x2="'+(x+55)+'" y2="'+(bottom-3)+'" class="dash-rule"/>';
+        for(const entry of items.slice(0,max)){const row=level==='hero'?36:level==='standard'?29:24;if(cy+row>bottom)break;const event=entry.event,d=new Date(event.start),when=event.allDay?'ALL DAY':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),a=eventAccent(event,palette);if(level==='hero'){svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="8.5" font-weight="800">'+esc(when)+'</text><circle cx="'+(x+55)+'" cy="'+(cy+11)+'" r="3.2" fill="'+a+'" stroke="'+black+'" stroke-width=".55"/><text x="'+(x+66)+'" y="'+(cy+14)+'" font-size="11.5" font-weight="800">'+esc(short(event.title,Math.max(12,Math.floor((bw-68)/6))))+'</text>';const detail=String(event.location||event.calendarName||event.calendarSummary||'').trim();if(detail)svg+='<text x="'+(x+66)+'" y="'+(cy+27)+'" font-size="7.7">'+esc(short(detail,Math.max(10,Math.floor((bw-68)/5))))+'</text>'}else{svg+='<circle cx="'+(x+3)+'" cy="'+(cy+11)+'" r="2.6" fill="'+a+'" stroke="'+black+'" stroke-width=".5"/><text x="'+(x+11)+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="750">'+esc(short(event.title,Math.max(10,Math.floor((bw-64)/5.8))))+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="8">'+esc(when)+'</text>'}cy+=row}
+      }
+    }else if(kind==='tasks'){
+      for(const task of items.slice(0,cfg.limit||4)){const row=level==='hero'?36:level==='standard'?28:23;if(cy+row>bottom)break;const due=task.due?new Date(task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'',a=taskAccent(task);svg+='<rect x="'+x+'" y="'+(cy+5)+'" width="10" height="10" rx="2.5" fill="'+white+'" stroke="'+black+'" stroke-width=".9"/><rect x="'+(x+17)+'" y="'+(cy+6)+'" width="3" height="9" rx="1.5" fill="'+a+'"/><text x="'+(x+27)+'" y="'+(cy+14)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="750">'+esc(short(task.title,Math.max(10,Math.floor((bw-(due?62:28))/5.8))))+'</text>';if(due)svg+='<text x="'+(x+bw)+'" y="'+(cy+14)+'" text-anchor="end" font-size="8" font-weight="700">'+esc(due)+'</text>';if(level==='hero'&&task.project)svg+='<text x="'+(x+27)+'" y="'+(cy+27)+'" font-size="7.5">'+esc(short(task.project,Math.max(10,Math.floor((bw-28)/5))))+'</text>';cy+=row}
+    }else if(kind==='goals'){
+      for(const goal of items.slice(0,cfg.limit||2)){const row=level==='hero'?50:level==='standard'?39:28;if(cy+row>bottom)break;const p=Math.round(num(goal.progress,0)),a=color(goal.accentColor,palette),m=goalMetric(goal);svg+='<text x="'+x+'" y="'+(cy+14)+'" font-size="'+(level==='compact'?9.5:10.5)+'" font-weight="800">'+esc(short(goal.title,Math.max(10,Math.floor((bw-46)/5.8))))+'</text><text x="'+(x+bw)+'" y="'+(cy+14)+'" text-anchor="end" font-size="'+(level==='hero'?15:11)+'" font-weight="900">'+p+'%</text>';if(level!=='compact'){if(m)svg+='<text x="'+x+'" y="'+(cy+27)+'" font-size="7.5">'+esc(short(m,Math.max(10,Math.floor(bw/5))))+'</text>';svg+=bar(p,x,cy+(level==='hero'?35:27),bw,level==='hero'?6:5,a)}cy+=row}
+    }else if(kind==='countdowns'){
+      for(const c of items.slice(0,cfg.limit||3)){const row=level==='hero'?48:level==='standard'?36:25;if(cy+row>bottom)break;const a=color(c.accentColor,palette),label=countdownLabel(c);if(level==='hero'){svg+='<text x="'+x+'" y="'+(cy+17)+'" font-size="10.5" font-weight="800">'+esc(short(c.name,Math.max(10,Math.floor((bw-90)/5.8))))+'</text><text x="'+(x+bw)+'" y="'+(cy+19)+'" text-anchor="end" font-size="18" font-weight="300" fill="'+a+'">'+esc(label)+'</text>';if(c.showExactDate!==false)svg+='<text x="'+x+'" y="'+(cy+31)+'" font-size="7.5">'+esc(new Date(c.end).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}))+'</text>';if(c.showProgressBar!==false)svg+=bar(c.progress,x,cy+38,bw,4,a)}else{svg+='<rect x="'+x+'" y="'+(cy+5)+'" width="3" height="'+(row-10)+'" rx="1.5" fill="'+a+'"/><text x="'+(x+10)+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="800">'+esc(short(c.name,Math.max(10,Math.floor((bw-72)/5.8))))+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?9:11)+'" font-weight="900">'+esc(label)+'</text>'}cy+=row}
+    }else if(kind==='markets'){
+      for(const q of items.slice(0,cfg.limit||4)){const row=level==='hero'?32:level==='standard'?27:22;if(cy+row>bottom)break;const pct=Number(q.percentChange),ok=q.available!==false&&q.close!=null,change=ok&&Number.isFinite(pct)?pct:null,a=palette==='mono'?black:(change>0?HEX.green:change<0?HEX.red:black),arrow=change>0?'▲':change<0?'▼':'•';svg+='<text x="'+x+'" y="'+(cy+15)+'" font-size="'+(level==='compact'?9:10.5)+'" font-weight="900">'+esc(q.symbol)+'</text>';if(level==='hero'&&q.name)svg+='<text x="'+(x+48)+'" y="'+(cy+15)+'" font-size="7.5">'+esc(short(q.name,Math.max(8,Math.floor((bw-145)/5))))+'</text>';svg+='<text x="'+(x+bw-55)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?8.5:10)+'" font-weight="750">'+esc(ok?money(q.close):'N/A')+'</text><text x="'+(x+bw)+'" y="'+(cy+15)+'" text-anchor="end" font-size="'+(level==='compact'?8:9.5)+'" font-weight="900" fill="'+a+'">'+(ok?arrow+' '+esc(Math.abs(change||0).toFixed(2))+'%':'—')+'</text>';if(level!=='compact'){const mid=x+bw-48,span=Math.min(38,Math.abs(change||0)*10+6);svg+='<line x1="'+mid+'" y1="'+(cy+23)+'" x2="'+(mid+span)+'" y2="'+(cy+23)+'" stroke="'+a+'" stroke-width="2" stroke-linecap="round"/>'}cy+=row}
+    }
+    svg+='</g>';
+  }
+  svg+='<text x="'+pad+'" y="'+(h-9)+'" font-size="7" font-weight="700">800 × 480 · SPECTRA 6 READY</text><text x="'+(w-pad)+'" y="'+(h-9)+'" text-anchor="end" font-size="7">Updated '+esc(new Date(data.generatedAt).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text></svg>';
+  return svg;
+}
+
 export function renderDisplaySvg(data,width=800,height=480){
   const w=clamp(Math.round(num(width,800)),300,2000),h=clamp(Math.round(num(height,480)),300,2000),palette=data.display?.palette||'spectra6';
+  if((data.display?.mode||'daily')==='dashboard')return renderDashboardSvg(data,w,h);
   const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black=HEX.black,muted=HEX.black,rule=HEX.black;
   const now=new Date(),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
   let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:750;letter-spacing:1.35px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1.1}</style>';
