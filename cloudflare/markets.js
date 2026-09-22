@@ -1,6 +1,5 @@
 import { saveState, normalizeMarkets, cleanText } from './state.js';
 
-const encoder=new TextEncoder(),decoder=new TextDecoder();
 const marketNumber=value=>{const n=Number(value);return Number.isFinite(n)?n:null};
 
 function normalizeInstrument(value={}){
@@ -23,54 +22,12 @@ function normalizeInstrument(value={}){
 function unavailable(item,message='Tickerbot returned no quote for this symbol.'){
   return{...normalizeInstrument(item),close:null,open:null,high:null,low:null,previousClose:null,change:null,percentChange:null,volume:null,marketOpen:null,datetime:'',available:false,error:cleanText(message,220)};
 }
-function b64u(bytes){
-  let raw='';for(const b of bytes)raw+=String.fromCharCode(b);
-  return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-function fromB64u(value){
-  const input=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
-  const raw=atob(input+'='.repeat((4-input.length%4)%4));
-  return Uint8Array.from(raw,c=>c.charCodeAt(0));
-}
-async function credentialKey(env){
-  if(!env.APP_SECRET)throw new Error('APP_SECRET is not configured on the Worker.');
-  const hash=await crypto.subtle.digest('SHA-256',encoder.encode(String(env.APP_SECRET)));
-  return crypto.subtle.importKey('raw',hash,{name:'AES-GCM'},false,['encrypt','decrypt']);
-}
-async function encryptCredential(value,env){
-  const key=await credentialKey(env),iv=crypto.getRandomValues(new Uint8Array(12));
-  const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,encoder.encode(String(value)));
-  return'market1.'+b64u(iv)+'.'+b64u(new Uint8Array(data));
-}
-async function decryptCredential(value,env){
-  if(!value||!String(value).startsWith('market1.'))return'';
-  try{
-    const [,iv,data]=String(value).split('.'),key=await credentialKey(env);
-    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64u(iv)},key,fromB64u(data));
-    return decoder.decode(plain);
-  }catch{return''}
-}
-export async function saveMarketCredential(state,env,value){
-  const secret=cleanText(value,5000);
-  if(!secret)throw new Error('Tickerbot API key cannot be empty.');
-  state.markets=normalizeMarkets(state.markets);
-  state.markets.credential=await encryptCredential(secret,env);
-  state.marketCache=null;
-  await saveState(env,state);
-}
-export async function clearMarketCredential(state,env){
-  state.markets=normalizeMarkets(state.markets);
-  state.markets.credential=null;
-  state.marketCache=null;
-  await saveState(env,state);
-}
-async function marketApiKey(state,env){
-  const config=normalizeMarkets(state.markets);
-  return(await decryptCredential(config.credential,env))||String(env.TICKERBOT_API_KEY||'').trim();
+function marketApiKey(env){
+  return String(env.TICKERBOT_API_KEY||'').trim();
 }
 async function requestTickerbot(state,env,path){
-  const apiKey=await marketApiKey(state,env);
-  if(!apiKey)throw new Error('Add the shared Tickerbot API key in Settings → Markets.');
+  const apiKey=marketApiKey(env);
+  if(!apiKey)throw new Error('TICKERBOT_API_KEY is not configured as a Cloudflare Worker secret.');
   const response=await fetch('https://api.tickerbot.io/v2/'+String(path||'').replace(/^\/+/,''),{
     headers:{Authorization:'Bearer '+apiKey,Accept:'application/json'}
   });
