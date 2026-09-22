@@ -255,7 +255,7 @@ function defaults() {
     google: { accounts: [], countdownWindowDays: 30 },
     weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
     appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
-    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 15, credential: null },
+    markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 15 },
     marketCache: null,
     agent: { enabled: false, provider: 'hermes', baseUrl: '', model: 'hermes-agent', credential: null, requireConfirmation: true, contextDays: 14 },
     notifications: normalizeNotifications({}),
@@ -414,8 +414,8 @@ function normalizeAgent(x = {}) {
     enabled: Boolean(x.enabled),
     provider,
     baseUrl: requestedBase || defaultAgentBaseUrl(provider),
-    model: cleanText(x.model, 160) || defaultAgentModel(provider),
-    credential: typeof x.credential === 'string' ? x.credential : null,
+    model: cleanText(x.model, 160) || defaultAgentModel(provider)
+,
     requireConfirmation: true,
     contextDays: clamp(Math.round(num(x.contextDays, 14)), 1, 30)
   };
@@ -2340,7 +2340,7 @@ function persistMarketCache() {
   save(db);
 }
 function marketApiKey() {
-  return cleanText(decrypt(db.markets?.credential) || TICKERBOT_API_KEY, 5000);
+  return cleanText(TICKERBOT_API_KEY, 5000);
 }
 function marketConfigured() { return Boolean(marketApiKey()); }
 function marketNumber(value) {
@@ -2357,7 +2357,7 @@ function unavailableMarketQuote(item, message = 'Tickerbot returned no quote for
 }
 async function tickerbotRequest(resource) {
   const apiKey = marketApiKey();
-  if (!apiKey) throw new Error('Add the shared Tickerbot API key in Settings → Markets.');
+  if (!apiKey) throw new Error('TICKERBOT_API_KEY is not configured in the server environment.');
   const response = await fetch('https://api.tickerbot.io/v2/' + String(resource || '').replace(/^\/+/, ''), {
     headers: { Authorization: 'Bearer ' + apiKey, Accept: 'application/json' }
   });
@@ -3576,19 +3576,13 @@ const server = http.createServer(async (req, res) => {
       if (incoming.showCountdowns !== undefined) db.display.showCountdowns = Boolean(incoming.showCountdowns);
       if (incoming.showWeather !== undefined) db.display.showWeather = Boolean(incoming.showWeather);
       if (incoming.weatherStyle !== undefined) db.display.weatherStyle = en(incoming.weatherStyle, WEATHER_STYLES, 'forecast');
-      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined || incoming.marketApiKey !== undefined || incoming.marketClearApiKey !== undefined) {
+      if (incoming.marketWatchlist !== undefined || incoming.marketSymbols !== undefined || incoming.marketRefreshMinutes !== undefined) {
         const current = normalizeMarkets(db.markets);
         db.markets = normalizeMarkets({
           ...current,
           watchlist: incoming.marketWatchlist !== undefined ? incoming.marketWatchlist : (incoming.marketSymbols !== undefined ? incoming.marketSymbols : current.watchlist),
-          refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : current.refreshMinutes,
-          credential: current.credential
+          refreshMinutes: incoming.marketRefreshMinutes !== undefined ? incoming.marketRefreshMinutes : current.refreshMinutes
         });
-        if (incoming.marketClearApiKey) db.markets.credential = null;
-        if (incoming.marketApiKey !== undefined && cleanText(incoming.marketApiKey, 5000)) {
-          if (!APP_SECRET) return json(res, 400, { error: 'Set APP_SECRET before saving the shared Tickerbot API key.' });
-          db.markets.credential = encrypt(cleanText(incoming.marketApiKey, 5000));
-        }
         marketCache = { key: '', expiresAt: 0, data: null };
         db.marketCache = null;
       }
