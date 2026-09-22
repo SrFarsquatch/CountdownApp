@@ -191,9 +191,30 @@ export function renderDisplaySvg(data,width=800,height=480){
     }else if(kind==='weather'){
       const weather=data.weather,current=weather?.current,forecast=weather?.forecast||[],unit=weather?.units==='imperial'?'°F':'°C';
       if(current){
-        svg+=weatherIcon(current.condition,x,cy,34,palette)+'<text x="'+(x+44)+'" y="'+(cy+22)+'" font-size="20" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+108)+'" y="'+(cy+22)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-110)/6))))+'</text>';cy+=39;
-        if(cfg.style!=='compact'){const max=Math.min(cfg.limit||5,forecast.length),cellW=bw/Math.max(1,max);forecast.slice(0,max).forEach((d,i)=>{const dx=x+i*cellW;svg+='<text x="'+dx+'" y="'+(cy+8)+'" font-size="8" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>'+weatherIcon(d.condition,dx,cy+12,19,palette)+'<text x="'+(dx+23)+'" y="'+(cy+27)+'" font-size="9" font-weight="700">'+esc(Math.round(num(d.high,0))+'°/'+Math.round(num(d.low,0))+'°')+'</text>'});cy+=43}
-        if(weather.location)svg+='<text x="'+x+'" y="'+Math.min(y+bh-3,cy+10)+'" font-size="8.5" class="muted">'+esc(short(weather.location,Math.floor(bw/5)))+'</text>';
+        if(cfg.style==='compact'){
+          svg+=weatherIcon(current.condition,x,cy,30,palette)+'<text x="'+(x+38)+'" y="'+(cy+20)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+98)+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-100)/6))))+'</text>';
+          cy+=34;
+        }else if(cfg.style==='current'){
+          svg+=weatherIcon(current.condition,x,cy,40,palette)+'<text x="'+(x+50)+'" y="'+(cy+25)+'" font-size="24" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+50)+'" y="'+(cy+42)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-52)/6))))+'</text>';
+          svg+='<text x="'+x+'" y="'+(cy+61)+'" font-size="9.5" class="muted">Feels '+esc(Math.round(num(current.feelsLike,current.temperature))+unit)+' · '+Math.round(num(current.humidity,0))+'% humidity · '+Math.round(num(current.windSpeed,0))+(weather.units==='imperial'?' mph':' km/h')+'</text>';
+          cy+=70;
+        }else{
+          const max=Math.max(1,Math.min(cfg.limit||7,forecast.length));
+          const headerH=Math.min(42,Math.max(30,bh*.24)),availableForecast=Math.max(36,bh-headerH-10),cols=Math.min(max,Math.max(2,Math.floor(bw/78))),rows=Math.ceil(max/cols),cellW=bw/cols,cellH=Math.max(34,availableForecast/rows);
+          svg+=weatherIcon(current.condition,x,cy,30,palette)+'<text x="'+(x+38)+'" y="'+(cy+20)+'" font-size="18" font-weight="800">'+esc(Math.round(num(current.temperature,0))+unit)+'</text><text x="'+(x+98)+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(short(current.description||'',Math.max(12,Math.floor((bw-100)/6))))+'</text>';
+          cy+=headerH;
+          forecast.slice(0,max).forEach((d,i)=>{
+            const col=i%cols,row=Math.floor(i/cols),dx=x+col*cellW,dy=cy+row*cellH,pop=Math.round(num(d.precipitationProbability,0));
+            if(col>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+dx+'" y2="'+Math.min(y+bh,dy+cellH-3)+'" class="line"/>';
+            if(row>0)svg+='<line x1="'+dx+'" y1="'+dy+'" x2="'+Math.min(x+bw,dx+cellW-3)+'" y2="'+dy+'" class="line"/>';
+            svg+='<text x="'+(dx+4)+'" y="'+(dy+10)+'" font-size="8.5" font-weight="800" class="muted">'+esc(i===0?'TODAY':new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase())+'</text>';
+            svg+=weatherIcon(d.condition,dx+4,dy+14,22,palette);
+            svg+='<text x="'+(dx+31)+'" y="'+(dy+28)+'" font-size="11" font-weight="800">'+esc(Math.round(num(d.high,0))+'°')+'</text><text x="'+(dx+31)+'" y="'+(dy+41)+'" font-size="9" class="muted">'+esc(Math.round(num(d.low,0))+'° low')+'</text>';
+            if(cellH>=58)svg+='<text x="'+(dx+4)+'" y="'+Math.min(dy+cellH-5,dy+56)+'" font-size="8.5" class="muted">'+(pop?esc(pop+'% precip'):'')+'</text>';
+          });
+          cy+=rows*cellH;
+        }
+        if(weather.location)svg+='<text x="'+x+'" y="'+Math.min(y+bh-3,cy+9)+'" font-size="8.5" class="muted">'+esc(short(weather.location,Math.floor(bw/5)))+'</text>';
       }
     }else if(kind==='tasks'){
       for(const task of items.slice(0,cfg.limit||4)){if(cy+28>y+bh)break;const due=task.due?new Date(task.due).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'';svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';if(cfg.style!=='compact')svg+='<rect x="'+x+'" y="'+(cy+9)+'" width="10" height="10" rx="2" fill="#fff" stroke="'+black+'"/>';svg+='<text x="'+(x+(cfg.style==='compact'?0:18))+'" y="'+(cy+19)+'" font-size="'+(cfg.style==='compact'?11:13)+'" font-weight="700">'+esc(short(task.title,Math.max(12,Math.floor((bw-(due?72:18))/7))))+'</text>';if(due)svg+='<text x="'+(x+bw)+'" y="'+(cy+19)+'" text-anchor="end" font-size="10" class="muted">'+esc(due)+'</text>';cy+=27}
