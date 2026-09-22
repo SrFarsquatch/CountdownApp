@@ -356,14 +356,14 @@ Core/integration secrets:
 | `APP_SECRET` | Secret | Google token encryption and OAuth state signing |
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
 | `ALPHA_VANTAGE_API_KEY` | Secret | Markets |
-| `OPENAI_API_KEY` | Secret | Cloud Navi with OpenAI |
-| `ANTHROPIC_API_KEY` | Secret | Cloud Navi with Anthropic |
-| `GEMINI_API_KEY` | Secret | Cloud Navi with Gemini |
-| `OPENROUTER_API_KEY` | Secret | Cloud Navi with OpenRouter |
-| `GROQ_API_KEY` | Secret | Cloud Navi with Groq |
-| `MISTRAL_API_KEY` | Secret | Cloud Navi with Mistral |
-| `DEEPSEEK_API_KEY` | Secret | Cloud Navi with DeepSeek |
-| `XAI_API_KEY` | Secret | Cloud Navi with xAI |
+| `OPENAI_API_KEY` | Secret | Optional fallback for Cloud Navi OpenAI |
+| `ANTHROPIC_API_KEY` | Secret | Optional fallback for Cloud Navi Anthropic |
+| `GEMINI_API_KEY` | Secret | Optional fallback for Cloud Navi Gemini |
+| `OPENROUTER_API_KEY` | Secret | Optional fallback for Cloud Navi OpenRouter |
+| `GROQ_API_KEY` | Secret | Optional fallback for Cloud Navi Groq |
+| `MISTRAL_API_KEY` | Secret | Optional fallback for Cloud Navi Mistral |
+| `DEEPSEEK_API_KEY` | Secret | Optional fallback for Cloud Navi DeepSeek |
+| `XAI_API_KEY` | Secret | Optional fallback for Cloud Navi xAI |
 | `VAPID_PRIVATE_KEY` | Secret | Web Push private key |
 | `LOCAL_AGENT_API_KEY` | Secret | Optional bearer token for a private local-model endpoint |
 | `LOCAL_AGENT_ACCESS_CLIENT_ID` | Secret | Optional Cloudflare Access service-token client ID |
@@ -552,18 +552,17 @@ The **Test connection** action checks the provider's `/v1/models` endpoint.
 
 ## Navi — cloud hosted AI
 
-Choose the hosted provider in Quest Log, then store the matching Worker secret:
+For normal cloud setup, configure **`APP_SECRET` once** on the Worker. Then manage provider credentials directly in **Settings → AI connection**:
 
-- OpenAI: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
-- Anthropic: `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
-- Gemini: `GEMINI_API_KEY`, optional `GEMINI_MODEL`
-- OpenRouter: `OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`
-- Groq: `GROQ_API_KEY`, optional `GROQ_MODEL`
-- Mistral: `MISTRAL_API_KEY`, optional `MISTRAL_MODEL`
-- DeepSeek: `DEEPSEEK_API_KEY`, optional `DEEPSEEK_MODEL`
-- xAI: `XAI_API_KEY`, optional `XAI_MODEL`
+1. Choose OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, DeepSeek, or xAI.
+2. Paste the provider API key.
+3. Save Navi.
+4. Use **Load models** to discover models exposed by that provider when supported.
+5. Select a discovered model or enter a model ID manually.
 
-The browser never receives these cloud API keys.
+Quest Log encrypts saved cloud AI credentials with AES-GCM using `APP_SECRET` and stores only the ciphertext in D1. The saved API key is never returned to the browser.
+
+Provider-specific Worker secrets such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and the matching optional `*_MODEL` values remain supported as deployment-level fallbacks, but they are no longer required for normal in-app setup.
 
 ## Navi — cloud to a local/private model
 
