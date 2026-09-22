@@ -4,7 +4,7 @@ import {
   normalizeAppearance, normalizeMarkets, normalizeSectionLayout,
   normalizeModeLayouts, normalizeModeSections, normalizeSectionOrder,
   LAYOUTS, PALETTES, DATE_WIDGETS, DISPLAY_MODES, WEATHER_STYLES,
-  APPEARANCE_MODES, UI_THEMES, UI_DENSITIES
+  APPEARANCE_MODES, UI_THEMES, UI_DENSITIES, AGENT_PROVIDERS
 } from './state.js';
 import {
   googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth,
@@ -282,14 +282,15 @@ async function handleApi(request,env,identity){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
     }
     if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined){
-      const provider=['openai','local'].includes(String(incoming.agentProvider||state.agent.provider))?String(incoming.agentProvider||state.agent.provider):'openai';
+      const requested=String(incoming.agentProvider||state.agent.provider||'openai');
+      const provider=AGENT_PROVIDERS.includes(requested)?requested:'openai';
       let baseUrl=cleanText(incoming.agentBaseUrl??state.agent.baseUrl,500).replace(/\/+$/,'');
       if(provider==='local'&&baseUrl){
         let parsed;try{parsed=new URL(baseUrl)}catch{const e=new Error('Local model endpoint is invalid.');e.status=400;throw e}
         if(parsed.protocol!=='https:'){const e=new Error('Cloud local-model endpoints must use HTTPS.');e.status=400;throw e}
       }
-      if(provider==='openai')baseUrl='';
-      state.agent={...state.agent,enabled:incoming.agentEnabled??state.agent.enabled,provider,baseUrl,model:cleanText(incoming.agentModel||state.agent.model,160),contextDays:clamp(Math.round(num(incoming.agentContextDays,state.agent.contextDays||14)),1,30)};
+      if(provider!=='local')baseUrl='';
+      state.agent={...state.agent,enabled:incoming.agentEnabled??state.agent.enabled,provider,baseUrl,model:cleanText(incoming.agentModel??state.agent.model,160),contextDays:clamp(Math.round(num(incoming.agentContextDays,state.agent.contextDays||14)),1,30)};
     }
     await saveState(env,state);return json({ok:true});
   }
