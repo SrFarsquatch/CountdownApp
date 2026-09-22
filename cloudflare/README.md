@@ -165,6 +165,49 @@ Cloud weather is fetched directly from Open-Meteo by the Worker and uses coordin
 
 No weather API key is required for the current cloud implementation. The self-hosted runtime keeps its Environment Canada + Open-Meteo hybrid behavior; the cloud runtime currently uses Open-Meteo only.
 
+## Push notifications
+
+Quest Log supports standards-based Web Push notifications for tasks, timed Google Calendar events, goal deadlines, and countdowns. Push subscriptions are created per device/browser and are stored only in the Quest Log runtime that the device is connected to.
+
+Generate one VAPID key pair:
+
+~~~bash
+npm install
+npm run generate:vapid
+~~~
+
+Keep the generated **private key secret**. The public key is safe to expose to the browser.
+
+### Self-hosted
+
+Add these environment variables to the CasaOS/Docker deployment:
+
+~~~text
+VAPID_PUBLIC_KEY=<public key>
+VAPID_PRIVATE_KEY=<private key>
+VAPID_SUBJECT=mailto:you@example.com
+~~~
+
+The self-hosted runtime checks reminders every five minutes while the container is running.
+
+Web Push requires a secure browser context. A plain LAN URL such as `http://192.168.x.x:8088` can still use Quest Log normally, but push subscription/service-worker features require HTTPS (or localhost). Use an HTTPS reverse proxy or trusted HTTPS VPN hostname for self-hosted push.
+
+### Cloudflare
+
+Configure:
+
+- `VAPID_PUBLIC_KEY` as a Worker variable;
+- `VAPID_PRIVATE_KEY` as a Worker secret;
+- `VAPID_SUBJECT` as a Worker variable such as `mailto:you@example.com`.
+
+The Worker has a `*/5 * * * *` Cron Trigger in `wrangler.jsonc` and checks due reminders every five minutes. Push delivery comes directly from the Worker to the browser's push service; it does not require the PWA to be open.
+
+### Enable a device
+
+Open **Settings → Push reminders → Enable notifications**. Approve the browser/Android permission prompt, choose the desired reminder types/lead times, and use **Send test** to verify delivery.
+
+Each phone, tablet, or browser profile must be enabled separately. Removing a subscription on one device does not remove subscriptions on other devices.
+
 ## Cloud login and logout
 
 The cloud application is protected by Cloudflare Access.
