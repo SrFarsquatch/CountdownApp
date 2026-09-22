@@ -52,3 +52,36 @@ self.addEventListener('fetch',event=>{
     })
   );
 });
+
+
+self.addEventListener('push',event=>{
+  let data={};
+  try{data=event.data?event.data.json():{}}catch{data={body:event.data?.text?.()||''}}
+  const title=data.title||'Quest Log';
+  const options={
+    body:data.body||'You have a new Quest Log notification.',
+    icon:'/branding/icon-quest-192.png',
+    badge:'/branding/icon-quest-192.png',
+    tag:data.tag||'questlog-notification',
+    renotify:false,
+    data:{url:data.url||'/?view=today',kind:data.kind||'general',timestamp:data.timestamp||new Date().toISOString()}
+  };
+  event.waitUntil(self.registration.showNotification(title,options));
+});
+
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();
+  const target=new URL(event.notification?.data?.url||'/?view=today',self.location.origin).href;
+  event.waitUntil((async()=>{
+    const windows=await clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of windows){
+      try{
+        if(new URL(client.url).origin===self.location.origin){
+          await client.navigate(target);
+          return client.focus();
+        }
+      }catch{}
+    }
+    return clients.openWindow(target);
+  })());
+});
