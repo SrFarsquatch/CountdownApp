@@ -1,72 +1,153 @@
 import { saveState, normalizeMarkets, cleanText } from './state.js';
 
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const marketNumber=value=>{const n=Number(String(value??'').replace('%',''));return Number.isFinite(n)?n:null};
+const encoder=new TextEncoder(),decoder=new TextDecoder();
+const marketNumber=value=>{const n=Number(value);return Number.isFinite(n)?n:null};
+
 function normalizeInstrument(value={}){
   const source=typeof value==='string'?{symbol:value}:value||{};
   const providerSymbol=cleanText(source.providerSymbol||source.symbol,32).toUpperCase();
-  const displaySymbol=cleanText(source.symbol||providerSymbol,32).toUpperCase().replace(/\.(TRT|TRV)$/i,'');
-  return{symbol:displaySymbol,providerSymbol,name:cleanText(source.name,120),exchange:cleanText(source.exchange||source.region,80),region:cleanText(source.region||source.country,80),type:cleanText(source.type,60),currency:cleanText(source.currency,12).toUpperCase(),marketOpen:cleanText(source.marketOpen,20),marketClose:cleanText(source.marketClose,20),timezone:cleanText(source.timezone,60),matchScore:cleanText(source.matchScore,20)};
+  return{
+    symbol:cleanText(source.symbol||providerSymbol,32).toUpperCase(),
+    providerSymbol,
+    name:cleanText(source.name,120),
+    exchange:cleanText(source.exchange||source.region,80),
+    region:cleanText(source.region||source.country,80),
+    type:cleanText(source.type||source.asset_type,60),
+    currency:cleanText(source.currency||source.currency_name,12).toUpperCase(),
+    marketOpen:cleanText(source.marketOpen,20),
+    marketClose:cleanText(source.marketClose,20),
+    timezone:cleanText(source.timezone,60),
+    matchScore:cleanText(source.matchScore,20)
+  };
 }
-function effectiveRefresh(config){
-  const count=Math.max(1,config.watchlist.length),quotaSafe=Math.ceil((count*1440)/20);
-  return Math.max(config.refreshMinutes,quotaSafe);
-}
-function quoteFromRaw(raw={},fallback={}){
-  const requested=normalizeInstrument(fallback),close=marketNumber(raw['05. price']);
-  return{...requested,providerSymbol:cleanText(raw['01. symbol']||requested.providerSymbol,32).toUpperCase(),close,open:marketNumber(raw['02. open']),high:marketNumber(raw['03. high']),low:marketNumber(raw['04. low']),volume:marketNumber(raw['06. volume']),datetime:cleanText(raw['07. latest trading day']||'',50),previousClose:marketNumber(raw['08. previous close']),change:marketNumber(raw['09. change']),percentChange:marketNumber(raw['10. change percent']),marketOpen:null,available:close!==null,error:''};
-}
-function unavailable(item,message='No quote returned for this watchlist symbol.'){
+function unavailable(item,message='Tickerbot returned no quote for this symbol.'){
   return{...normalizeInstrument(item),close:null,open:null,high:null,low:null,previousClose:null,change:null,percentChange:null,volume:null,marketOpen:null,datetime:'',available:false,error:cleanText(message,220)};
 }
-function providerError(raw={},status=0){
-  const message=cleanText(raw['Error Message']||raw.Note||raw.Information||'',260);
-  if(/1 request per second|spread.*sparsely|call frequency/i.test(message))return{kind:'burst',message:'Alpha Vantage rate limit hit. Quest Log will retry automatically.'};
-  if(/25 requests per day|daily.*limit|standard api call frequency/i.test(message))return{kind:'daily',message:'Alpha Vantage daily free API limit reached. Cached market data will be used until the allowance resets.'};
-  return{kind:'api',message:message||'Alpha Vantage request failed ('+status+').'};
+function b64u(bytes){
+  let raw='';for(const b of bytes)raw+=String.fromCharCode(b);
+  return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
-async function requestAlpha(env,params={}){
-  if(!env.ALPHA_VANTAGE_API_KEY)throw new Error('ALPHA_VANTAGE_API_KEY is not configured as a Worker secret.');
-  for(let attempt=0;attempt<2;attempt++){
-    const q=new URLSearchParams({...params,apikey:env.ALPHA_VANTAGE_API_KEY});
-    const response=await fetch('https://www.alphavantage.co/query?'+q),raw=await response.json().catch(()=>({})),err=providerError(raw,response.status);
-    if(response.ok&&!raw['Error Message']&&!raw.Note&&!raw.Information)return raw;
-    if(err.kind==='burst'&&attempt===0){await sleep(1250);continue}
-    const e=new Error(err.message);e.kind=err.kind;throw e;
+function fromB64u(value){
+  const input=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(input+'='.repeat((4-input.length%4)%4));
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function credentialKey(env){
+  if(!env.APP_SECRET)throw new Error('APP_SECRET is not configured on the Worker.');
+  const hash=await crypto.subtle.digest('SHA-256',encoder.encode(String(env.APP_SECRET)));
+  return crypto.subtle.importKey('raw',hash,{name:'AES-GCM'},false,['encrypt','decrypt']);
+}
+async function encryptCredential(value,env){
+  const key=await credentialKey(env),iv=crypto.getRandomValues(new Uint8Array(12));
+  const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,encoder.encode(String(value)));
+  return'market1.'+b64u(iv)+'.'+b64u(new Uint8Array(data));
+}
+async function decryptCredential(value,env){
+  if(!value||!String(value).startsWith('market1.'))return'';
+  try{
+    const [,iv,data]=String(value).split('.'),key=await credentialKey(env);
+    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64u(iv)},key,fromB64u(data));
+    return decoder.decode(plain);
+  }catch{return''}
+}
+export async function saveMarketCredential(state,env,value){
+  const secret=cleanText(value,5000);
+  if(!secret)throw new Error('Tickerbot API key cannot be empty.');
+  state.markets=normalizeMarkets(state.markets);
+  state.markets.credential=await encryptCredential(secret,env);
+  state.marketCache=null;
+  await saveState(env,state);
+}
+export async function clearMarketCredential(state,env){
+  state.markets=normalizeMarkets(state.markets);
+  state.markets.credential=null;
+  state.marketCache=null;
+  await saveState(env,state);
+}
+async function marketApiKey(state,env){
+  const config=normalizeMarkets(state.markets);
+  return(await decryptCredential(config.credential,env))||String(env.TICKERBOT_API_KEY||'').trim();
+}
+async function requestTickerbot(state,env,path){
+  const apiKey=await marketApiKey(state,env);
+  if(!apiKey)throw new Error('Add the shared Tickerbot API key in Settings → Markets.');
+  const response=await fetch('https://api.tickerbot.io/v2/'+String(path||'').replace(/^\/+/,''),{
+    headers:{Authorization:'Bearer '+apiKey,Accept:'application/json'}
+  });
+  const raw=await response.json().catch(()=>({}));
+  if(!response.ok){
+    const message=cleanText(raw?.error?.message||raw?.message||raw?.error||'',260);
+    if(response.status===401)throw new Error('Tickerbot rejected the saved API key.');
+    if(response.status===429)throw new Error('Tickerbot rate limit reached. Quest Log will keep using cached market data.');
+    throw new Error(message||'Tickerbot request failed ('+response.status+').');
   }
-  const e=new Error('Alpha Vantage rate limit hit. Try again shortly.');e.kind='burst';throw e;
+  return raw;
+}
+function quoteFromTickerbot(raw={},fallback={},asOf=''){
+  const requested=normalizeInstrument(fallback),close=marketNumber(raw.price),percentChange=marketNumber(raw.change_1d_pct);
+  const previousClose=close!=null&&percentChange!=null&&Math.abs(100+percentChange)>0.0001?close/(1+percentChange/100):null;
+  const change=close!=null&&previousClose!=null?close-previousClose:null;
+  return{
+    ...requested,
+    symbol:cleanText(raw.ticker||requested.symbol,32).toUpperCase(),
+    providerSymbol:cleanText(raw.ticker||requested.providerSymbol,32).toUpperCase(),
+    name:cleanText(raw.name||requested.name,120),
+    exchange:cleanText(raw.exchange||requested.exchange,80),
+    region:cleanText(raw.country||requested.region,80).toUpperCase(),
+    type:cleanText(raw.asset_type||requested.type,60),
+    currency:cleanText(raw.currency_name||requested.currency||'USD',12).toUpperCase(),
+    close,
+    open:null,
+    high:null,
+    low:null,
+    volume:marketNumber(raw.volume_today),
+    datetime:cleanText(raw.date||asOf,50),
+    previousClose,
+    change,
+    percentChange,
+    marketOpen:null,
+    available:close!==null,
+    error:''
+  };
 }
 export async function marketData(state,env){
-  const config=normalizeMarkets(state.markets),refresh=effectiveRefresh(config),key=config.watchlist.map(x=>x.providerSymbol).join(','),cache=state.marketCache||null;
+  const config=normalizeMarkets(state.markets),key='tickerbot:'+config.watchlist.map(x=>x.providerSymbol).join(','),cache=state.marketCache||null;
   if(cache?.data&&cache.key===key&&Number(cache.expiresAt)>Date.now())return cache.data;
-  const quotes=[];
-  for(let i=0;i<config.watchlist.length;i++){
-    const item=config.watchlist[i];
-    if(item.providerSymbol.includes('/')){quotes.push(unavailable(item,'Crypto pairs are not included in the Alpha Vantage stock quote watchlist.'));continue}
-    try{
-      const raw=await requestAlpha(env,{function:'GLOBAL_QUOTE',symbol:item.providerSymbol}),quote=raw['Global Quote']||{};
-      quotes.push(Object.keys(quote).length?quoteFromRaw(quote,item):unavailable(item,'Alpha Vantage returned no quote for this symbol.'));
-    }catch(error){
-      const stale=cache?.data?.quotes?.find(q=>q.providerSymbol===item.providerSymbol||q.symbol===item.symbol);
-      quotes.push(stale?.close!=null?{...stale,stale:true,error:error.message||'Using cached quote.'}:unavailable(item,error.message||'Quote unavailable.'));
-      if(error.kind==='daily'){
-        for(let j=i+1;j<config.watchlist.length;j++){
-          const next=config.watchlist[j],old=cache?.data?.quotes?.find(q=>q.providerSymbol===next.providerSymbol||q.symbol===next.symbol);
-          quotes.push(old?.close!=null?{...old,stale:true,error:'Using cached quote because the Alpha Vantage daily free API limit was reached.'}:unavailable(next,'Skipped because the Alpha Vantage daily free API limit was reached.'));
-        }
-        break;
-      }
-    }
-    if(i<config.watchlist.length-1)await sleep(1150);
+  if(!config.watchlist.length){
+    const data={provider:'Tickerbot',quotes:[],watchlist:[],symbols:[],updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:config.refreshMinutes,freeMonthlyRequestLimit:10000,batchSize:50};
+    state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveState(env,state);return data;
   }
-  const data={provider:'Alpha Vantage',quotes,watchlist:config.watchlist,symbols:config.watchlist.map(x=>x.symbol),updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:refresh,freeDailyRequestLimit:25};
-  state.marketCache={key,expiresAt:Date.now()+refresh*60000,data};if(env.DB)await saveState(env,state);return data;
+  let raw;
+  try{
+    const symbols=config.watchlist.map(item=>encodeURIComponent(item.providerSymbol)).join(',');
+    raw=await requestTickerbot(state,env,'tickers/'+symbols);
+  }catch(error){
+    if(cache?.data)return{...cache.data,quotes:(cache.data.quotes||[]).map(q=>({...q,stale:true,error:error.message||'Using cached quote.'}))};
+    throw error;
+  }
+  const rows=raw?.data&&typeof raw.data==='object'?raw.data:{},notFound=new Set((raw?.not_found||[]).map(x=>String(x).toUpperCase()));
+  const quotes=config.watchlist.map(item=>{
+    const symbol=item.providerSymbol.toUpperCase(),row=rows[symbol]||rows[item.symbol?.toUpperCase?.()];
+    if(row)return quoteFromTickerbot(row,item,raw.as_of||'');
+    return unavailable(item,notFound.has(symbol)?'Tickerbot does not track this symbol.':'Tickerbot returned no quote for this symbol.');
+  });
+  const data={provider:'Tickerbot',quotes,watchlist:config.watchlist,symbols:config.watchlist.map(x=>x.symbol),updatedAt:new Date().toISOString(),providerAsOf:cleanText(raw.as_of,50),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:config.refreshMinutes,freeMonthlyRequestLimit:10000,batchSize:50};
+  state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveState(env,state);return data;
 }
-export async function marketSearch(query,env){
-  const q=cleanText(query,80).trim();if(!q)return[];
-  const raw=await requestAlpha(env,{function:'SYMBOL_SEARCH',keywords:q});
-  return(raw.bestMatches||[]).slice(0,10).map(item=>{
-    const providerSymbol=cleanText(item['1. symbol'],32).toUpperCase();
-    return normalizeInstrument({symbol:providerSymbol.replace(/\.(TRT|TRV)$/i,''),providerSymbol,name:item['2. name'],type:item['3. type'],region:item['4. region'],exchange:item['4. region'],marketOpen:item['5. marketOpen'],marketClose:item['6. marketClose'],timezone:item['7. timezone'],currency:item['8. currency'],matchScore:item['9. matchScore']});
-  }).filter(x=>x.providerSymbol);
+export async function marketSearch(query,state,env){
+  const q=cleanText(query,64).trim();if(!q)return[];
+  const raw=await requestTickerbot(state,env,'tickers?search='+encodeURIComponent(q)+'&asset_class=stocks&limit=10');
+  return(raw.results||[]).filter(item=>item?.active!==false).slice(0,10).map(item=>normalizeInstrument({
+    symbol:item.ticker,
+    providerSymbol:item.ticker,
+    name:item.name,
+    type:item.asset_type,
+    region:item.country,
+    exchange:item.exchange,
+    currency:item.currency_name
+  })).filter(x=>x.providerSymbol);
+}
+export async function testMarketConnection(state,env){
+  const raw=await requestTickerbot(state,env,'tickers/SPY');
+  return{ok:Boolean(raw?.data),provider:'Tickerbot',ticker:raw?.data?.ticker||'SPY',name:raw?.data?.name||''};
 }
