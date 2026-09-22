@@ -17,6 +17,9 @@ CLOUD_WORKSPACE_ID=default
 # OPENAI_API_KEY
 # OPENAI_MODEL=gpt-5.6-luna
 # ALPHA_VANTAGE_API_KEY
+# VAPID_PUBLIC_KEY
+# VAPID_PRIVATE_KEY
+# VAPID_SUBJECT=mailto:you@example.com
 #
 # The standalone Cloudflare runtime does NOT use ORIGIN_BASE_URL,
 # Cloudflare Tunnel, CasaOS, or origin service tokens.
