@@ -124,7 +124,11 @@ These credentials and tokens belong to the cloud deployment only.
 
 Cloud Navi supports hosted provider presets plus a local OpenAI-compatible endpoint.
 
-Hosted provider secrets:
+Set `APP_SECRET` once, then hosted-provider API keys can be entered and managed directly in Quest Log under **Settings → AI connection**. Quest Log encrypts those keys with AES-GCM before saving them to D1, and never returns plaintext credentials to the frontend.
+
+The UI can query a provider's model endpoint through the Worker and populate a model selector. Providers that do not expose a compatible model-list endpoint still allow a model ID to be entered manually.
+
+Worker-level provider secrets remain supported as optional fallbacks:
 
 - OpenAI: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
 - Anthropic: `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`
