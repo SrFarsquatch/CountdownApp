@@ -12,7 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketSearch } from './markets.js';
-import { testAgent, chat, applyActions } from './agent.js';
+import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 
@@ -281,7 +281,7 @@ async function handleApi(request,env,identity){
     if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
     }
-    if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined){
+    if(incoming.agentEnabled!==undefined||incoming.agentProvider!==undefined||incoming.agentBaseUrl!==undefined||incoming.agentModel!==undefined||incoming.agentContextDays!==undefined||incoming.agentApiKey!==undefined||incoming.agentClearApiKey!==undefined){
       const requested=String(incoming.agentProvider||state.agent.provider||'openai');
       const provider=AGENT_PROVIDERS.includes(requested)?requested:'openai';
       let baseUrl=cleanText(incoming.agentBaseUrl??state.agent.baseUrl,500).replace(/\/+$/,'');
@@ -291,6 +291,8 @@ async function handleApi(request,env,identity){
       }
       if(provider!=='local')baseUrl='';
       state.agent={...state.agent,enabled:incoming.agentEnabled??state.agent.enabled,provider,baseUrl,model:cleanText(incoming.agentModel??state.agent.model,160),contextDays:clamp(Math.round(num(incoming.agentContextDays,state.agent.contextDays||14)),1,30)};
+      if(incoming.agentClearApiKey)await clearAgentCredential(state,env,provider);
+      if(incoming.agentApiKey!==undefined&&cleanText(incoming.agentApiKey,5000))await saveAgentCredential(state,env,provider,cleanText(incoming.agentApiKey,5000));
     }
     await saveState(env,state);return json({ok:true});
   }
@@ -351,6 +353,9 @@ async function handleApi(request,env,identity){
     return json({error:'Unsupported event operation.'},405);
   }
 
+  if(p==='/api/agent/models'&&method==='GET'){
+    try{return json(await listAgentModels(state,env))}catch(error){return json({ok:false,error:error.message||'Could not load models.'},400)}
+  }
   if(p==='/api/agent/test'&&method==='POST'){
     try{return json(await testAgent(state,env))}catch(error){return json({ok:false,error:error.message||'Agent connection failed.'},400)}
   }
