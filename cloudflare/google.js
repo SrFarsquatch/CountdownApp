@@ -1,4 +1,4 @@
-import { saveState, normalizeGoogleAccount, normalizeTask, id, cleanText, iso, num, clamp } from './state.js';
+import { saveState, saveGoogleAccounts, normalizeGoogleAccount, normalizeTask, id, cleanText, iso, num, clamp } from './state.js';
 
 const SCOPES='https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/tasks';
 const enc=new TextEncoder(),dec=new TextDecoder();
@@ -64,7 +64,7 @@ async function accessToken(accountValue,state,env){
   const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:payload});
   if(!response.ok)return null;
   const next=await response.json(),merged={...token,...next,refresh_token:token.refresh_token,scope:next.scope||token.scope,expires_at:Date.now()+num(next.expires_in,3600)*1000};
-  accountValue.token=await encryptToken(merged,env);await saveState(env,state);return merged.access_token;
+  accountValue.token=await encryptToken(merged,env);await saveGoogleAccounts(env,state.google.accounts);return merged.access_token;
 }
 async function googleRequest(accountValue,state,env,endpoint,method='GET',payload){
   const access=await accessToken(accountValue,state,env);if(!access)throw new Error('Google account is not connected.');
@@ -98,7 +98,7 @@ async function calendarList(accountValue,state,env){
     out.push(...(data.items||[]));pageToken=data.nextPageToken||'';
   }while(pageToken);
   const identity=accountLabel(out),changed=(identity.googleId&&identity.googleId!==accountValue.googleId)||(identity.label&&identity.label!==accountValue.label);
-  if(identity.googleId)accountValue.googleId=identity.googleId;if(identity.label)accountValue.label=identity.label;if(changed)await saveState(env,state);
+  if(identity.googleId)accountValue.googleId=identity.googleId;if(identity.label)accountValue.label=identity.label;if(changed)await saveGoogleAccounts(env,state.google.accounts);
   return out;
 }
 export async function startGoogleAuth(request,env){
