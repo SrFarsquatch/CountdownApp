@@ -90,7 +90,7 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
       sectionLayoutMode:'custom',
       sectionLayout:normalizeSectionLayout(state.display?.sectionLayout,'dashboard'),
       sectionOrder:normalizeSectionOrder(state.display?.sectionOrder),
-      gridCols:24,gridRows:16,
+      layoutUnits:'percent',
       refreshMinutes:clamp(num(state.display?.refreshMinutes,15),1,1440),
       showAgenda:state.display?.showAgenda!==false,
       showTasks:state.display?.showTasks!==false,
@@ -188,7 +188,7 @@ export function renderDisplaySvg(data,width=800,height=480){
   const defs=[],queue=[];
   for(const kind of order){
     if(!DISPLAY_KEYS.includes(kind)||sections[kind]?.enabled===false)continue;
-    const r=layout[kind],x=pad+contentWidth*r.x/24,y=top+available*r.y/16,bw=contentWidth*r.w/24,bh=available*r.h/16,inset=Math.max(5,Math.min(9,Math.round(Math.min(bw,bh)*.035))),clip='clip-'+kind;
+    const r=layout[kind],x=pad+contentWidth*r.x/100,y=top+available*r.y/100,bw=contentWidth*r.w/100,bh=available*r.h/100,inset=Math.max(5,Math.min(9,Math.round(Math.min(bw,bh)*.035))),clip='clip-'+kind;
     defs.push('<clipPath id="'+clip+'"><rect x="'+(x+inset)+'" y="'+(y+inset)+'" width="'+Math.max(1,bw-inset*2)+'" height="'+Math.max(1,bh-inset*2)+'" rx="4"/></clipPath>');
     queue.push({kind,x,y,bw,bh,inset,clip});
   }

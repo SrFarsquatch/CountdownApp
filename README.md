@@ -85,14 +85,19 @@ The cloud local-model connector is only an AI endpoint. It does not connect the 
 ### E-ink / FrameOS
 
 - Token-protected JSON feed.
-- Token-protected rendered SVG endpoint.
-- Browser preview using the same display renderer.
+- Primary **HTML/CSS → Chromium screenshot → PNG** image renderer at `/api/frameos/image`.
+- Self-hosted PNG output is quantized to the six Spectra colors (or monochrome) before it is returned.
+- Cloud PNG output uses Cloudflare Browser Run with the same shared HTML/CSS renderer.
+- The previous rendered SVG endpoint remains available as a lightweight fallback/debug renderer.
+- Browser preview uses the image renderer and automatically benefits from the same display composition.
 - Dashboard, Daily, Weekly, Monthly, and Countdowns display modes.
 - Agenda, Weather, Tasks, Goals, Countdowns, and Markets widgets.
-- 24 × 16 drag-and-resize layout editor.
-- Landscape and portrait output.
-- Spectra-style six-color and monochrome palettes.
+- Per-mode **freeform percentage-based layouts** with continuous drag and resize instead of a fixed 24 × 16 grid.
+- Existing grid layouts are automatically migrated to equivalent percentage positions.
+- Widget visibility, item limits, styles, ordering, landscape/portrait output, six-color and monochrome palettes remain configurable.
 - Resolution-independent rendering for displays such as 800 × 480 panels.
+
+The self-hosted container includes Chromium for screenshot rendering. If Chromium cannot start, `/api/frameos/image` automatically returns the legacy SVG renderer so the physical display is not left blank. The Cloudflare deployment declares a Browser Run binding named `BROWSER`; if Browser Run is unavailable, the same endpoint also falls back to SVG.
 
 ## Repository layout
 
@@ -108,7 +113,9 @@ The cloud local-model connector is only an AI endpoint. It does not connect the 
 | `cloudflare/google.js` | Cloud Google Calendar/Tasks integration |
 | `cloudflare/agent.js` | Cloud Navi integration |
 | `cloudflare/markets.js` | Cloud Yahoo Finance integration |
-| `cloudflare/display.js` | Cloud e-ink feed/SVG renderer |
+| `cloudflare/display.js` | Cloud e-ink feed/SVG fallback renderer |
+| `eink/render.mjs` | Shared HTML/CSS e-ink renderer used by cloud and self-hosted screenshot pipelines |
+| `eink/quantize.cjs` | Self-hosted six-color PNG quantizer |
 | `cloudflare/migrations/` | D1 schema |
 | `wrangler.jsonc` | Cloudflare Worker + D1 configuration |
 

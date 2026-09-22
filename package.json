@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "web-push": "^3.6.7",
-    "yahoo-finance2": "^4.0.2"
+    "yahoo-finance2": "^4.0.2",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.11.0"
   }
 }

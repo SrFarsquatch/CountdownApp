@@ -49,20 +49,30 @@ export function normalizeNotifications(x={}){
   };
 }
 
+const DISPLAY_LAYOUT_VERSION=6;
 function defaultLayout(mode='dashboard'){
-  if(mode==='daily'||mode==='weekly')return{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
-  if(mode==='monthly')return{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4},markets:{x:18,y:12,w:6,h:4}};
-  if(mode==='countdowns')return{agenda:{x:0,y:0,w:12,h:8},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:8,w:12,h:8},countdowns:{x:0,y:0,w:24,h:16},markets:{x:12,y:8,w:12,h:8}};
-  return{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
+  if(mode==='daily'||mode==='weekly')return{agenda:{x:0,y:0,w:66.67,h:100},weather:{x:66.67,y:0,w:33.33,h:25},tasks:{x:66.67,y:25,w:33.33,h:25},goals:{x:66.67,y:50,w:33.33,h:25},countdowns:{x:66.67,y:75,w:33.33,h:25},markets:{x:66.67,y:75,w:33.33,h:25}};
+  if(mode==='monthly')return{agenda:{x:0,y:0,w:75,h:100},weather:{x:75,y:0,w:25,h:25},tasks:{x:75,y:25,w:25,h:25},goals:{x:75,y:50,w:25,h:25},countdowns:{x:75,y:75,w:25,h:25},markets:{x:75,y:75,w:25,h:25}};
+  if(mode==='countdowns')return{agenda:{x:0,y:0,w:50,h:50},weather:{x:50,y:0,w:50,h:25},tasks:{x:50,y:25,w:50,h:25},goals:{x:0,y:50,w:50,h:50},countdowns:{x:0,y:0,w:100,h:100},markets:{x:50,y:50,w:50,h:50}};
+  return{weather:{x:0,y:0,w:42,h:42},agenda:{x:42,y:0,w:58,h:62},tasks:{x:0,y:42,w:42,h:26},goals:{x:0,y:68,w:42,h:32},countdowns:{x:42,y:62,w:29,h:38},markets:{x:71,y:62,w:29,h:38}};
 }
+const roundLayout=v=>Math.round(num(v,0)*100)/100;
 export function normalizeSectionLayout(input,mode='dashboard'){
   const base=defaultLayout(mode),source=input&&typeof input==='object'?input:{},out={};
   for(const key of DISPLAY_KEYS){
-    const raw=source[key]&&typeof source[key]==='object'?source[key]:base[key];
-    const w=clamp(Math.round(num(raw.w,base[key].w)),2,24),h=clamp(Math.round(num(raw.h,base[key].h)),1,16);
-    out[key]={x:clamp(Math.round(num(raw.x,base[key].x)),0,24-w),y:clamp(Math.round(num(raw.y,base[key].y)),0,16-h),w,h};
+    const raw=source[key]&&typeof source[key]==='object'?source[key]:base[key],w=clamp(roundLayout(raw.w||base[key].w),5,100),h=clamp(roundLayout(raw.h||base[key].h),5,100);
+    out[key]={x:clamp(roundLayout(raw.x),0,100-w),y:clamp(roundLayout(raw.y),0,100-h),w,h};
   }
   return out;
+}
+function migrateGridLayoutToPercent(input,mode='dashboard'){
+  if(!input||typeof input!=='object')return defaultLayout(mode);
+  const base=defaultLayout(mode),out={};
+  for(const key of DISPLAY_KEYS){
+    const raw=input[key];if(!raw||typeof raw!=='object'){out[key]=base[key];continue}
+    out[key]={x:roundLayout(num(raw.x,0)/24*100),y:roundLayout(num(raw.y,0)/16*100),w:roundLayout(num(raw.w,6)/24*100),h:roundLayout(num(raw.h,4)/16*100)};
+  }
+  return normalizeSectionLayout(out,mode);
 }
 function defaultSections(mode='dashboard'){
   const countdownOnly=mode==='countdowns';
@@ -148,10 +158,16 @@ function displayToken(){
   return crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','').slice(0,16);
 }
 function normalizeDisplay(x={}){
-  const generatedToken=displayToken();
-  const base={token:generatedToken,title:'Today',maxEvents:5,maxCountdowns:3,maxTasks:6,maxGoals:3,layout:'auto',palette:'spectra6',dateWidgetStyle:'plain',mode:'daily',plannerLayoutVersion:5,sectionLayoutMode:'custom',sectionLayout:defaultLayout('dashboard'),sectionOrder:[...DISPLAY_KEYS],weatherStyle:'forecast',modeLayouts:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultLayout(m)])),modeSections:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultSections(m)])),refreshMinutes:15,showAgenda:true,showTasks:true,showGoals:true,showCountdowns:true,showWeather:true};
+  const generatedToken=displayToken(),legacyVersion=num(x?.plannerLayoutVersion,0);
+  const base={token:generatedToken,title:'Today',maxEvents:5,maxCountdowns:3,maxTasks:6,maxGoals:3,layout:'auto',palette:'spectra6',dateWidgetStyle:'plain',mode:'daily',plannerLayoutVersion:DISPLAY_LAYOUT_VERSION,sectionLayoutMode:'custom',sectionLayout:defaultLayout('dashboard'),sectionOrder:[...DISPLAY_KEYS],weatherStyle:'forecast',modeLayouts:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultLayout(m)])),modeSections:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultSections(m)])),refreshMinutes:15,showAgenda:true,showTasks:true,showGoals:true,showCountdowns:true,showWeather:true};
   const rawToken=cleanText(x?.token,160),token=/^[a-f0-9]{48}$/i.test(rawToken)?rawToken:generatedToken,m={...base,...x};
-  return{...m,token,sectionLayoutMode:'custom',sectionLayout:normalizeSectionLayout(m.sectionLayout,'dashboard'),sectionOrder:normalizeSectionOrder(m.sectionOrder),modeLayouts:normalizeModeLayouts(m.modeLayouts,m.sectionLayout),modeSections:normalizeModeSections(m.modeSections),plannerLayoutVersion:5};
+  let sectionLayout=m.sectionLayout,modeLayouts=m.modeLayouts;
+  if(legacyVersion<DISPLAY_LAYOUT_VERSION){
+    const modes=modeLayouts&&typeof modeLayouts==='object'?modeLayouts:{},migrated={};
+    for(const mode of DISPLAY_MODES)migrated[mode]=migrateGridLayoutToPercent(modes[mode]||(mode==='dashboard'?sectionLayout:null),mode);
+    modeLayouts=migrated;sectionLayout=migrated.dashboard;
+  }
+  return{...m,token,sectionLayoutMode:'custom',sectionLayout:normalizeSectionLayout(sectionLayout,'dashboard'),sectionOrder:normalizeSectionOrder(m.sectionOrder),modeLayouts:normalizeModeLayouts(modeLayouts,sectionLayout),modeSections:normalizeModeSections(m.modeSections),plannerLayoutVersion:DISPLAY_LAYOUT_VERSION};
 }
 export function defaults(){
   return{countdowns:[],tasks:[],goals:[],google:{accounts:[],countdownWindowDays:30},weather:normalizeWeather({units:'metric'}),appearance:normalizeAppearance({mode:'system',theme:'quest',density:'comfortable'}),markets:normalizeMarkets({}),marketCache:null,agent:{enabled:true,provider:'openai',baseUrl:'',model:'gpt-5.6-luna',contextDays:14,credentials:{}},notifications:normalizeNotifications({}),display:normalizeDisplay({})};
@@ -180,7 +196,7 @@ function cloudAgentHasCredential(state,env,provider){
 }
 export function publicState(state,env){
   const market=normalizeMarkets(state.markets);
-  return{countdowns:[...state.countdowns].sort((a,b)=>Number(Boolean(b.pinned))-Number(Boolean(a.pinned))||new Date(a.end)-new Date(b.end)),tasks:[...state.tasks].sort((a,b)=>(a.status==='done')-(b.status==='done')||(a.due?new Date(a.due):Infinity)-(b.due?new Date(b.due):Infinity)),goals:state.goals.map(g=>({...g,progress:goalProgress(g)})),updater:{configured:false,cloudManaged:true},runtime:{type:'cloudflare',standalone:true},appearance:normalizeAppearance(state.appearance),weather:{...normalizeWeather(state.weather),configured:true,provider:'Open-Meteo'},markets:{watchlist:market.watchlist,refreshMinutes:market.refreshMinutes,configured:true,provider:'Yahoo Finance',effectiveRefreshMinutes:market.refreshMinutes,batchSize:50,unofficial:true},agent:{enabled:state.agent.enabled!==false,provider:state.agent.provider||'openai',baseUrl:state.agent.provider==='local'?(state.agent.baseUrl||''):'',model:(()=>{const p=state.agent.provider||'openai',name=cloudAgentModelEnvName(p);return cleanText(state.agent.model||(name&&env[name])||(p==='openai'?'gpt-5.6-luna':''),160)})(),hasApiKey:cloudAgentHasCredential(state,env,state.agent.provider||'openai'),configuredProviders:AGENT_PROVIDERS.filter(provider=>cloudAgentHasCredential(state,env,provider)),canStoreApiKey:Boolean(env.APP_SECRET),requireConfirmation:true,contextDays:state.agent.contextDays||14,cloudManaged:true},notifications:{enabled:state.notifications?.enabled||false,taskReminders:state.notifications?.taskReminders!==false,eventReminders:state.notifications?.eventReminders!==false,goalReminders:state.notifications?.goalReminders!==false,countdownReminders:state.notifications?.countdownReminders!==false,taskLeadMinutes:state.notifications?.taskLeadMinutes||30,eventLeadMinutes:state.notifications?.eventLeadMinutes||15,goalLeadMinutes:state.notifications?.goalLeadMinutes||1440,countdownLeadMinutes:state.notifications?.countdownLeadMinutes||1440,subscriptionCount:Array.isArray(state.notifications?.subscriptions)?state.notifications.subscriptions.length:0},options:{colors:COLORS,progressModes:PROGRESS_MODES,progressStyles:PROGRESS_STYLES,dateStyles:DATE_STYLES,timeStyles:TIME_STYLES,taskStatus:TASK_STATUS,taskPriority:TASK_PRIORITY,goalTypes:GOAL_TYPES},google:{configured:Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.APP_SECRET),connected:state.google.accounts.some(a=>Boolean(a.token)),accounts:state.google.accounts.map(a=>({id:a.id,googleId:a.googleId,label:a.label,selectedCalendarIds:a.selectedCalendarIds||[],selectedTaskListIds:a.selectedTaskListIds||[],defaultTaskListId:a.defaultTaskListId||'',connectedAt:a.connectedAt,canWrite:Boolean(a.token),canTasks:Boolean(a.token)})),countdownWindowDays:state.google.countdownWindowDays||30},display:{...state.display,sectionLayout:normalizeSectionLayout(state.display.sectionLayout,'dashboard'),modeLayouts:normalizeModeLayouts(state.display.modeLayouts,state.display.sectionLayout),modeSections:normalizeModeSections(state.display.modeSections),sectionOrder:normalizeSectionOrder(state.display.sectionOrder),sectionLayoutMode:'custom',gridCols:24,gridRows:16,feedPath:'/api/frameos/feed?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token}};
+  return{countdowns:[...state.countdowns].sort((a,b)=>Number(Boolean(b.pinned))-Number(Boolean(a.pinned))||new Date(a.end)-new Date(b.end)),tasks:[...state.tasks].sort((a,b)=>(a.status==='done')-(b.status==='done')||(a.due?new Date(a.due):Infinity)-(b.due?new Date(b.due):Infinity)),goals:state.goals.map(g=>({...g,progress:goalProgress(g)})),updater:{configured:false,cloudManaged:true},runtime:{type:'cloudflare',standalone:true},appearance:normalizeAppearance(state.appearance),weather:{...normalizeWeather(state.weather),configured:true,provider:'Open-Meteo'},markets:{watchlist:market.watchlist,refreshMinutes:market.refreshMinutes,configured:true,provider:'Yahoo Finance',effectiveRefreshMinutes:market.refreshMinutes,batchSize:50,unofficial:true},agent:{enabled:state.agent.enabled!==false,provider:state.agent.provider||'openai',baseUrl:state.agent.provider==='local'?(state.agent.baseUrl||''):'',model:(()=>{const p=state.agent.provider||'openai',name=cloudAgentModelEnvName(p);return cleanText(state.agent.model||(name&&env[name])||(p==='openai'?'gpt-5.6-luna':''),160)})(),hasApiKey:cloudAgentHasCredential(state,env,state.agent.provider||'openai'),configuredProviders:AGENT_PROVIDERS.filter(provider=>cloudAgentHasCredential(state,env,provider)),canStoreApiKey:Boolean(env.APP_SECRET),requireConfirmation:true,contextDays:state.agent.contextDays||14,cloudManaged:true},notifications:{enabled:state.notifications?.enabled||false,taskReminders:state.notifications?.taskReminders!==false,eventReminders:state.notifications?.eventReminders!==false,goalReminders:state.notifications?.goalReminders!==false,countdownReminders:state.notifications?.countdownReminders!==false,taskLeadMinutes:state.notifications?.taskLeadMinutes||30,eventLeadMinutes:state.notifications?.eventLeadMinutes||15,goalLeadMinutes:state.notifications?.goalLeadMinutes||1440,countdownLeadMinutes:state.notifications?.countdownLeadMinutes||1440,subscriptionCount:Array.isArray(state.notifications?.subscriptions)?state.notifications.subscriptions.length:0},options:{colors:COLORS,progressModes:PROGRESS_MODES,progressStyles:PROGRESS_STYLES,dateStyles:DATE_STYLES,timeStyles:TIME_STYLES,taskStatus:TASK_STATUS,taskPriority:TASK_PRIORITY,goalTypes:GOAL_TYPES},google:{configured:Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.APP_SECRET),connected:state.google.accounts.some(a=>Boolean(a.token)),accounts:state.google.accounts.map(a=>({id:a.id,googleId:a.googleId,label:a.label,selectedCalendarIds:a.selectedCalendarIds||[],selectedTaskListIds:a.selectedTaskListIds||[],defaultTaskListId:a.defaultTaskListId||'',connectedAt:a.connectedAt,canWrite:Boolean(a.token),canTasks:Boolean(a.token)})),countdownWindowDays:state.google.countdownWindowDays||30},display:{...state.display,sectionLayout:normalizeSectionLayout(state.display.sectionLayout,'dashboard'),modeLayouts:normalizeModeLayouts(state.display.modeLayouts,state.display.sectionLayout),modeSections:normalizeModeSections(state.display.modeSections),sectionOrder:normalizeSectionOrder(state.display.sectionOrder),sectionLayoutMode:'custom',layoutUnits:'percent',feedPath:'/api/frameos/feed?token='+state.display.token,imagePath:'/api/frameos/image?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token}};
 }
 async function ensureSchema(db){
   await db.prepare("CREATE TABLE IF NOT EXISTS questlog_state (workspace_id TEXT PRIMARY KEY,state_json TEXT NOT NULL,schema_version INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT (datetime('now')),updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();

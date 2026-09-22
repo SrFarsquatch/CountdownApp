@@ -14,6 +14,7 @@ import {
 import { marketData, marketSearch, testMarketConnection } from './markets.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
+import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 
 let jwksCache={expiresAt:0,keys:[]};
@@ -374,7 +375,7 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/display/rotate-token'&&method==='POST'){
     state.display.token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','').slice(0,16);await saveState(env,state);
-    return json({feedPath:'/api/frameos/feed?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token});
+    return json({feedPath:'/api/frameos/feed?token='+state.display.token,imagePath:'/api/frameos/image?token='+state.display.token,svgPath:'/api/frameos/svg?token='+state.display.token,viewPath:'/frame?token='+state.display.token});
   }
   if(p==='/api/frameos/feed'&&method==='GET'){
     if(!identity?.displayAuthorized&&url.searchParams.get('token')!==state.display.token)return json({error:'Invalid display token'},401);
@@ -384,6 +385,37 @@ async function handleApi(request,env,identity){
     if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
     try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
     return json(buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError}));
+  }
+  if(p==='/api/frameos/image'&&method==='GET'){
+    if(!identity?.displayAuthorized&&url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
+    const range=displayRange(state);
+    let events=[],calendarError=null,weather=null,weatherError=null,markets=null,marketError=null;
+    if(range){try{events=await eventsBetween(range.start.toISOString(),range.end.toISOString(),state,env)}catch(error){calendarError=error.message}}
+    if(state.display?.showWeather!==false){try{weather=await weatherData(state);if(!weather)weatherError='Choose a weather location in Settings.'}catch(error){weatherError=error.message}}
+    try{markets=await marketData(state,env)}catch(error){marketError=error.message;markets=state.marketCache?.data||null}
+    const feed=buildDisplayFeed(state,{events,weather,markets,calendarError,weatherError,marketError});
+    const width=clamp(Math.round(num(url.searchParams.get('w'),800)),300,2000),height=clamp(Math.round(num(url.searchParams.get('h'),480)),300,2000);
+    try{
+      if(!env.BROWSER?.quickAction)throw new Error('Cloudflare Browser Run binding is unavailable.');
+      const response=await env.BROWSER.quickAction('screenshot',{
+        html:renderEinkHtml(feed,width,height),
+        viewport:{width,height,deviceScaleFactor:1},
+        screenshotOptions:{type:'png',fullPage:false,omitBackground:false}
+      });
+      if(!response.ok)throw new Error('Browser Run screenshot failed ('+response.status+').');
+      const headers=new Headers(response.headers);
+      headers.set('content-type','image/png');
+      headers.set('cache-control','no-store, max-age=0');
+      headers.set('x-questlog-renderer','html-browser-run');
+      headers.set('x-frameos-refresh-minutes',String(feed.display.refreshMinutes));
+      return new Response(response.body,{status:200,headers});
+    }catch(error){
+      return text(renderDisplaySvg(feed,width,height),200,'image/svg+xml; charset=utf-8',{
+        'x-questlog-renderer':'svg-fallback',
+        'x-questlog-renderer-error':cleanText(error.message,160),
+        'x-frameos-refresh-minutes':String(feed.display.refreshMinutes)
+      });
+    }
   }
   if(p==='/api/frameos/svg'&&method==='GET'){
     if(!identity?.displayAuthorized&&url.searchParams.get('token')!==state.display.token)return text('Invalid display token',401);
@@ -419,7 +451,7 @@ export default{
       try{return Response.redirect(accessLoginUrl(request,env,url.searchParams.get('next')||'/'),302)}
       catch(error){return text(error.message||'Login is unavailable.',503)}
     }
-    const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/svg';
+    const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/image'||url.pathname==='/api/frameos/svg';
     if(machineDisplay){
       try{
         const state=await loadState(env),tokenValid=url.searchParams.get('token')===state.display.token;

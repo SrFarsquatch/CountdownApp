@@ -5,7 +5,7 @@
 <script>
 const q=new URLSearchParams(location.search),token=q.get('token')||'',w=Math.max(300,Math.min(2000,Number(q.get('w'))||800)),h=Math.max(300,Math.min(2000,Number(q.get('h'))||480)),img=document.getElementById('frame'),info=document.getElementById('info');
 img.style.aspectRatio=w+'/'+h;
-function refresh(){img.src='/api/frameos/svg?token='+encodeURIComponent(token)+'&w='+w+'&h='+h+'&_='+Date.now()}
+function refresh(){img.src='/api/frameos/image?token='+encodeURIComponent(token)+'&w='+w+'&h='+h+'&_='+Date.now()}
 async function init(){try{const r=await fetch('/api/frameos/feed?token='+encodeURIComponent(token)),d=await r.json();if(!r.ok)throw Error(d.error||'Unable to load display');const m=Math.max(1,Number(d.display?.refreshMinutes)||15);info.textContent=w+' × '+h+' · refresh '+m+'m';refresh();setInterval(refresh,m*60000)}catch(e){document.querySelector('.wrap').innerHTML='<div class="error">'+String(e.message||e)+'</div>';info.remove()}}
 init();
 </script></body></html>

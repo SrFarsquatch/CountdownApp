@@ -22,6 +22,7 @@ services:
       DOCKER_SOCKET: "/var/run/docker.sock"
       TARGET_CONTAINER: "countdownapp"
       TARGET_IMAGE: "ghcr.io/srfarsquatch/countdownapp:edge"
+      PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium"
     volumes:
       - type: bind
         source: /DATA/AppData/countdownapp/data
@@ -36,10 +37,10 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
-    mem_limit: 192m
-    mem_reservation: 32m
-    cpus: "0.35"
-    pids_limit: 64
+    mem_limit: 384m
+    mem_reservation: 64m
+    cpus: "0.50"
+    pids_limit: 128
     security_opt:
       - no-new-privileges:true
     logging:

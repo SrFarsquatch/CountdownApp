@@ -212,7 +212,7 @@
 .eink-layout-shell{position:relative;width:100%;max-width:920px;margin:0 auto;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.02)}
 .eink-layout-header{position:absolute;left:2%;right:2%;top:1.5%;height:7%;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #d8d8d2;color:#111;font-size:clamp(8px,1.25vw,12px);font-weight:800;letter-spacing:.04em}
 .eink-layout-footer{position:absolute;left:2%;bottom:.8%;font-size:clamp(6px,.9vw,8px);color:#777}
-.section-layout-editor{position:absolute;left:2%;right:2%;top:10%;bottom:3.5%;touch-action:none;background-image:linear-gradient(to right,rgba(20,20,20,.055) 1px,transparent 1px),linear-gradient(to bottom,rgba(20,20,20,.055) 1px,transparent 1px);background-size:calc(100% / 24) calc(100% / 16);border-right:1px solid rgba(20,20,20,.055);border-bottom:1px solid rgba(20,20,20,.055)}
+.section-layout-editor{position:absolute;left:2%;right:2%;top:10%;bottom:3.5%;touch-action:none;background-image:radial-gradient(circle,rgba(20,20,20,.12) 1px,transparent 1px);background-size:18px 18px;border:1px solid rgba(20,20,20,.08);border-radius:8px}
 .layout-block{position:absolute;min-width:0;min-height:0;border:2px solid var(--text);border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);padding:7px 9px;cursor:grab;user-select:none;touch-action:none;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .layout-block:active{cursor:grabbing}
 .layout-block.off{opacity:.35;border-style:dashed}
@@ -510,7 +510,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
   <div class="card eink-layout-card" id="einkLayoutCard">
     <div class="eyebrow">Section editor</div>
     <h3 style="margin:4px 0">Arrange this display mode</h3>
-    <p class="meta layout-help">Every mode has its own 24 × 16 layout. Drag widgets to move them, resize from the bottom-right corner for finer control, or tap the ⚙ button inside a widget to change what it shows.</p>
+    <p class="meta layout-help">Every mode has its own freeform canvas. Drag widgets anywhere, resize continuously from the bottom-right corner, overlap them when useful, or tap the ⚙ button inside a widget to change what it shows.</p>
     <div class="eink-layout-toolbar">
       <div class="meta" id="layoutEditorStatus">Custom layout is off.</div>
       <div class="row-actions"><button class="btn tiny" id="autoArrangeSections">Arrange for resolution</button><button class="btn tiny" id="resetSectionLayout">Reset layout</button></div>
@@ -518,15 +518,16 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
     <div class="eink-layout-shell" id="einkLayoutShell">
       <div class="eink-layout-header"><span id="layoutEditorDate">SEP 20, 2026</span><strong id="layoutEditorMode">DAY · 2:49 PM</strong></div>
       <div class="section-layout-editor" id="sectionLayoutEditor"></div>
-      <div class="eink-layout-footer" id="layoutEditorFooter">24 × 16 grid</div>
+      <div class="eink-layout-footer" id="layoutEditorFooter">Freeform layout</div>
     </div>
     <div class="widget-settings" id="widgetSettings" hidden></div>
   </div>
 
   <div class="card connection-box">
     <div class="eyebrow">FrameOS connection</div><h3 style="margin:4px 0 4px">Private display sources</h3>
-    <p class="meta">Use the rendered SVG for the exact Quest Log layout, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
-    <div class="connection-row"><strong>Rendered SVG</strong><div class="connection-url" id="svgUrl"></div><button class="btn tiny" data-copy="svgUrl">Copy</button></div>
+    <p class="meta">Use the rendered PNG for the browser-based E-Ink layout, the SVG as a lightweight fallback, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
+    <div class="connection-row"><strong>Rendered PNG</strong><div class="connection-url" id="imageUrl"></div><button class="btn tiny" data-copy="imageUrl">Copy</button></div>
+    <div class="connection-row"><strong>SVG fallback</strong><div class="connection-url" id="svgUrl"></div><button class="btn tiny" data-copy="svgUrl">Copy</button></div>
     <div class="connection-row"><strong>JSON feed</strong><div class="connection-url" id="feedUrl"></div><button class="btn tiny" data-copy="feedUrl">Copy</button></div>
     <div class="connection-row"><strong>Browser preview</strong><div class="connection-url" id="viewUrl"></div><button class="btn tiny" data-copy="viewUrl">Copy</button></div>
     <div class="row-actions"><button class="btn tiny" id="rotateDisplayToken">Rotate private token</button></div>
@@ -1391,7 +1392,7 @@ const DISPLAY_SECTION_STYLES={
 };
 const DISPLAY_MODES=['dashboard','daily','weekly','monthly','countdowns'];
 function cloneDisplayLayout(layout){
- const fallback={agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
+ const fallback={weather:{x:0,y:0,w:42,h:42},agenda:{x:42,y:0,w:58,h:62},tasks:{x:0,y:42,w:42,h:26},goals:{x:0,y:68,w:42,h:32},countdowns:{x:42,y:62,w:29,h:38},markets:{x:71,y:62,w:29,h:38}};
  const source=layout||fallback,out={};
  Object.keys(fallback).forEach(k=>{const r=source[k]||fallback[k];out[k]={x:Number(r.x)||0,y:Number(r.y)||0,w:Number(r.w)||fallback[k].w,h:Number(r.h)||fallback[k].h}});
  return out;
@@ -1411,35 +1412,28 @@ function cloneModeSections(source={}){
  });
  return out;
 }
-function displayGrid(){return{cols:Number(state?.display?.gridCols)||24,rows:Number(state?.display?.gridRows)||16}}
 function currentDisplayMode(){return $('displayMode').value||'daily'}
 function activeSectionDraft(){return displaySectionsDraft?.[currentDisplayMode()]||{}}
 function sectionEnabled(kind){return activeSectionDraft()?.[kind]?.enabled!==false}
-function layoutCollision(kind,candidate){
- return Object.entries(displayLayoutDraft||{}).some(([other,r])=>{
-   if(other===kind||!sectionEnabled(other))return false;
-   return candidate.x<r.x+r.w&&candidate.x+candidate.w>r.x&&candidate.y<r.y+r.h&&candidate.y+candidate.h>r.y;
- });
-}
+function roundLayoutValue(value){return Math.round(Number(value)*4)/4}
 function applyLayoutBlock(block,rect){
- const g=displayGrid();
- block.style.left=(rect.x/g.cols*100)+'%';block.style.top=(rect.y/g.rows*100)+'%';block.style.width=(rect.w/g.cols*100)+'%';block.style.height=(rect.h/g.rows*100)+'%';
+ block.style.left=rect.x+'%';block.style.top=rect.y+'%';block.style.width=rect.w+'%';block.style.height=rect.h+'%';
  const settings=activeSectionDraft()[block.dataset.kind]||{};
- const small=block.querySelector('small');if(small)small.textContent=rect.w+' × '+rect.h+' cells · '+(settings.enabled===false?'hidden':settings.style||'default');
+ const small=block.querySelector('small');if(small)small.textContent=rect.w.toFixed(1)+'% × '+rect.h.toFixed(1)+'% · '+(settings.enabled===false?'hidden':settings.style||'default');
  block.classList.toggle('off',settings.enabled===false);
 }
 function defaultDisplayLayoutForResolution(mode=currentDisplayMode()){
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480),portrait=h>w;
  if(mode==='daily'||mode==='weekly') return portrait
-   ?{agenda:{x:0,y:0,w:24,h:10},weather:{x:0,y:10,w:24,h:2},tasks:{x:0,y:12,w:8,h:4},goals:{x:8,y:12,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}}
-   :{agenda:{x:0,y:0,w:16,h:16},weather:{x:16,y:0,w:8,h:4},tasks:{x:16,y:4,w:8,h:4},goals:{x:16,y:8,w:8,h:4},countdowns:{x:16,y:12,w:8,h:4},markets:{x:16,y:12,w:8,h:4}};
+   ?{agenda:{x:0,y:0,w:100,h:62},weather:{x:0,y:62,w:100,h:14},tasks:{x:0,y:76,w:33.33,h:24},goals:{x:33.33,y:76,w:33.34,h:24},countdowns:{x:66.67,y:76,w:33.33,h:24},markets:{x:66.67,y:76,w:33.33,h:24}}
+   :{agenda:{x:0,y:0,w:66.67,h:100},weather:{x:66.67,y:0,w:33.33,h:25},tasks:{x:66.67,y:25,w:33.33,h:25},goals:{x:66.67,y:50,w:33.33,h:25},countdowns:{x:66.67,y:75,w:33.33,h:25},markets:{x:66.67,y:75,w:33.33,h:25}};
  if(mode==='monthly') return portrait
-   ?{agenda:{x:0,y:0,w:24,h:12},weather:{x:0,y:12,w:24,h:2},tasks:{x:0,y:14,w:8,h:2},goals:{x:8,y:14,w:8,h:2},countdowns:{x:16,y:14,w:8,h:2},markets:{x:16,y:14,w:8,h:2}}
-   :{agenda:{x:0,y:0,w:18,h:16},weather:{x:18,y:0,w:6,h:4},tasks:{x:18,y:4,w:6,h:4},goals:{x:18,y:8,w:6,h:4},countdowns:{x:18,y:12,w:6,h:4},markets:{x:18,y:12,w:6,h:4}};
- if(mode==='countdowns') return{agenda:{x:0,y:0,w:12,h:6},weather:{x:12,y:0,w:12,h:4},tasks:{x:12,y:4,w:12,h:4},goals:{x:0,y:6,w:12,h:6},countdowns:{x:0,y:0,w:24,h:16},markets:{x:12,y:8,w:12,h:8}};
+   ?{agenda:{x:0,y:0,w:100,h:72},weather:{x:0,y:72,w:100,h:12},tasks:{x:0,y:84,w:33.33,h:16},goals:{x:33.33,y:84,w:33.34,h:16},countdowns:{x:66.67,y:84,w:33.33,h:16},markets:{x:66.67,y:84,w:33.33,h:16}}
+   :{agenda:{x:0,y:0,w:75,h:100},weather:{x:75,y:0,w:25,h:25},tasks:{x:75,y:25,w:25,h:25},goals:{x:75,y:50,w:25,h:25},countdowns:{x:75,y:75,w:25,h:25},markets:{x:75,y:75,w:25,h:25}};
+ if(mode==='countdowns') return{agenda:{x:0,y:0,w:50,h:40},weather:{x:50,y:0,w:50,h:25},tasks:{x:50,y:25,w:50,h:25},goals:{x:0,y:40,w:50,h:35},countdowns:{x:0,y:0,w:100,h:100},markets:{x:50,y:50,w:50,h:50}};
  return portrait
-   ?{agenda:{x:0,y:0,w:24,h:6},weather:{x:0,y:6,w:24,h:2},tasks:{x:0,y:8,w:24,h:2},goals:{x:0,y:10,w:8,h:6},countdowns:{x:8,y:10,w:8,h:6},markets:{x:16,y:10,w:8,h:6}}
-   :{agenda:{x:0,y:0,w:14,h:8},weather:{x:14,y:0,w:10,h:4},tasks:{x:14,y:4,w:10,h:4},goals:{x:0,y:8,w:8,h:8},countdowns:{x:8,y:8,w:8,h:8},markets:{x:16,y:8,w:8,h:8}};
+   ?{weather:{x:0,y:0,w:100,h:34},agenda:{x:0,y:34,w:100,h:36},tasks:{x:0,y:70,w:50,h:15},goals:{x:50,y:70,w:50,h:15},countdowns:{x:0,y:85,w:50,h:15},markets:{x:50,y:85,w:50,h:15}}
+   :{weather:{x:0,y:0,w:42,h:42},agenda:{x:42,y:0,w:58,h:62},tasks:{x:0,y:42,w:42,h:26},goals:{x:0,y:68,w:42,h:32},countdowns:{x:42,y:62,w:29,h:38},markets:{x:71,y:62,w:29,h:38}};
 }
 function setLayoutStatus(message,error=false){const el=$('layoutEditorStatus');if(!el)return;el.textContent=message;el.style.color=error?'#b42318':''}
 function renderWidgetSettings(kind=selectedDisplayWidget){
@@ -1474,7 +1468,7 @@ function renderSectionLayoutEditor(renderSettings=true){
  const now=new Date(),modeLabels={dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'};
  if($('layoutEditorDate'))$('layoutEditorDate').textContent=now.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
  if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
- if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='24 × 16 grid · '+w+' × '+h+' preview';
+ if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='Freeform layout · '+w+' × '+h+' preview';
  $('einkLayoutCard').classList.remove('disabled');
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
    const r=displayLayoutDraft[kind];
@@ -1485,19 +1479,19 @@ function renderSectionLayoutEditor(renderSettings=true){
    const kind=block.dataset.kind;applyLayoutBlock(block,displayLayoutDraft[kind]);
    block.onpointerdown=e=>{
      if(e.target.closest('[data-config]'))return;
-     e.preventDefault();const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),g=displayGrid(),startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
+     e.preventDefault();const resize=Boolean(e.target.closest('[data-resize]')),bounds=editor.getBoundingClientRect(),startX=e.clientX,startY=e.clientY,start={...displayLayoutDraft[kind]};
      block.setPointerCapture?.(e.pointerId);
      const move=ev=>{
-       const dx=Math.round((ev.clientX-startX)/bounds.width*g.cols),dy=Math.round((ev.clientY-startY)/bounds.height*g.rows);let next;
-       if(resize)next={...start,w:Math.max(2,Math.min(g.cols-start.x,start.w+dx)),h:Math.max(1,Math.min(g.rows-start.y,start.h+dy))};
-       else next={...start,x:Math.max(0,Math.min(g.cols-start.w,start.x+dx)),y:Math.max(0,Math.min(g.rows-start.h,start.y+dy))};
-       displayLayoutDraft[kind]=next;applyLayoutBlock(block,next);const overlaps=layoutCollision(kind,next);block.classList.toggle('overlap',overlaps);setLayoutStatus(overlaps?'Sections cannot overlap.':'Unsaved '+mode+' layout.',overlaps);
+       const dx=(ev.clientX-startX)/bounds.width*100,dy=(ev.clientY-startY)/bounds.height*100;let next;
+       if(resize)next={...start,w:roundLayoutValue(Math.max(5,Math.min(100-start.x,start.w+dx))),h:roundLayoutValue(Math.max(5,Math.min(100-start.y,start.h+dy)))};
+       else next={...start,x:roundLayoutValue(Math.max(0,Math.min(100-start.w,start.x+dx))),y:roundLayoutValue(Math.max(0,Math.min(100-start.h,start.y+dy)))};
+       displayLayoutDraft[kind]=next;applyLayoutBlock(block,next);setLayoutStatus('Unsaved '+mode+' freeform layout.');
      };
-     const up=ev=>{block.removeEventListener('pointermove',move);block.removeEventListener('pointerup',up);block.removeEventListener('pointercancel',up);const current=displayLayoutDraft[kind];if(layoutCollision(kind,current)){displayLayoutDraft[kind]=start;applyLayoutBlock(block,start);block.classList.remove('overlap');setLayoutStatus('Move cancelled because it overlapped another visible widget.',true)}else displayLayoutsDraft[mode]=displayLayoutDraft;try{block.releasePointerCapture?.(ev.pointerId)}catch{}};
+     const up=ev=>{block.removeEventListener('pointermove',move);block.removeEventListener('pointerup',up);block.removeEventListener('pointercancel',up);displayLayoutsDraft[mode]=displayLayoutDraft;try{block.releasePointerCapture?.(ev.pointerId)}catch{}};
      block.addEventListener('pointermove',move);block.addEventListener('pointerup',up);block.addEventListener('pointercancel',up);
    };
  });
- setLayoutStatus('Editing '+mode+' mode · drag, resize, or tap ⚙ for widget settings.');
+ setLayoutStatus('Editing '+mode+' mode · freeform drag/resize · tap ⚙ for widget settings.');
  if(renderSettings&&!$('widgetSettings').hidden)renderWidgetSettings(selectedDisplayWidget);
 }
 function renderDisplay(){
@@ -1506,13 +1500,14 @@ function renderDisplay(){
  if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.locationLabel?'Weather: '+wc.locationLabel+' · location managed in Settings.':'Choose a weather location in Settings.';
  displayLayoutsDraft=cloneModeLayouts(d.modeLayouts);displaySectionsDraft=cloneModeSections(d.modeSections);displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];
  const root=location.origin;
- $('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);
+ if($('imageUrl'))$('imageUrl').textContent=root+(d.imagePath||d.svgPath)+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);
  renderSectionLayoutEditor();previewDisplay();
 }
 function previewDisplay(){
  if(!state)return;
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);
- $('displayPreview').src=state.display.svgPath+'&w='+w+'&h='+h+'&_='+Date.now();
+ $('displayPreview').src=(state.display.imagePath||state.display.svgPath)+'&w='+w+'&h='+h+'&_='+Date.now();
+ if($('imageUrl'))$('imageUrl').textContent=location.origin+(state.display.imagePath||state.display.svgPath)+'&w='+w+'&h='+h;
  if($('svgUrl'))$('svgUrl').textContent=location.origin+state.display.svgPath+'&w='+w+'&h='+h;
  if($('feedUrl'))$('feedUrl').textContent=location.origin+state.display.feedPath;
  if($('viewUrl'))$('viewUrl').textContent=location.origin+state.display.viewPath+'&w='+w+'&h='+h;

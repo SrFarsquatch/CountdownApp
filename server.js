@@ -4,6 +4,8 @@ const path = require('path');
 const crypto = require('crypto');
 const webpush = require('web-push');
 const YahooFinance = require('yahoo-finance2').default;
+const puppeteer = require('puppeteer-core');
+const { quantizeSpectra6 } = require('./eink/quantize.cjs');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 8080);
@@ -44,8 +46,7 @@ const COUNTDOWN_STYLES = ['detailed', 'compact'];
 const MARKET_STYLES = ['summary', 'compact', 'ticker'];
 const DISPLAY_SECTION_LAYOUT_MODES = ['auto', 'custom'];
 const DISPLAY_SECTION_KEYS = ['agenda', 'weather', 'tasks', 'goals', 'countdowns', 'markets'];
-const DISPLAY_GRID_COLS = 24;
-const DISPLAY_GRID_ROWS = 16;
+const DISPLAY_LAYOUT_VERSION = 6;
 const TASK_STATUS = ['todo', 'progress', 'done'];
 const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
 const GOAL_TYPES = ['number', 'checklist', 'deadline'];
@@ -92,69 +93,75 @@ const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max)
 
 function defaultSectionLayout(mode = 'dashboard') {
   if (mode === 'daily' || mode === 'weekly') return {
-    agenda: { x: 0, y: 0, w: 16, h: 16 },
-    weather: { x: 16, y: 0, w: 8, h: 4 },
-    tasks: { x: 16, y: 4, w: 8, h: 4 },
-    goals: { x: 16, y: 8, w: 8, h: 4 },
-    countdowns: { x: 16, y: 12, w: 8, h: 4 },
-    markets: { x: 16, y: 12, w: 8, h: 4 }
+    agenda: { x: 0, y: 0, w: 66.67, h: 100 },
+    weather: { x: 66.67, y: 0, w: 33.33, h: 25 },
+    tasks: { x: 66.67, y: 25, w: 33.33, h: 25 },
+    goals: { x: 66.67, y: 50, w: 33.33, h: 25 },
+    countdowns: { x: 66.67, y: 75, w: 33.33, h: 25 },
+    markets: { x: 66.67, y: 75, w: 33.33, h: 25 }
   };
   if (mode === 'monthly') return {
-    agenda: { x: 0, y: 0, w: 18, h: 16 },
-    weather: { x: 18, y: 0, w: 6, h: 4 },
-    tasks: { x: 18, y: 4, w: 6, h: 4 },
-    goals: { x: 18, y: 8, w: 6, h: 4 },
-    countdowns: { x: 18, y: 12, w: 6, h: 4 },
-    markets: { x: 18, y: 12, w: 6, h: 4 }
+    agenda: { x: 0, y: 0, w: 75, h: 100 },
+    weather: { x: 75, y: 0, w: 25, h: 25 },
+    tasks: { x: 75, y: 25, w: 25, h: 25 },
+    goals: { x: 75, y: 50, w: 25, h: 25 },
+    countdowns: { x: 75, y: 75, w: 25, h: 25 },
+    markets: { x: 75, y: 75, w: 25, h: 25 }
   };
   if (mode === 'countdowns') return {
-    agenda: { x: 0, y: 0, w: 12, h: 8 },
-    weather: { x: 12, y: 0, w: 12, h: 4 },
-    tasks: { x: 12, y: 4, w: 12, h: 4 },
-    goals: { x: 0, y: 8, w: 12, h: 8 },
-    countdowns: { x: 0, y: 0, w: 24, h: 16 },
-    markets: { x: 12, y: 8, w: 12, h: 8 }
+    agenda: { x: 0, y: 0, w: 50, h: 50 },
+    weather: { x: 50, y: 0, w: 50, h: 25 },
+    tasks: { x: 50, y: 25, w: 50, h: 25 },
+    goals: { x: 0, y: 50, w: 50, h: 50 },
+    countdowns: { x: 0, y: 0, w: 100, h: 100 },
+    markets: { x: 50, y: 50, w: 50, h: 50 }
   };
   return {
-    agenda: { x: 0, y: 0, w: 14, h: 8 },
-    weather: { x: 14, y: 0, w: 10, h: 4 },
-    tasks: { x: 14, y: 4, w: 10, h: 4 },
-    goals: { x: 0, y: 8, w: 8, h: 8 },
-    countdowns: { x: 8, y: 8, w: 8, h: 8 },
-    markets: { x: 16, y: 8, w: 8, h: 8 }
+    weather: { x: 0, y: 0, w: 42, h: 42 },
+    agenda: { x: 42, y: 0, w: 58, h: 62 },
+    tasks: { x: 0, y: 42, w: 42, h: 26 },
+    goals: { x: 0, y: 68, w: 42, h: 32 },
+    countdowns: { x: 42, y: 62, w: 29, h: 38 },
+    markets: { x: 71, y: 62, w: 29, h: 38 }
   };
 }
+function roundLayout(value) { return Math.round(num(value, 0) * 100) / 100; }
 function normalizeSectionLayout(input, mode = 'dashboard') {
-  const base = defaultSectionLayout(mode);
-  const source = input && typeof input === 'object' ? input : {};
-  const out = {};
+  const base = defaultSectionLayout(mode), source = input && typeof input === 'object' ? input : {}, out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
     const raw = source[key] && typeof source[key] === 'object' ? source[key] : base[key];
-    const w = clamp(Math.round(num(raw.w, base[key].w)), 2, DISPLAY_GRID_COLS);
-    const h = clamp(Math.round(num(raw.h, base[key].h)), 1, DISPLAY_GRID_ROWS);
-    const x = clamp(Math.round(num(raw.x, base[key].x)), 0, DISPLAY_GRID_COLS - w);
-    const y = clamp(Math.round(num(raw.y, base[key].y)), 0, DISPLAY_GRID_ROWS - h);
+    const w = clamp(roundLayout(raw.w || base[key].w), 5, 100);
+    const h = clamp(roundLayout(raw.h || base[key].h), 5, 100);
+    const x = clamp(roundLayout(raw.x), 0, 100 - w);
+    const y = clamp(roundLayout(raw.y), 0, 100 - h);
     out[key] = { x, y, w, h };
   }
   return out;
 }
 function migrateLegacy12x8Layout(input, mode = 'dashboard') {
-  if (!input || typeof input !== 'object') return defaultSectionLayout(mode);
-  const base = defaultSectionLayout(mode);
+  if (!input || typeof input !== 'object') return null;
   const out = {};
+  for (const key of DISPLAY_SECTION_KEYS) {
+    const raw = input[key];
+    if (!raw || typeof raw !== 'object') continue;
+    out[key] = { x: num(raw.x,0)*2, y:num(raw.y,0)*2, w:num(raw.w,1)*2, h:num(raw.h,1)*2 };
+  }
+  return out;
+}
+function migrateGridLayoutToPercent(input, mode = 'dashboard') {
+  if (!input || typeof input !== 'object') return defaultSectionLayout(mode);
+  const base = defaultSectionLayout(mode), out = {};
   for (const key of DISPLAY_SECTION_KEYS) {
     const raw = input[key];
     if (!raw || typeof raw !== 'object') { out[key] = base[key]; continue; }
     out[key] = {
-      x: clamp(Math.round(num(raw.x, 0) * 2), 0, DISPLAY_GRID_COLS - 2),
-      y: clamp(Math.round(num(raw.y, 0) * 2), 0, DISPLAY_GRID_ROWS - 1),
-      w: clamp(Math.round(num(raw.w, base[key].w / 2) * 2), 2, DISPLAY_GRID_COLS),
-      h: clamp(Math.round(num(raw.h, base[key].h / 2) * 2), 1, DISPLAY_GRID_ROWS)
+      x: roundLayout(num(raw.x,0) / 24 * 100),
+      y: roundLayout(num(raw.y,0) / 16 * 100),
+      w: roundLayout(num(raw.w,6) / 24 * 100),
+      h: roundLayout(num(raw.h,4) / 16 * 100)
     };
-    out[key].x = clamp(out[key].x, 0, DISPLAY_GRID_COLS - out[key].w);
-    out[key].y = clamp(out[key].y, 0, DISPLAY_GRID_ROWS - out[key].h);
   }
-  return out;
+  return normalizeSectionLayout(out, mode);
 }
 
 function defaultSectionSettings(mode = 'dashboard') {
@@ -262,7 +269,7 @@ function defaults() {
     display: {
       token: crypto.randomBytes(24).toString('hex'),
       title: 'Today', maxEvents: 5, maxCountdowns: 3, maxTasks: 6, maxGoals: 3,
-      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: 5,
+      layout: 'auto', palette: 'spectra6', dateWidgetStyle: 'plain', mode: 'daily', plannerLayoutVersion: DISPLAY_LAYOUT_VERSION,
       sectionLayoutMode: 'custom', sectionLayout: defaultSectionLayout('dashboard'), sectionOrder: DISPLAY_SECTION_KEYS.slice(), weatherStyle: 'forecast',
       modeLayouts: defaultModeLayouts(), modeSections: defaultModeSections(),
       refreshMinutes: 15, showAgenda: true, showTasks: true, showGoals: true, showCountdowns: true, showWeather: true
@@ -521,7 +528,16 @@ function load() {
           migratedModeLayouts = {};
           for (const mode of DISPLAY_MODES) {
             const source = sourceModes[mode] || (mode === 'dashboard' ? legacyDisplay.sectionLayout : null);
-            migratedModeLayouts[mode] = source ? migrateLegacy12x8Layout(source, mode) : defaultSectionLayout(mode);
+            migratedModeLayouts[mode] = source ? migrateLegacy12x8Layout(source, mode) : null;
+          }
+          migratedSectionLayout = migratedModeLayouts.dashboard;
+        }
+        if (legacyVersion < DISPLAY_LAYOUT_VERSION) {
+          const sourceModes = migratedModeLayouts && typeof migratedModeLayouts === 'object' ? migratedModeLayouts : {};
+          migratedModeLayouts = {};
+          for (const mode of DISPLAY_MODES) {
+            const source = sourceModes[mode] || (mode === 'dashboard' ? migratedSectionLayout : null);
+            migratedModeLayouts[mode] = source ? migrateGridLayoutToPercent(source, mode) : defaultSectionLayout(mode);
           }
           migratedSectionLayout = migratedModeLayouts.dashboard;
         }
@@ -535,7 +551,7 @@ function load() {
         };
         if (legacyVersion < 2 && (!legacyDisplay.mode || legacyDisplay.mode === 'dashboard')) display.mode = 'daily';
         display.sectionLayoutMode = 'custom';
-        display.plannerLayoutVersion = 5;
+        display.plannerLayoutVersion = DISPLAY_LAYOUT_VERSION;
         return display;
       })()
     };
@@ -2535,7 +2551,7 @@ async function feed() {
       dateWidgetStyle: en(db.display.dateWidgetStyle, DATE_WIDGETS, 'plain'), mode: en(db.display.mode, DISPLAY_MODES, 'dashboard'),
       sectionLayoutMode: en(db.display.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto'),
       sectionLayout: normalizeSectionLayout(db.display.sectionLayout), sectionOrder: normalizeSectionOrder(db.display.sectionOrder),
-      gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS,
+      layoutUnits: 'percent',
       refreshMinutes: clamp(num(db.display.refreshMinutes, 15), 1, 1440),
       showAgenda: db.display.showAgenda !== false, showTasks: db.display.showTasks !== false,
       showGoals: db.display.showGoals !== false, showCountdowns: db.display.showCountdowns !== false,
@@ -3118,10 +3134,10 @@ function renderSvg(data, w, h) {
     for (const kind of order) {
       if (!availableKinds.includes(kind)) continue;
       const r = layout[kind];
-      const x = pad + contentWidth * r.x / DISPLAY_GRID_COLS;
-      const y = top + available * r.y / DISPLAY_GRID_ROWS;
-      const width = contentWidth * r.w / DISPLAY_GRID_COLS;
-      const height = available * r.h / DISPLAY_GRID_ROWS;
+      const x = pad + contentWidth * r.x / 100;
+      const y = top + available * r.y / 100;
+      const width = contentWidth * r.w / 100;
+      const height = available * r.h / 100;
       const inset = Math.max(5, Math.min(9, Math.round(Math.min(width, height) * 0.035)));
       const clipId = 'clip-' + kind;
       defs += '<clipPath id="' + clipId + '"><rect x="' + (x + inset) + '" y="' + (y + inset) + '" width="' + Math.max(1, width - inset * 2) + '" height="' + Math.max(1, height - inset * 2) + '" rx="4"/></clipPath>';
@@ -3180,6 +3196,43 @@ function renderSvg(data, w, h) {
   return svg;
 }
 
+let einkBrowserPromise = null;
+let einkRendererPromise = null;
+function chromiumPath() {
+  const configured = cleanText(process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH, 500);
+  const candidates = [configured, '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(Boolean);
+  return candidates.find(candidate => fs.existsSync(candidate)) || '';
+}
+async function einkRenderer() {
+  if (!einkRendererPromise) einkRendererPromise = import('./eink/render.mjs');
+  return einkRendererPromise;
+}
+async function einkBrowser() {
+  if (!einkBrowserPromise) {
+    const executablePath = chromiumPath();
+    if (!executablePath) throw new Error('Chromium is not installed for the HTML e-ink renderer.');
+    einkBrowserPromise = puppeteer.launch({
+      executablePath,
+      headless: true,
+      args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--font-render-hinting=none']
+    }).catch(error => { einkBrowserPromise = null; throw error; });
+  }
+  return einkBrowserPromise;
+}
+async function renderEinkPng(data, width, height) {
+  const { renderEinkHtml } = await einkRenderer();
+  const browser = await einkBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width, height, deviceScaleFactor: 1 });
+    await page.setContent(renderEinkHtml(data, width, height), { waitUntil: 'load', timeout: 15000 });
+    const raw = await page.screenshot({ type: 'png', fullPage: false, omitBackground: false });
+    return quantizeSpectra6(raw, data.display?.palette || 'spectra6');
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 function serve(res, requestPath) {
   let file = requestPath === '/' ? '/index.html' : requestPath;
   file = path.normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
@@ -3221,7 +3274,7 @@ function state() {
       })),
       countdownWindowDays: db.google.countdownWindowDays || 30
     },
-    display: { ...db.display, sectionLayout: normalizeSectionLayout(db.display.sectionLayout, 'dashboard'), modeLayouts: normalizeModeLayouts(db.display.modeLayouts, db.display.sectionLayout), modeSections: normalizeModeSections(db.display.modeSections, db.display), sectionOrder: normalizeSectionOrder(db.display.sectionOrder), sectionLayoutMode: 'custom', gridCols: DISPLAY_GRID_COLS, gridRows: DISPLAY_GRID_ROWS, feedPath: '/api/frameos/feed?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
+    display: { ...db.display, sectionLayout: normalizeSectionLayout(db.display.sectionLayout, 'dashboard'), modeLayouts: normalizeModeLayouts(db.display.modeLayouts, db.display.sectionLayout), modeSections: normalizeModeSections(db.display.modeSections, db.display), sectionOrder: normalizeSectionOrder(db.display.sectionOrder), sectionLayoutMode: 'custom', layoutUnits: 'percent', feedPath: '/api/frameos/feed?token=' + db.display.token, imagePath: '/api/frameos/image?token=' + db.display.token, svgPath: '/api/frameos/svg?token=' + db.display.token, viewPath: '/frame?token=' + db.display.token }
   };
 }
 
@@ -3582,7 +3635,7 @@ const server = http.createServer(async (req, res) => {
       if (incoming.palette !== undefined) db.display.palette = en(incoming.palette, PALETTES, 'spectra6');
       if (incoming.dateWidgetStyle !== undefined) db.display.dateWidgetStyle = en(incoming.dateWidgetStyle, DATE_WIDGETS, 'plain');
       if (incoming.mode !== undefined) db.display.mode = en(incoming.mode, DISPLAY_MODES, 'daily');
-      db.display.plannerLayoutVersion = 5;
+      db.display.plannerLayoutVersion = DISPLAY_LAYOUT_VERSION;
       if (incoming.sectionLayoutMode !== undefined) db.display.sectionLayoutMode = en(incoming.sectionLayoutMode, DISPLAY_SECTION_LAYOUT_MODES, 'auto');
       if (incoming.sectionLayout !== undefined) db.display.sectionLayout = normalizeSectionLayout(incoming.sectionLayout);
       if (incoming.sectionOrder !== undefined) db.display.sectionOrder = normalizeSectionOrder(incoming.sectionOrder);
@@ -3637,6 +3690,7 @@ const server = http.createServer(async (req, res) => {
       db.display.token = crypto.randomBytes(24).toString('hex'); save(db);
       return json(res, 200, {
         feedPath: '/api/frameos/feed?token=' + db.display.token,
+        imagePath: '/api/frameos/image?token=' + db.display.token,
         svgPath: '/api/frameos/svg?token=' + db.display.token,
         viewPath: '/frame?token=' + db.display.token
       });
@@ -3644,6 +3698,29 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/frameos/feed') {
       if (!authorized(url)) return json(res, 401, { error: 'Invalid display token' });
       return json(res, 200, await feed());
+    }
+    if (p === '/api/frameos/image') {
+      if (!authorized(url)) return text(res, 401, 'Invalid display token');
+      const w = clamp(Math.round(num(url.searchParams.get('w'), 800)), 300, 2000);
+      const h = clamp(Math.round(num(url.searchParams.get('h'), 480)), 300, 2000);
+      const data = await feed();
+      try {
+        const png = await renderEinkPng(data, w, h);
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'no-store',
+          'X-QuestLog-Renderer': 'html-chromium-spectra6',
+          'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes)
+        });
+        return res.end(png);
+      } catch (error) {
+        console.warn('HTML e-ink renderer failed; serving SVG fallback:', error.message);
+        return text(res, 200, renderSvg(data, w, h), 'image/svg+xml; charset=utf-8', {
+          'X-QuestLog-Renderer': 'svg-fallback',
+          'X-QuestLog-Renderer-Error': cleanText(error.message, 160),
+          'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes)
+        });
+      }
     }
     if (p === '/api/frameos/svg') {
       if (!authorized(url)) return text(res, 401, 'Invalid display token');
