@@ -6,6 +6,51 @@ import {
 import { eventsBetween, calendars, taskLists, mutateEvent } from './google.js';
 
 const ACTION_TYPES=['create_task','update_task','create_goal','update_goal','create_countdown','update_countdown','create_event','update_event'];
+const credentialEncoder=new TextEncoder(),credentialDecoder=new TextDecoder();
+function credentialB64u(bytes){
+  let raw='';for(const b of bytes)raw+=String.fromCharCode(b);
+  return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function credentialFromB64u(value){
+  const input=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(input+'='.repeat((4-input.length%4)%4));
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function agentCredentialKey(env){
+  if(!env.APP_SECRET)throw new Error('APP_SECRET is not configured on the Worker.');
+  const hash=await crypto.subtle.digest('SHA-256',credentialEncoder.encode(String(env.APP_SECRET)));
+  return crypto.subtle.importKey('raw',hash,{name:'AES-GCM'},false,['encrypt','decrypt']);
+}
+async function encryptAgentCredential(value,env){
+  const key=await agentCredentialKey(env),iv=crypto.getRandomValues(new Uint8Array(12));
+  const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,credentialEncoder.encode(String(value)));
+  return 'agent1.'+credentialB64u(iv)+'.'+credentialB64u(new Uint8Array(data));
+}
+async function decryptAgentCredential(value,env){
+  if(!value||!String(value).startsWith('agent1.'))return'';
+  try{
+    const [,iv,data]=String(value).split('.'),key=await agentCredentialKey(env);
+    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:credentialFromB64u(iv)},key,credentialFromB64u(data));
+    return credentialDecoder.decode(plain);
+  }catch{return''}
+}
+export async function saveAgentCredential(state,env,provider,value){
+  const cleanProvider=cleanText(provider,40),secret=cleanText(value,5000);
+  if(!secret)throw new Error('API key cannot be empty.');
+  state.agent=state.agent||{};
+  state.agent.credentials=state.agent.credentials&&typeof state.agent.credentials==='object'?state.agent.credentials:{};
+  state.agent.credentials[cleanProvider]=await encryptAgentCredential(secret,env);
+  await saveState(env,state);
+}
+export async function clearAgentCredential(state,env,provider){
+  state.agent=state.agent||{};
+  state.agent.credentials=state.agent.credentials&&typeof state.agent.credentials==='object'?state.agent.credentials:{};
+  delete state.agent.credentials[cleanText(provider,40)];
+  await saveState(env,state);
+}
+async function storedAgentCredential(state,env,provider){
+  return decryptAgentCredential(state.agent?.credentials?.[provider],env);
+}
 
 const PROVIDER_CONFIG={
   openai:{base:'https://api.openai.com/v1',key:'OPENAI_API_KEY',modelEnv:'OPENAI_MODEL',defaultModel:'gpt-5.6-luna',style:'openai'},
@@ -17,13 +62,14 @@ const PROVIDER_CONFIG={
   deepseek:{base:'https://api.deepseek.com',key:'DEEPSEEK_API_KEY',modelEnv:'DEEPSEEK_MODEL',defaultModel:'',style:'openai'},
   xai:{base:'https://api.x.ai/v1',key:'XAI_API_KEY',modelEnv:'XAI_MODEL',defaultModel:'',style:'openai'}
 };
-function endpointConfig(state,env){
+async function endpointConfig(state,env){
   const cfg=state.agent||{},provider=cfg.provider||'openai';
   if(provider==='local'){
     const base=cleanText(cfg.baseUrl||env.LOCAL_AGENT_BASE_URL,500).replace(/\/+$/,'');
     if(!base)throw new Error('Configure a local model HTTPS endpoint in Navi settings.');
     let parsed;try{parsed=new URL(base)}catch{throw new Error('Local model endpoint is invalid.')}
     if(parsed.protocol!=='https:')throw new Error('Cloud Navi local model endpoints must use HTTPS.');
+    const storedKey=await storedAgentCredential(state,env,provider),key=storedKey||env.LOCAL_AGENT_API_KEY||'';
     return{
       provider,
       style:'openai',
@@ -31,7 +77,7 @@ function endpointConfig(state,env){
       model:cleanText(cfg.model||env.LOCAL_AGENT_MODEL||'local-model',160),
       headers:{
         'Content-Type':'application/json',
-        ...(env.LOCAL_AGENT_API_KEY?{Authorization:'Bearer '+env.LOCAL_AGENT_API_KEY}:{}),
+        ...(key?{Authorization:'Bearer '+key}:{}),
         ...(env.LOCAL_AGENT_ACCESS_CLIENT_ID&&env.LOCAL_AGENT_ACCESS_CLIENT_SECRET?{
           'CF-Access-Client-Id':env.LOCAL_AGENT_ACCESS_CLIENT_ID,
           'CF-Access-Client-Secret':env.LOCAL_AGENT_ACCESS_CLIENT_SECRET
@@ -39,8 +85,9 @@ function endpointConfig(state,env){
       }
     };
   }
-  const preset=PROVIDER_CONFIG[provider]||PROVIDER_CONFIG.openai,key=env[preset.key];
-  if(!key)throw new Error(preset.key+' is not configured as a Worker secret.');
+  const preset=PROVIDER_CONFIG[provider]||PROVIDER_CONFIG.openai;
+  const storedKey=await storedAgentCredential(state,env,provider),key=storedKey||env[preset.key]||'';
+  if(!key)throw new Error('Add an API key for '+provider+' in Navi settings.');
   return{
     provider,
     style:preset.style,
@@ -52,7 +99,7 @@ function endpointConfig(state,env){
   };
 }
 async function modelFetch(state,env,resource,options={}){
-  const cfg=endpointConfig(state,env),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+  const cfg=await endpointConfig(state,env),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
   try{
     const response=await fetch(cfg.base+'/'+String(resource||'').replace(/^\/+/,''),{
       ...options,
@@ -240,8 +287,19 @@ function parseEnvelope(raw){
   if(!parsed||typeof parsed!=='object')return{message:original||'I could not format a response.',actions:[]};
   return{message:cleanText(parsed.message||parsed.reply||original,10000),actions:Array.isArray(parsed.actions)?parsed.actions.map(normalizeAction).filter(Boolean).slice(0,10):[]};
 }
+export async function listAgentModels(state,env){
+  const cfg=await endpointConfig(state,env);
+  try{
+    const result=await modelFetch(state,env,'models',{method:'GET'});
+    const data=result.data,raw=Array.isArray(data?.data)?data.data:(Array.isArray(data?.models)?data.models:[]);
+    const models=raw.map(x=>cleanText(x?.id||x?.name||x,200)).filter(Boolean);
+    return{ok:true,provider:cfg.provider,models:[...new Set(models)].slice(0,200),configuredModel:cfg.model||''};
+  }catch(error){
+    return{ok:true,provider:cfg.provider,models:[],configuredModel:cfg.model||'',warning:'This provider did not return a model list. Enter the model ID manually.'};
+  }
+}
 export async function testAgent(state,env){
-  const cfg=endpointConfig(state,env);
+  const cfg=await endpointConfig(state,env);
   if(!cfg.model)throw new Error('Configure a model for '+cfg.provider+' first.');
   try{
     const result=await modelFetch(state,env,'models',{method:'GET'});
@@ -260,7 +318,7 @@ export async function testAgent(state,env){
   }
 }
 export async function chat(state,env,messages){
-  const cfg=endpointConfig(state,env),context=await plannerContext(state,env),history=cleanMessages(messages);
+  const cfg=await endpointConfig(state,env),context=await plannerContext(state,env),history=cleanMessages(messages);
   if(!cfg.model)throw new Error('Configure a model for '+cfg.provider+' first.');
   let resource='chat/completions',payload;
   if(cfg.style==='anthropic'){
