@@ -92,7 +92,7 @@ async function endpointConfig(state,env){
     provider,
     style:preset.style,
     base:preset.base,
-    model:cleanText(env[preset.modelEnv]||cfg.model||preset.defaultModel,160),
+    model:cleanText(cfg.model||env[preset.modelEnv]||preset.defaultModel,160),
     headers:preset.style==='anthropic'
       ?{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':key}
       :{'Content-Type':'application/json',Authorization:'Bearer '+key}
