@@ -1,8 +1,9 @@
 import {
   saveState, cleanText, iso, num, clamp, en, id,
-  normalizeTask, normalizeGoal, normalizeCountdown, goalProgress
+  normalizeTask, normalizeGoal, normalizeCountdown, goalProgress,
+  normalizeWeather, normalizeMarkets, normalizeAppearance, normalizeModeSections, normalizeSectionOrder
 } from './state.js';
-import { eventsBetween, calendars, mutateEvent } from './google.js';
+import { eventsBetween, calendars, taskLists, mutateEvent } from './google.js';
 
 const ACTION_TYPES=['create_task','update_task','create_goal','update_goal','create_countdown','update_countdown','create_event','update_event'];
 
@@ -68,28 +69,109 @@ function cleanMessages(input){
 }
 async function plannerContext(state,env){
   const now=new Date(),end=new Date(now.getTime()+clamp(num(state.agent?.contextDays,14),1,30)*86400000);
+  const weather=normalizeWeather(state.weather||{}),markets=normalizeMarkets(state.markets||{}),appearance=normalizeAppearance(state.appearance||{});
   let events=[];try{events=await eventsBetween(now.toISOString(),end.toISOString(),state,env)}catch{}
-  const writable=[];
+  const accounts=[],calendarItems=[],taskListItems=[],writable=[];
   for(const account of state.google?.accounts||[]){
+    accounts.push({
+      id:account.id,label:account.label,
+      connected:Boolean(account.token),
+      selectedCalendarIds:(account.selectedCalendarIds||[]).slice(0,50),
+      selectedTaskListIds:(account.selectedTaskListIds||[]).slice(0,50),
+      defaultTaskListId:account.defaultTaskListId||''
+    });
     try{
       for(const cal of await calendars(account.id,state,env)){
-        if(['writer','owner'].includes(cal.accessRole))writable.push({accountId:account.id,accountLabel:account.label,calendarId:cal.id,calendarName:cal.summary,primary:Boolean(cal.primary),selected:(account.selectedCalendarIds||[]).includes(cal.id)});
+        const entry={accountId:account.id,accountLabel:account.label,id:cal.id,name:cal.summary,primary:Boolean(cal.primary),accessRole:cal.accessRole,selected:(account.selectedCalendarIds||[]).includes(cal.id)};
+        calendarItems.push(entry);
+        if(['writer','owner'].includes(cal.accessRole))writable.push({accountId:account.id,accountLabel:account.label,calendarId:cal.id,calendarName:cal.summary,primary:Boolean(cal.primary),selected:entry.selected});
+      }
+    }catch{}
+    try{
+      for(const list of await taskLists(account.id,state,env)){
+        taskListItems.push({accountId:account.id,accountLabel:account.label,id:list.id,title:list.title,selected:(account.selectedTaskListIds||[]).includes(list.id),isDefault:account.defaultTaskListId===list.id});
       }
     }catch{}
   }
+
+  const allTasks=state.tasks||[],allGoals=state.goals||[],allCountdowns=state.countdowns||[];
+  const projects=[...new Set([...allTasks.map(x=>cleanText(x.project,80)),...allGoals.map(x=>cleanText(x.project,80))].filter(Boolean))].slice(0,100);
   return{
     generatedAt:now.toISOString(),
-    tasks:(state.tasks||[]).slice(0,50).map(x=>({id:x.id,title:x.title,description:x.description,status:x.status,priority:x.priority,due:x.due,start:x.start,project:x.project,goalId:x.goalId})),
-    goals:(state.goals||[]).slice(0,30).map(x=>({id:x.id,title:x.title,description:x.description,type:x.type,current:x.current,target:x.target,unit:x.unit,deadline:x.deadline,project:x.project,status:x.status,progress:goalProgress(x)})),
-    countdowns:(state.countdowns||[]).filter(x=>new Date(x.end)>now).slice(0,30).map(x=>({id:x.id,name:x.name,end:x.end,pinned:x.pinned,goalId:x.goalId})),
-    events:events.slice(0,60).map(x=>({id:x.id,accountId:x.accountId,calendarId:x.calendarId,calendarName:x.calendarName,title:x.title,description:cleanText(x.description,500),start:x.start,end:x.end,allDay:x.allDay,location:x.location,accessRole:x.accessRole})),
+    app:{
+      runtime:'cloudflare',
+      appearance,
+      display:{
+        title:cleanText(state.display?.title||'Today',80),
+        mode:state.display?.mode||'daily',
+        layout:state.display?.layout||'auto',
+        palette:state.display?.palette||'spectra6',
+        dateWidgetStyle:state.display?.dateWidgetStyle||'plain',
+        refreshMinutes:clamp(num(state.display?.refreshMinutes,15),1,1440),
+        sectionOrder:normalizeSectionOrder(state.display?.sectionOrder),
+        modeSections:normalizeModeSections(state.display?.modeSections)
+      }
+    },
+    userContext:{
+      weatherLocation:{
+        configured:Number.isFinite(weather.latitude)&&Number.isFinite(weather.longitude),
+        label:weather.locationLabel||'',
+        countryCode:weather.countryCode||'',
+        latitude:weather.latitude,
+        longitude:weather.longitude,
+        units:weather.units,
+        meaning:'This is the location saved by the user for Quest Log weather. Treat it as their preferred/local context when useful, but do not claim it is their verified current physical location.'
+      }
+    },
+    plannerSummary:{
+      totalTasks:allTasks.length,
+      openTasks:allTasks.filter(x=>x.status!=='done').length,
+      completedTasks:allTasks.filter(x=>x.status==='done').length,
+      activeGoals:allGoals.filter(x=>x.status==='active').length,
+      activeCountdowns:allCountdowns.filter(x=>new Date(x.end)>now).length,
+      upcomingEventsInContextWindow:events.length,
+      contextWindowDays:clamp(num(state.agent?.contextDays,14),1,30)
+    },
+    projects,
+    tasks:allTasks.slice(0,75).map(x=>({
+      id:x.id,title:x.title,description:x.description,status:x.status,priority:x.priority,due:x.due,start:x.start,
+      estimatedMinutes:x.estimatedMinutes,project:x.project,goalId:x.goalId,tags:(x.tags||[]).slice(0,12),
+      subtasks:(x.subtasks||[]).slice(0,20).map(item=>({id:item.id,title:item.title,done:item.done})),
+      created:x.created,updated:x.updated,completedAt:x.completedAt,displayEnabled:x.displayEnabled!==false,
+      googleTaskListTitle:x.googleTaskListTitle||'',linkedToGoogleTask:Boolean(x.googleTaskId)
+    })),
+    goals:allGoals.slice(0,40).map(x=>({
+      id:x.id,title:x.title,description:x.description,type:x.type,current:x.current,target:x.target,unit:x.unit,
+      deadline:x.deadline,project:x.project,status:x.status,progress:goalProgress(x),accentColor:x.accentColor,
+      displayEnabled:x.displayEnabled!==false,
+      checklist:(x.checklist||[]).slice(0,25).map(item=>({id:item.id,title:item.title,done:item.done})),
+      created:x.created,updated:x.updated
+    })),
+    countdowns:allCountdowns.filter(x=>new Date(x.end)>now).slice(0,40).map(x=>({
+      id:x.id,name:x.name,end:x.end,created:x.created,pinned:x.pinned,goalId:x.goalId,accentColor:x.accentColor,
+      progressMode:x.progressMode,progressCurrent:x.progressCurrent,progressTotal:x.progressTotal,progressStart:x.progressStart,
+      displayEnabled:x.displayEnabled!==false,dateDisplayStyle:x.dateDisplayStyle,timeDisplayStyle:x.timeDisplayStyle
+    })),
+    events:events.slice(0,80).map(x=>({
+      id:x.id,accountId:x.accountId,calendarId:x.calendarId,calendarName:x.calendarName,title:x.title,
+      description:cleanText(x.description,1000),start:x.start,end:x.end,allDay:x.allDay,location:x.location,
+      accessRole:x.accessRole,recurringEventId:x.recurringEventId||''
+    })),
+    integrations:{
+      google:{connected:accounts.some(x=>x.connected),accounts:accounts.slice(0,12),calendars:calendarItems.slice(0,100),taskLists:taskListItems.slice(0,100)},
+      weather:{configured:Number.isFinite(weather.latitude)&&Number.isFinite(weather.longitude),provider:'Open-Meteo',location:{label:weather.locationLabel||'',countryCode:weather.countryCode||'',latitude:weather.latitude,longitude:weather.longitude,units:weather.units}},
+      markets:{configured:Boolean(env.ALPHA_VANTAGE_API_KEY),provider:'Alpha Vantage',refreshMinutes:markets.refreshMinutes,watchlist:(markets.watchlist||[]).slice(0,8).map(item=>({symbol:item.symbol,providerSymbol:item.providerSymbol,name:item.name,exchange:item.exchange,region:item.region,currency:item.currency}))}
+    },
     writableCalendars:writable.slice(0,50)
   };
 }
 function systemPrompt(){
   return[
     'You are Navi, the planning companion inside Quest Log.',
-    'Use the supplied Quest Log context as the source of truth for current planner data.',
+    'Use the supplied Quest Log context as the source of truth for current planner data, app settings, integrations, and saved preferences.',
+    'The saved weatherLocation is especially important local context. It is the location the user chose for weather, not verified live device location, so use it as a default local area without claiming the user is physically there right now.',
+    'You may use app appearance, display preferences, project names, Google account/calendar/task-list metadata, weather configuration, and market watchlist when relevant.',
+    'Secrets, OAuth tokens, API keys, agent credentials, and display tokens are intentionally excluded from context; never ask the user to reveal them in chat.',
     'Return ONLY one JSON object with this shape: {"message":"your response","actions":[]}.',
     'Never claim a proposed planner change already happened.',
     'When the user asks to change planner data, return one or more actions. The user will approve them before execution.',
