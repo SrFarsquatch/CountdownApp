@@ -2988,7 +2988,7 @@ function serve(res, requestPath) {
     if (error) return text(res, 404, 'Not found');
     const type = {
       '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
-      .css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json; charset=utf-8',
+      '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json; charset=utf-8',
       '.webmanifest': 'application/manifest+json; charset=utf-8'
     }[path.extname(full).toLowerCase()] || 'application/octet-stream';
     res.writeHead(200, { 'Content-Type': type });
