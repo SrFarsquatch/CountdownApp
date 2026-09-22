@@ -280,6 +280,93 @@
 @keyframes updatePulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 @media(max-width:760px){.update-builds{grid-template-columns:1fr}.update-actions .btn{flex:1}}
 
+/* Compact single-screen Planner */
+body.planner-mode{overflow:hidden}
+body.planner-mode .top{height:58px;padding:0 18px}
+body.planner-mode .top h1{font-size:20px}
+body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);height:calc(100dvh - 58px);padding:10px 14px 14px;overflow:hidden}
+#view-planner.on{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px}
+#view-planner>.hero{display:none}
+#view-planner .calendar-toolbar{min-height:38px;flex-wrap:nowrap;gap:8px}
+#view-planner .calendar-nav{min-width:0;gap:5px}
+#view-planner .calendar-nav .btn{min-height:36px;padding:6px 10px}
+#view-planner .calendar-title{min-width:0;width:auto;max-width:370px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-planner .calendar-toolbar>div:last-child{min-width:0;flex-wrap:nowrap}
+#plannerViews{flex:0 0 auto}
+#plannerViews button{min-height:32px;padding:5px 9px}
+#connectInline:disabled{display:none}
+#view-planner .calendar-shell{margin-top:0!important;height:100%;min-height:0;grid-template-columns:196px minmax(0,1fr);gap:10px}
+#view-planner .mini{padding:11px;overflow:hidden}
+#view-planner .mini-head{margin-bottom:6px}
+#view-planner .mini-grid{gap:2px}
+#view-planner .mini-grid span{padding:4px 1px}
+#view-planner .mini-grid [data-mini-date]{cursor:pointer}
+#view-planner .mini-grid .selected{outline:1px solid var(--accent);background:var(--accent-soft);color:var(--text)}
+#view-planner .mini-grid .today{outline-color:var(--text)}
+#view-planner .calendar-stage{height:100%;min-height:0;max-height:none;border-radius:14px}
+.timeline-root{--hour-height:52px}
+.timeline-time-rail,.timeline-lane{height:1248px}
+.timeline-lane{background:repeating-linear-gradient(to bottom,transparent 0,transparent 51px,var(--line) 52px)}
+.timeline-lane.today-lane{background:repeating-linear-gradient(to bottom,color-mix(in srgb,var(--accent) 2%,transparent) 0,color-mix(in srgb,var(--accent) 2%,transparent) 51px,var(--line) 52px)}
+.timeline-day-all-day,.day-time-grid{grid-template-columns:60px minmax(0,1fr)}
+.week-day-heads,.week-all-day,.week-time-grid{grid-template-columns:60px repeat(7,minmax(88px,1fr));min-width:700px}
+.week-day-heads>div{padding:7px 5px}
+.all-day-label{padding:7px 6px}
+.all-day-cell{min-height:34px;max-height:74px;padding:3px;gap:3px;overflow:auto}
+.all-day-chip{padding:3px 5px}
+#calendarStage[data-calendar-mode="month"]{overflow:hidden}
+#calendarStage[data-calendar-mode="month"] .month-head,#calendarStage[data-calendar-mode="month"] .month-grid{min-width:0;grid-template-columns:repeat(7,minmax(0,1fr))}
+#calendarStage[data-calendar-mode="month"] .month-head{height:30px}
+#calendarStage[data-calendar-mode="month"] .month-head div{padding:6px 4px}
+#calendarStage[data-calendar-mode="month"] .month-grid{height:calc(100% - 30px);grid-template-rows:repeat(6,minmax(0,1fr))}
+#calendarStage[data-calendar-mode="month"] .month-cell{min-height:0;padding:5px 6px;overflow:hidden}
+.month-date-button{display:inline-grid;place-items:center;min-width:24px;height:22px;margin:0 0 2px;padding:0 5px;border:0;border-radius:7px;background:transparent;color:inherit;font-size:11px;font-weight:850}
+.month-date-button:hover,.month-date-button:focus-visible{background:var(--panel2);outline:1px solid var(--line)}
+.today-cell .month-date-button{background:var(--text);color:var(--panel)}
+.month-chip{width:100%;text-align:left;line-height:1.15}
+.month-more{display:block;width:100%;padding:2px 4px;border:0;background:transparent;color:var(--muted);font-size:9px;font-weight:800;text-align:left}
+.mobile-week-strip{display:none}
+@media(max-width:1050px) and (min-width:761px){
+  #view-planner .calendar-shell{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  body.planner-mode .top{height:54px;padding:0 12px}
+  body.planner-mode .content{height:calc(100vh - 130px - env(safe-area-inset-bottom));height:calc(100dvh - 130px - env(safe-area-inset-bottom));padding:7px 8px 6px}
+  #view-planner.on{gap:6px}
+  #view-planner .calendar-toolbar{display:grid;grid-template-columns:1fr;align-items:stretch;gap:6px}
+  #view-planner .calendar-nav{width:100%;display:grid;grid-template-columns:42px 58px 42px minmax(0,1fr);gap:5px;align-items:center}
+  #view-planner .calendar-nav .btn{min-height:40px;padding:5px 7px}
+  #view-planner .calendar-title{grid-column:4;min-width:0;max-width:none;text-align:right;padding:0;font-size:11px}
+  #view-planner .calendar-toolbar>div:last-child{width:100%;display:flex!important;flex-direction:row;justify-content:space-between;align-items:center;gap:6px!important}
+  #plannerViews{width:auto;display:flex}
+  #plannerViews button{width:auto;min-width:58px;min-height:40px;padding:5px 8px}
+  #connectInline{width:auto;min-height:40px;padding:6px 9px;font-size:11px}
+  #view-planner .calendar-shell{display:block;height:100%;min-height:0;margin:0!important}
+  #view-planner .calendar-stage{height:100%;width:100%;min-width:0;max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .timeline-day-all-day,.day-time-grid{grid-template-columns:52px minmax(0,1fr)}
+  .all-day-label{font-size:8px;padding:6px 4px}
+  .timeline-hour-label{right:5px;font-size:9px}
+  .calendar-event-block{padding:4px 5px}
+  .cal-block-title{font-size:10px}
+  .mobile-week-strip{position:sticky;top:0;z-index:16;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;padding:5px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .mobile-week-day{min-width:0;min-height:44px;padding:4px 1px;border:0;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center;gap:1px}
+  .mobile-week-day small{font-size:9px;font-weight:800}
+  .mobile-week-day strong{font-size:12px;line-height:1}
+  .mobile-week-day.on{background:var(--accent-soft);color:var(--text)}
+  .mobile-week-day.today{box-shadow:inset 0 0 0 1px var(--text)}
+  #calendarStage[data-calendar-mode="month"] .month-head{height:26px}
+  #calendarStage[data-calendar-mode="month"] .month-head div{padding:5px 0;font-size:9px}
+  #calendarStage[data-calendar-mode="month"] .month-grid{height:calc(100% - 26px)}
+  #calendarStage[data-calendar-mode="month"] .month-cell{padding:3px}
+  .month-date-button{min-width:20px;height:18px;padding:0 3px;font-size:9px}
+  .month-chip{margin:2px 0;padding:2px 3px;font-size:8px;border-left-width:2px}
+  .month-more{padding:1px 2px;font-size:8px}
+}
+@media(max-width:380px){
+  #view-planner .calendar-nav{grid-template-columns:38px 52px 38px minmax(0,1fr)}
+  #plannerViews button{min-width:52px;padding-left:6px;padding-right:6px}
+}
+
 </style>
 </head>
 <body>
@@ -747,7 +834,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
+function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));document.body.classList.toggle('planner-mode',name==='planner');$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
@@ -1045,13 +1132,13 @@ function plannerRange(){
  const s=weekStart(a),e=new Date(s);e.setDate(e.getDate()+7);return{start:s,end:e}
 }
 function renderMini(){
- const n=new Date(plannerAnchor),first=new Date(n.getFullYear(),n.getMonth(),1),days=new Date(n.getFullYear(),n.getMonth()+1,0).getDate(),offset=(first.getDay()+6)%7;
+ const n=new Date(plannerAnchor),first=new Date(n.getFullYear(),n.getMonth(),1),days=new Date(n.getFullYear(),n.getMonth()+1,0).getDate(),offset=(first.getDay()+6)%7,selected=dateKeyLocal(n),today=dateKeyLocal(new Date());
  $('miniMonth').textContent=n.toLocaleDateString([],{month:'long',year:'numeric'});
  let h=['M','T','W','T','F','S','S'].map(x=>'<span class="meta">'+x+'</span>').join('');
  for(let i=0;i<offset;i++)h+='<span></span>';
- for(let d=1;d<=days;d++){const date=new Date(n.getFullYear(),n.getMonth(),d);h+='<span class="'+(date.toDateString()===new Date().toDateString()?'today':'')+'" data-mini-date="'+date.toISOString()+'">'+d+'</span>'}
+ for(let d=1;d<=days;d++){const date=new Date(n.getFullYear(),n.getMonth(),d),key=dateKeyLocal(date),cls=(key===today?' today':'')+(key===selected?' selected':'');h+='<span class="'+cls.trim()+'" data-mini-date="'+key+'">'+d+'</span>'}
  $('miniCalendar').innerHTML=h;
- $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=new Date(x.dataset.miniDate);plannerView='day';syncPlannerViewButtons();renderPlanner()})
+ $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=parseDateKey(x.dataset.miniDate);plannerView='day';syncPlannerViewButtons();renderPlanner()})
 }
 function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.classList.toggle('on',b.dataset.calview===plannerView))}
 function plannerLabel(range){
@@ -1060,7 +1147,7 @@ function plannerLabel(range){
  const last=new Date(range.end);last.setDate(last.getDate()-1);
  return range.start.toLocaleDateString([],{month:'short',day:'numeric'})+' – '+last.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});
 }
-const HOUR_HEIGHT=64,TIMELINE_HEIGHT=24*HOUR_HEIGHT;
+const HOUR_HEIGHT=52,TIMELINE_HEIGHT=24*HOUR_HEIGHT;
 function eventOverlapsDay(e,day,next){const s=new Date(e.start),end=new Date(e.end||e.start);return s<next&&end>day}
 function taskCalendarSpan(t){
  const startValue=t.start||t.due;if(!startValue)return null;
@@ -1123,13 +1210,22 @@ function calendarItemsForDay(day,next){
 function allDayChip(e){
  return'<button type="button" class="all-day-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</button>';
 }
-function scrollTimeline(){
- requestAnimationFrame(()=>{const stage=$('calendarStage');if(!stage)return;const now=new Date(),target=Math.max(0,((now.getHours()||8)-2)*HOUR_HEIGHT);stage.scrollTop=target});
+function timelineFocusDate(range){
+ const now=new Date();if(now>=range.start&&now<range.end)return now;
+ const candidates=[];
+ calEvents.forEach(e=>{if(e.allDay)return;const d=new Date(e.start);if(!Number.isNaN(d.getTime())&&d>=range.start&&d<range.end)candidates.push(d)});
+ state.tasks.filter(t=>t.status!=='done'&&t.start).forEach(t=>{const span=taskCalendarSpan(t);if(span&&span.start>=range.start&&span.start<range.end)candidates.push(span.start)});
+ if(candidates.length)return new Date(Math.min(...candidates.map(d=>d.getTime())));
+ const fallback=new Date(range.start);fallback.setHours(8,0,0,0);return fallback;
+}
+function scrollTimeline(range){
+ requestAnimationFrame(()=>{const stage=$('calendarStage');if(!stage)return;const focus=timelineFocusDate(range),hour=focus.getHours()+focus.getMinutes()/60,visible=Math.max(4,stage.clientHeight/HOUR_HEIGHT),lead=Math.min(2,Math.max(1,visible*.18)),target=Math.max(0,(hour-lead)*HOUR_HEIGHT);stage.scrollTop=target});
 }
 function bindCalendarInteractions(){
  const root=$('calendarStage');if(!root)return;
  root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=calEvents.find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
  root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
+ root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);plannerView='day';syncPlannerViewButtons();renderPlanner()});
  root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
    if(e.target.closest('[data-event-key],[data-cal-task],button'))return;
    const rect=lane.getBoundingClientRect(),raw=(e.clientY-rect.top)/HOUR_HEIGHT*60;
@@ -1158,16 +1254,29 @@ function calendarEventModal(e){
  if(link&&$('openGoogleEvent'))$('openGoogleEvent').onclick=()=>window.open(link,'_blank','noopener');
 }
 function renderDay(range){
- const day=new Date(range.start),next=new Date(range.end),dayKey=dateKeyLocal(day);
+ const stage=$('calendarStage'),day=new Date(range.start),next=new Date(range.end),dayKey=dateKeyLocal(day);
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
  const items=calendarItemsForDay(day,next);
  let h='<div class="timeline-root">';
  h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div></div>';
  h+='<div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div>';
- $('calendarStage').innerHTML=h;bindCalendarInteractions();scrollTimeline();
+ stage.dataset.calendarMode='day';stage.innerHTML=h;bindCalendarInteractions();scrollTimeline(range);
+}
+function renderMobileWeek(range){
+ const stage=$('calendarStage'),todayKey=dateKeyLocal(new Date());let selected=startOfDay(plannerAnchor);
+ if(selected<range.start||selected>=range.end)selected=new Date(range.start);
+ const selectedKey=dateKeyLocal(selected),next=new Date(selected);next.setDate(next.getDate()+1);
+ let picker='';
+ for(let i=0;i<7;i++){const day=new Date(range.start);day.setDate(range.start.getDate()+i);const key=dateKeyLocal(day);picker+='<button type="button" class="mobile-week-day '+(key===selectedKey?'on ':'')+(key===todayKey?'today':'')+'" data-week-day="'+key+'"><small>'+day.toLocaleDateString([],{weekday:'narrow'})+'</small><strong>'+day.getDate()+'</strong></button>'}
+ const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next);
+ stage.dataset.calendarMode='week-mobile';
+ stage.innerHTML='<div class="mobile-week-strip">'+picker+'</div><div class="timeline-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div>';
+ stage.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=()=>{plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
+ bindCalendarInteractions();scrollTimeline({start:selected,end:next});
 }
 function renderWeek(range){
- let heads='<div></div>',all='<div class="all-day-label">All day</div>',body=timeRailHtml();
+ if(window.matchMedia('(max-width:760px)').matches){renderMobileWeek(range);return}
+ const stage=$('calendarStage');let heads='<div></div>',all='<div class="all-day-label">All day</div>',body=timeRailHtml();
  for(let i=0;i<7;i++){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1);
    const isToday=day.toDateString()===new Date().toDateString();
@@ -1177,37 +1286,41 @@ function renderWeek(range){
    const items=calendarItemsForDay(day,next);
    body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
  }
- $('calendarStage').innerHTML='<div class="timeline-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="week-time-grid">'+body+'</div></div>';
- bindCalendarInteractions();scrollTimeline();
+ stage.dataset.calendarMode='week';stage.innerHTML='<div class="timeline-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="week-time-grid">'+body+'</div></div>';
+ bindCalendarInteractions();scrollTimeline(range);
 }
 function monthEventChip(e){
  const prefix=e.allDay?'':fmtTime(e.start)+' ';
- return'<span class="month-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(prefix+e.title)+'</span>';
+ return'<button type="button" class="month-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(prefix+e.title)+'</button>';
 }
 function renderMonth(range){
+ const stage=$('calendarStage'),mobile=window.matchMedia('(max-width:760px)').matches,limit=mobile?2:3;
  let h='<div class="month-head">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
  const today=new Date(),month=plannerAnchor.getMonth();
  for(let i=0;i<42;i++){
-   const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1);
-   const ev=calEvents.filter(e=>eventOverlapsDay(e,day,next)).slice(0,3);
-   const tasks=state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).slice(0,3);
+   const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
+   const entries=[];
+   calEvents.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
+   state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
+   entries.sort((a,b)=>a.sort-b.sort);const visible=entries.slice(0,limit),remaining=Math.max(0,entries.length-visible.length);
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
-   h+='<div class="month-cell'+cls+'" data-month-date="'+day.toISOString()+'"><div class="month-date">'+day.getDate()+'</div>'+ev.map(monthEventChip).join('')+tasks.map(t=>'<span class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</span>').join('')+'</div>';
+   h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
  }
- h+='</div>';$('calendarStage').innerHTML=h;
- $('calendarStage').querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=()=>{plannerAnchor=new Date(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
+ h+='</div>';stage.dataset.calendarMode='month';stage.innerHTML=h;
+ stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
  bindCalendarInteractions();
 }
 async function renderPlanner(){
  renderMini();syncPlannerViewButtons();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
  try{calEvents=state.google.connected?(await api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))).events||[]:[]}catch(e){console.warn(e);calEvents=[]}
- $('connectInline').textContent=state.google.connected?'Google Calendar connected':'Connect Google Calendar';$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
+ $('connectInline').textContent=state.google.connected?'Google Calendar connected':(window.matchMedia('(max-width:760px)').matches?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
  if(plannerView==='day')renderDay(range);else if(plannerView==='month')renderMonth(range);else renderWeek(range);
 }
 document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=()=>{plannerView=b.dataset.calview;syncPlannerViewButtons();renderPlanner()});
 $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()-1);else if(plannerView==='week')x.setDate(x.getDate()-7);else x.setMonth(x.getMonth()-1);plannerAnchor=x;renderPlanner()};
 $('plannerNext').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()+1);else if(plannerView==='week')x.setDate(x.getDate()+7);else x.setMonth(x.getMonth()+1);plannerAnchor=x;renderPlanner()};
+const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
 const DISPLAY_SECTION_STYLES={
