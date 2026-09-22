@@ -1331,62 +1331,196 @@ function agentMessageText(data) {
   if (typeof data?.output_text === 'string') return data.output_text.trim();
   return '';
 }
-async function writableAgentCalendars() {
-  const out = [];
+async function agentGoogleContext() {
+  const accounts = [], calendarItems = [], taskListItems = [], writableCalendars = [];
   for (const account of googleAccounts()) {
-    if (!accountCanWrite(account)) continue;
+    const accountSummary = {
+      id: account.id,
+      label: account.label,
+      connected: Boolean(decrypt(account.token)),
+      canWrite: accountCanWrite(account),
+      canTasks: accountCanTasks(account),
+      selectedCalendarIds: (account.selectedCalendarIds || []).slice(0, 50),
+      selectedTaskListIds: (account.selectedTaskListIds || []).slice(0, 50),
+      defaultTaskListId: account.defaultTaskListId || ''
+    };
+    accounts.push(accountSummary);
     try {
       const items = await calendars(account.id);
       for (const calendar of items) {
-        if (!['writer', 'owner'].includes(calendar.accessRole)) continue;
-        out.push({
+        const entry = {
           accountId: account.id,
           accountLabel: account.label,
-          calendarId: calendar.id,
-          calendarName: calendar.summary,
+          id: calendar.id,
+          name: calendar.summary,
           primary: Boolean(calendar.primary),
+          accessRole: calendar.accessRole,
           selected: (account.selectedCalendarIds || []).includes(calendar.id)
-        });
+        };
+        calendarItems.push(entry);
+        if (['writer', 'owner'].includes(calendar.accessRole)) {
+          writableCalendars.push({
+            accountId: account.id,
+            accountLabel: account.label,
+            calendarId: calendar.id,
+            calendarName: calendar.summary,
+            primary: Boolean(calendar.primary),
+            selected: entry.selected
+          });
+        }
       }
     } catch (error) {
       console.warn('Agent calendar context failed for ' + account.label + ':', error.message);
     }
+    if (accountCanTasks(account)) {
+      try {
+        const lists = await taskLists(account);
+        for (const list of lists) {
+          taskListItems.push({
+            accountId: account.id,
+            accountLabel: account.label,
+            id: list.id,
+            title: list.title,
+            selected: (account.selectedTaskListIds || []).includes(list.id),
+            isDefault: account.defaultTaskListId === list.id
+          });
+        }
+      } catch (error) {
+        console.warn('Agent task-list context failed for ' + account.label + ':', error.message);
+      }
+    }
   }
-  return out.slice(0, 50);
+  return {
+    accounts: accounts.slice(0, 12),
+    calendars: calendarItems.slice(0, 100),
+    taskLists: taskListItems.slice(0, 100),
+    writableCalendars: writableCalendars.slice(0, 50)
+  };
 }
 async function agentPlannerContext() {
   const now = new Date();
   const end = new Date(now.getTime() + normalizeAgent(db.agent).contextDays * 86400000);
+  const weather = normalizeWeather(db.weather);
+  const appearance = normalizeAppearance(db.appearance);
+  const markets = normalizeMarkets(db.markets);
+  const google = await agentGoogleContext();
   let upcomingEvents = [];
   try { upcomingEvents = await eventsBetween(now.toISOString(), end.toISOString()); }
   catch (error) { console.warn('Agent event context failed:', error.message); }
+
+  const allTasks = sortedTasks();
+  const allGoals = db.goals || [];
+  const allCountdowns = sortedCountdowns();
+  const projects = [...new Set([
+    ...allTasks.map(item => cleanText(item.project, 80)),
+    ...allGoals.map(item => cleanText(item.project, 80))
+  ].filter(Boolean))].slice(0, 100);
+
   return {
     generatedAt: now.toISOString(),
     timezone: process.env.TZ || 'America/Vancouver',
-    tasks: sortedTasks().slice(0, 50).map(task => ({
+    app: {
+      runtime: 'self-hosted',
+      appearance,
+      display: {
+        title: cleanText(db.display?.title || 'Today', 80),
+        mode: db.display?.mode || 'daily',
+        layout: db.display?.layout || 'auto',
+        palette: db.display?.palette || 'spectra6',
+        dateWidgetStyle: db.display?.dateWidgetStyle || 'plain',
+        refreshMinutes: clamp(num(db.display?.refreshMinutes, 15), 1, 1440),
+        sectionOrder: normalizeSectionOrder(db.display?.sectionOrder),
+        modeSections: normalizeModeSections(db.display?.modeSections, db.display)
+      }
+    },
+    userContext: {
+      weatherLocation: {
+        configured: Number.isFinite(weather.latitude) && Number.isFinite(weather.longitude),
+        label: weather.locationLabel || '',
+        countryCode: weather.countryCode || '',
+        latitude: weather.latitude,
+        longitude: weather.longitude,
+        units: weather.units,
+        meaning: 'This is the location saved by the user for Quest Log weather. Treat it as their preferred/local context when useful, but do not claim it is their verified current physical location.'
+      }
+    },
+    plannerSummary: {
+      totalTasks: allTasks.length,
+      openTasks: allTasks.filter(item => item.status !== 'done').length,
+      completedTasks: allTasks.filter(item => item.status === 'done').length,
+      activeGoals: allGoals.filter(item => item.status === 'active').length,
+      activeCountdowns: allCountdowns.filter(item => new Date(item.end) > now).length,
+      upcomingEventsInContextWindow: upcomingEvents.length,
+      contextWindowDays: normalizeAgent(db.agent).contextDays
+    },
+    projects,
+    tasks: allTasks.slice(0, 75).map(task => ({
       id: task.id, title: task.title, description: task.description, status: task.status, priority: task.priority,
-      due: task.due, start: task.start, project: task.project, goalId: task.goalId
+      due: task.due, start: task.start, estimatedMinutes: task.estimatedMinutes, project: task.project, goalId: task.goalId,
+      tags: (task.tags || []).slice(0, 12),
+      subtasks: (task.subtasks || []).slice(0, 20).map(item => ({ id: item.id, title: item.title, done: item.done })),
+      created: task.created, updated: task.updated, completedAt: task.completedAt,
+      displayEnabled: task.displayEnabled !== false,
+      googleTaskListTitle: task.googleTaskListTitle || '',
+      linkedToGoogleTask: Boolean(task.googleTaskId)
     })),
-    goals: db.goals.slice(0, 30).map(goal => ({
+    goals: allGoals.slice(0, 40).map(goal => ({
       id: goal.id, title: goal.title, description: goal.description, type: goal.type, current: goal.current,
       target: goal.target, unit: goal.unit, deadline: goal.deadline, project: goal.project, status: goal.status,
-      progress: goalProgress(goal)
+      progress: goalProgress(goal), accentColor: goal.accentColor, displayEnabled: goal.displayEnabled !== false,
+      checklist: (goal.checklist || []).slice(0, 25).map(item => ({ id: item.id, title: item.title, done: item.done })),
+      created: goal.created, updated: goal.updated
     })),
-    countdowns: sortedCountdowns().filter(item => new Date(item.end) > now).slice(0, 30).map(item => ({
-      id: item.id, name: item.name, end: item.end, pinned: item.pinned, goalId: item.goalId
+    countdowns: allCountdowns.filter(item => new Date(item.end) > now).slice(0, 40).map(item => ({
+      id: item.id, name: item.name, end: item.end, created: item.created, pinned: item.pinned, goalId: item.goalId,
+      accentColor: item.accentColor, progressMode: item.progressMode, progressCurrent: item.progressCurrent,
+      progressTotal: item.progressTotal, progressStart: item.progressStart, displayEnabled: item.displayEnabled !== false,
+      dateDisplayStyle: item.dateDisplayStyle, timeDisplayStyle: item.timeDisplayStyle
     })),
-    events: upcomingEvents.slice(0, 60).map(event => ({
+    events: upcomingEvents.slice(0, 80).map(event => ({
       id: event.id, accountId: event.accountId, calendarId: event.calendarId, calendarName: event.calendarName,
-      title: event.title, description: cleanText(event.description, 500), start: event.start, end: event.end,
-      allDay: event.allDay, location: event.location, accessRole: event.accessRole
+      title: event.title, description: cleanText(event.description, 1000), start: event.start, end: event.end,
+      allDay: event.allDay, location: event.location, accessRole: event.accessRole,
+      recurringEventId: event.recurringEventId || ''
     })),
-    writableCalendars: await writableAgentCalendars()
+    integrations: {
+      google: {
+        connected: google.accounts.some(account => account.connected),
+        accounts: google.accounts,
+        calendars: google.calendars,
+        taskLists: google.taskLists
+      },
+      weather: {
+        configured: Number.isFinite(weather.latitude) && Number.isFinite(weather.longitude),
+        provider: weather.countryCode === 'CA' ? 'Environment Canada + Open-Meteo' : 'Open-Meteo',
+        location: {
+          label: weather.locationLabel || '',
+          countryCode: weather.countryCode || '',
+          latitude: weather.latitude,
+          longitude: weather.longitude,
+          units: weather.units
+        }
+      },
+      markets: {
+        configured: marketConfigured(),
+        provider: 'Alpha Vantage',
+        refreshMinutes: markets.refreshMinutes,
+        watchlist: (markets.watchlist || []).slice(0, 8).map(item => ({
+          symbol: item.symbol, providerSymbol: item.providerSymbol, name: item.name,
+          exchange: item.exchange, region: item.region, currency: item.currency
+        }))
+      }
+    },
+    writableCalendars: google.writableCalendars
   };
 }
 function agentSystemPrompt() {
   return [
     'You are Navi, the planning companion inside Quest Log, a self-hosted calendar/task/goal/countdown app.',
-    'Use the supplied Quest Log context as the source of truth for the user\'s current planner data.',
+    'Use the supplied Quest Log context as the source of truth for the user\'s current planner data, app settings, integrations, and saved preferences.',
+    'The saved weatherLocation is especially important local context. It is the location the user chose for weather, not verified live device location, so use it as a default local area without claiming the user is physically there right now.',
+    'You may use app appearance, display preferences, project names, Google account/calendar/task-list metadata, weather configuration, and market watchlist when relevant.',
+    'Secrets, OAuth tokens, API keys, agent credentials, and display tokens are intentionally excluded from context; never ask the user to reveal them in chat.',
     'Return ONLY one JSON object with this exact top-level shape: {"message":"your response","actions":[]}.',
     'The message should be natural and concise. Never claim a proposed change has already happened.',
     'When the user asks you to change planner data, add one or more actions. Quest Log will validate them and ask the user to confirm before execution.',
