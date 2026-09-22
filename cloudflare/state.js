@@ -134,9 +134,10 @@ export function normalizeGoogleAccount(x={}){
   return{id:String(x.id||id()),googleId:cleanText(x.googleId,240),label:cleanText(x.label||x.googleId||'Google account',160),token:typeof x.token==='string'?x.token:null,selectedCalendarIds:Array.isArray(x.selectedCalendarIds)?x.selectedCalendarIds.map(String).slice(0,50):[],selectedTaskListIds,defaultTaskListId:selectedTaskListIds.includes(String(x.defaultTaskListId||''))?String(x.defaultTaskListId):selectedTaskListIds[0]||'',connectedAt:iso(x.connectedAt)||new Date().toISOString()};
 }
 function normalizeDisplay(x={}){
-  const base={token:crypto.randomUUID().replaceAll('-')+crypto.randomUUID().replaceAll('-').slice(0,16),title:'Today',maxEvents:5,maxCountdowns:3,maxTasks:6,maxGoals:3,layout:'auto',palette:'spectra6',dateWidgetStyle:'plain',mode:'daily',plannerLayoutVersion:5,sectionLayoutMode:'custom',sectionLayout:defaultLayout('dashboard'),sectionOrder:[...DISPLAY_KEYS],weatherStyle:'forecast',modeLayouts:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultLayout(m)])),modeSections:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultSections(m)])),refreshMinutes:15,showAgenda:true,showTasks:true,showGoals:true,showCountdowns:true,showWeather:true};
-  const m={...base,...x};
-  return{...m,sectionLayoutMode:'custom',sectionLayout:normalizeSectionLayout(m.sectionLayout,'dashboard'),sectionOrder:normalizeSectionOrder(m.sectionOrder),modeLayouts:normalizeModeLayouts(m.modeLayouts,m.sectionLayout),modeSections:normalizeModeSections(m.modeSections),plannerLayoutVersion:5};
+  const generatedToken=crypto.randomUUID().replaceAll('-')+crypto.randomUUID().replaceAll('-').slice(0,16);
+  const base={token:generatedToken,title:'Today',maxEvents:5,maxCountdowns:3,maxTasks:6,maxGoals:3,layout:'auto',palette:'spectra6',dateWidgetStyle:'plain',mode:'daily',plannerLayoutVersion:5,sectionLayoutMode:'custom',sectionLayout:defaultLayout('dashboard'),sectionOrder:[...DISPLAY_KEYS],weatherStyle:'forecast',modeLayouts:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultLayout(m)])),modeSections:Object.fromEntries(DISPLAY_MODES.map(m=>[m,defaultSections(m)])),refreshMinutes:15,showAgenda:true,showTasks:true,showGoals:true,showCountdowns:true,showWeather:true};
+  const m={...base,...x},token=cleanText(x?.token,160)||generatedToken;
+  return{...m,token,sectionLayoutMode:'custom',sectionLayout:normalizeSectionLayout(m.sectionLayout,'dashboard'),sectionOrder:normalizeSectionOrder(m.sectionOrder),modeLayouts:normalizeModeLayouts(m.modeLayouts,m.sectionLayout),modeSections:normalizeModeSections(m.modeSections),plannerLayoutVersion:5};
 }
 export function defaults(){
   return{countdowns:[],tasks:[],goals:[],google:{accounts:[],countdownWindowDays:30},weather:normalizeWeather({units:'metric'}),appearance:normalizeAppearance({mode:'system',theme:'quest',density:'comfortable'}),markets:normalizeMarkets({}),marketCache:null,agent:{enabled:true,provider:'openai',baseUrl:'',model:'gpt-5.6-luna',contextDays:14,credentials:{}},notifications:normalizeNotifications({}),display:normalizeDisplay({})};
@@ -176,7 +177,11 @@ export async function loadState(env){
   const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default';
   const row=await env.DB.prepare('SELECT state_json FROM questlog_state WHERE workspace_id=?').bind(workspace).first();
   if(!row?.state_json){const state=defaults();await saveState(env,state);return state}
-  try{return normalizeState(JSON.parse(row.state_json))}catch{const state=defaults();await saveState(env,state);return state}
+  try{
+    const parsed=JSON.parse(row.state_json),state=normalizeState(parsed);
+    if(!cleanText(parsed?.display?.token,160))await saveState(env,state);
+    return state;
+  }catch{const state=defaults();await saveState(env,state);return state}
 }
 export async function saveState(env,state){
   if(!env.DB)throw new Error('Cloudflare D1 binding DB is not configured.');
@@ -184,4 +189,12 @@ export async function saveState(env,state){
   const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default',normalized=normalizeState(state);
   await env.DB.prepare("INSERT INTO questlog_state(workspace_id,state_json,schema_version,created_at,updated_at) VALUES(?,?,1,datetime('now'),datetime('now')) ON CONFLICT(workspace_id) DO UPDATE SET state_json=excluded.state_json,schema_version=1,updated_at=datetime('now')").bind(workspace,JSON.stringify(normalized)).run();
   return normalized;
+}
+
+export async function saveMarketCache(env,marketCache){
+  if(!env.DB)return;
+  await ensureSchema(env.DB);
+  const workspace=cleanText(env.CLOUD_WORKSPACE_ID||'default',120)||'default';
+  await env.DB.prepare("UPDATE questlog_state SET state_json=json_set(state_json,'$.marketCache',json(?)),updated_at=datetime('now') WHERE workspace_id=?")
+    .bind(JSON.stringify(marketCache??null),workspace).run();
 }
