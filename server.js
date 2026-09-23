@@ -90,6 +90,55 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
 }[char]));
 const cleanText = (value, max = 500) => String(value || '').trim().slice(0, max);
+function validTimeZone(value) {
+  const zone = cleanText(value, 100);
+  if (!zone) return false;
+  try { new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(new Date()); return true; }
+  catch { return false; }
+}
+function normalizeTimeZone(value, fallback = 'America/Vancouver') {
+  const zone = cleanText(value, 100);
+  if (validTimeZone(zone)) return zone;
+  return validTimeZone(fallback) ? fallback : 'UTC';
+}
+function zonedParts(value, timeZone) {
+  const zone = normalizeTimeZone(timeZone);
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date);
+  return Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+}
+function zonedDateKey(value, timeZone) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parts = zonedParts(value, timeZone);
+  return parts ? parts.year + '-' + parts.month + '-' + parts.day : '';
+}
+function addDateKeyValue(key, days) {
+  const [year, month, day] = String(key || '').split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12));
+  return [value.getUTCFullYear(), String(value.getUTCMonth() + 1).padStart(2, '0'), String(value.getUTCDate()).padStart(2, '0')].join('-');
+}
+function zonedBoundary(key, timeZone, minutes = 0) {
+  const zone = normalizeTimeZone(timeZone);
+  const [year, month, day] = String(key || '').split('-').map(Number);
+  const hours = Math.floor(minutes / 60), mins = minutes % 60;
+  const target = Date.UTC(year, month - 1, day, hours, mins, 0);
+  let guess = target;
+  for (let i = 0; i < 3; i++) {
+    const parts = zonedParts(new Date(guess), zone);
+    if (!parts) break;
+    const shown = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second || 0));
+    guess += target - shown;
+  }
+  return new Date(guess);
+}
+function appTimeZoneServer() {
+  return normalizeTimeZone(db?.timeZone || db?.weather?.timeZone || process.env.TZ || 'America/Vancouver');
+}
 
 function defaultSectionLayout(mode = 'dashboard') {
   if (mode === 'daily' || mode === 'weekly') return {
@@ -276,6 +325,7 @@ function defaults() {
     tasks: [],
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
+    timeZone: normalizeTimeZone(process.env.TZ || 'America/Vancouver'),
     weather: { latitude: null, longitude: null, locationLabel: '', countryCode: '', timeZone: '', units: 'metric' },
     appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
     markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 15 },
@@ -530,6 +580,7 @@ function load() {
         accounts,
         countdownWindowDays: clamp(num(legacyGoogle.countdownWindowDays, 30), 1, 365)
       },
+      timeZone: normalizeTimeZone(parsed.timeZone || parsed.weather?.timeZone || base.timeZone, base.timeZone),
       weather: normalizeWeather(parsed.weather || base.weather),
       appearance: normalizeAppearance(parsed.appearance || base.appearance),
       markets: normalizeMarkets(parsed.markets || base.markets),
@@ -1658,7 +1709,7 @@ async function agentPlannerContext() {
 
   return {
     generatedAt: now.toISOString(),
-    timezone: process.env.TZ || 'America/Vancouver',
+    timezone: appTimeZoneServer(),
     app: {
       runtime: 'self-hosted',
       appearance,
@@ -2485,26 +2536,27 @@ async function testMarketConnection() {
 }
 
 function agendaRange(scope, now = new Date()) {
-  const startOfDay = value => { const d = new Date(value); d.setHours(0, 0, 0, 0); return d; };
+  const zone = appTimeZoneServer(), todayKey = zonedDateKey(now, zone);
   if (scope === 'today') {
-    const start = startOfDay(now), end = new Date(start); end.setDate(end.getDate() + 1);
-    return { start, end };
+    return { start: zonedBoundary(todayKey, zone), end: zonedBoundary(addDateKeyValue(todayKey, 1), zone) };
   }
   if (scope === 'week') {
-    const start = startOfDay(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-    const end = new Date(start); end.setDate(end.getDate() + 7);
-    return { start, end };
+    const weekday = new Date(todayKey + 'T12:00:00Z').getUTCDay();
+    const mondayKey = addDateKeyValue(todayKey, -((weekday + 6) % 7));
+    return { start: zonedBoundary(mondayKey, zone), end: zonedBoundary(addDateKeyValue(mondayKey, 7), zone) };
   }
   if (scope === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return { start, end };
+    const monthKey = todayKey.slice(0, 8) + '01';
+    const [year, month] = monthKey.split('-').map(Number);
+    const nextMonth = new Date(Date.UTC(year, month, 1, 12));
+    const nextKey = [nextMonth.getUTCFullYear(), String(nextMonth.getUTCMonth() + 1).padStart(2, '0'), '01'].join('-');
+    return { start: zonedBoundary(monthKey, zone), end: zonedBoundary(nextKey, zone) };
   }
   return { start: new Date(now), end: new Date(now.getTime() + clamp(num(db.google.countdownWindowDays, 30), 1, 365) * 86400000) };
 }
 
 function agendaTasksForRange(scope, range, now = new Date()) {
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = zonedBoundary(zonedDateKey(now, appTimeZoneServer()), appTimeZoneServer());
   return sortedTasks().filter(task => {
     if (task.status === 'done' || task.displayEnabled === false) return false;
     if (!task.due) return scope === 'today' || scope === 'upcoming';
@@ -2548,7 +2600,7 @@ async function feed() {
     .sort((a, b) => (a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER) - (b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER))
     .slice(0, clamp(num(db.display.maxGoals, 3), 1, 20)).map(g => ({ ...g, progress: goalProgress(g) }));
   return {
-    generatedAt: new Date().toISOString(), title: db.display.title || 'Today', calendarError, weatherError, weather, marketError, markets,
+    generatedAt: new Date().toISOString(), timeZone: appTimeZoneServer(), title: db.display.title || 'Today', calendarError, weatherError, weather, marketError, markets,
     nextEvent: ev.find(event => new Date(event.end || event.start).getTime() >= now) || null,
     events: modeSections.agenda.enabled ? ev.slice(0, modeSections.agenda.limit) : [],
     calendarEvents: modeSections.agenda.enabled ? ev.slice(0, 250) : [],
@@ -2582,11 +2634,11 @@ async function feed() {
 
 function color(name, palette) { return palette === 'mono' ? HEX.black : (HEX[name] || HEX.black); }
 function formatDateServer(value, style) {
-  const d = new Date(value);
-  if (style === 'numeric') return d.toLocaleDateString('en-CA');
-  if (style === 'short') return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-  if (style === 'long') return d.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  const d = new Date(value), timeZone = appTimeZoneServer();
+  if (style === 'numeric') return d.toLocaleDateString('en-CA', { timeZone });
+  if (style === 'short') return d.toLocaleDateString('en-CA', { timeZone, month: 'short', day: 'numeric' });
+  if (style === 'long') return d.toLocaleDateString('en-CA', { timeZone, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-CA', { timeZone, month: 'short', day: 'numeric', year: 'numeric' });
 }
 function timeLabel(c) {
   const r = c.remaining;
@@ -2614,16 +2666,14 @@ function sectionTitle(label, x, y, kind, palette) {
   return '<circle cx="' + (x + 4) + '" cy="' + (y - 4) + '" r="3.5" fill="' + accent + '" stroke="' + HEX.black + '" stroke-width=".8"/>' +
     '<text x="' + (x + 14) + '" y="' + y + '" class="k">' + esc(label) + '</text>';
 }
-function plannerDateKey(value) {
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const d = value instanceof Date ? value : new Date(value);
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+function plannerDateKey(value, data) {
+  return zonedDateKey(value, plannerTimeZone(data));
 }
-function plannerStartOfDay(value) {
-  const d = new Date(value); d.setHours(0, 0, 0, 0); return d;
+function plannerStartOfDay(value, data) {
+  const key = plannerDateKey(value, data);
+  return zonedBoundary(key, plannerTimeZone(data));
 }
-function plannerTimeZone(data) { return cleanText(data?.weather?.timeZone || db.weather?.timeZone || process.env.TZ || 'UTC', 100); }
+function plannerTimeZone(data) { return normalizeTimeZone(data?.timeZone || db.timeZone || data?.weather?.timeZone || db.weather?.timeZone || process.env.TZ || 'America/Vancouver'); }
 function plannerTime(value, data, options = { hour:'numeric', minute:'2-digit' }) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: plannerTimeZone(data), ...options }).format(new Date(value));
 }
@@ -3315,6 +3365,7 @@ function state() {
   return {
     countdowns: sortedCountdowns(), tasks: sortedTasks(), goals: db.goals.map(g => ({ ...g, progress: goalProgress(g) })),
     updater: { configured: updaterConfigured() },
+    timeZone: appTimeZoneServer(),
     appearance: normalizeAppearance(db.appearance),
     weather: { ...normalizeWeather(db.weather), configured: true, provider: 'Open-Meteo' },
     markets: (() => { const config = normalizeMarkets(db.markets); return { watchlist: config.watchlist, symbols: config.symbols, refreshMinutes: config.refreshMinutes, configured: true, provider: 'Yahoo Finance', effectiveRefreshMinutes: config.refreshMinutes, batchSize: 50, unofficial: true }; })(),
@@ -3656,6 +3707,11 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/settings' && req.method === 'PUT') {
       const incoming = await body(req);
+      if (incoming.timeZone !== undefined) {
+        const requestedTimeZone = cleanText(incoming.timeZone, 100);
+        if (!validTimeZone(requestedTimeZone)) return json(res, 400, { error: 'Choose a valid IANA time zone.' });
+        db.timeZone = normalizeTimeZone(requestedTimeZone, appTimeZoneServer());
+      }
       if (Array.isArray(incoming.selectedCalendarIds) && googleAccounts().length === 1) googleAccounts()[0].selectedCalendarIds = incoming.selectedCalendarIds.map(String).slice(0, 50);
       if (incoming.countdownWindowDays !== undefined) db.google.countdownWindowDays = clamp(num(incoming.countdownWindowDays, 30), 1, 365);
       if (incoming.agentEnabled !== undefined || incoming.agentProvider !== undefined || incoming.agentBaseUrl !== undefined || incoming.agentModel !== undefined || incoming.agentContextDays !== undefined || incoming.agentApiKey !== undefined || incoming.agentClearApiKey !== undefined) {

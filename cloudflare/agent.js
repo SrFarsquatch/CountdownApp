@@ -1,7 +1,7 @@
 import {
   saveState, cleanText, iso, num, clamp, en, id,
   normalizeTask, normalizeGoal, normalizeCountdown, goalProgress,
-  normalizeWeather, normalizeMarkets, normalizeAppearance, normalizeModeSections, normalizeSectionOrder
+  normalizeWeather, normalizeMarkets, normalizeAppearance, normalizeTimeZone, normalizeModeSections, normalizeSectionOrder
 } from './state.js';
 import { eventsBetween, calendars, taskLists, mutateEvent } from './google.js';
 
@@ -161,6 +161,7 @@ async function plannerContext(state,env){
   const projects=[...new Set([...allTasks.map(x=>cleanText(x.project,80)),...allGoals.map(x=>cleanText(x.project,80))].filter(Boolean))].slice(0,100);
   return{
     generatedAt:now.toISOString(),
+    timezone:normalizeTimeZone(state.timeZone||weather.timeZone||'America/Vancouver'),
     app:{
       runtime:'cloudflare',
       appearance,

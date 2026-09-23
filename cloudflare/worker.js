@@ -1,7 +1,7 @@
 import {
   loadState, saveState, publicState, id, cleanText, iso, num, clamp, en,
   normalizeCountdown, normalizeTask, normalizeGoal, normalizeWeather,
-  normalizeAppearance, normalizeMarkets, normalizeSectionLayout,
+  normalizeAppearance, normalizeMarkets, normalizeTimeZone, validTimeZone, normalizeSectionLayout,
   normalizeModeLayouts, normalizeModeSections, normalizeSectionOrder,
   LAYOUTS, PALETTES, DATE_WIDGETS, DISPLAY_MODES, WEATHER_STYLES,
   APPEARANCE_MODES, UI_THEMES, UI_DENSITIES, AGENT_PROVIDERS
@@ -315,6 +315,11 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/settings'&&method==='PUT'){
     const incoming=await body(request);
+    if(incoming.timeZone!==undefined){
+      const requestedTimeZone=cleanText(incoming.timeZone,100);
+      if(!validTimeZone(requestedTimeZone)){const e=new Error('Choose a valid IANA time zone.');e.status=400;throw e}
+      state.timeZone=normalizeTimeZone(requestedTimeZone,state.timeZone||state.weather?.timeZone||'America/Vancouver');
+    }
     if(incoming.appearanceMode!==undefined||incoming.appearanceTheme!==undefined||incoming.appearanceDensity!==undefined){
       state.appearance=normalizeAppearance({...state.appearance,mode:incoming.appearanceMode??state.appearance.mode,theme:incoming.appearanceTheme??state.appearance.theme,density:incoming.appearanceDensity??state.appearance.density});
     }

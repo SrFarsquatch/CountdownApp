@@ -90,7 +90,7 @@
 .today-hero{display:grid;grid-template-columns:minmax(235px,.75fr) minmax(320px,1.15fr) auto;gap:24px;align-items:center;min-height:78px}.today-greeting{min-width:0}.today-agent-bar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;max-width:620px;width:100%;justify-self:center;padding:7px 8px 7px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}.today-agent-bar:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 12%,transparent)}.today-agent-icon{font-size:17px;color:var(--accent);line-height:1}.today-agent-bar input{border:0!important;background:transparent!important;min-height:34px!important;padding:5px 2px!important;outline:0;box-shadow:none!important;width:100%}.today-agent-bar button{width:34px;height:34px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-contrast);font-size:18px;font-weight:850;display:grid;place-items:center}.today-hero-side{margin-left:0;display:grid;gap:7px;justify-items:end;min-width:280px}
 .agent-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:69}.agent-drawer-backdrop.open{opacity:1;pointer-events:auto}.agent-drawer{position:fixed;right:24px;bottom:24px;width:min(430px,calc(100vw - 32px));height:min(650px,calc(100vh - 110px));display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.24);overflow:hidden;z-index:70;opacity:0;transform:translateY(18px) scale(.975);pointer-events:none;transition:opacity .2s ease,transform .2s ease}.agent-drawer.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}.agent-drawer-head{padding:15px 16px;background:color-mix(in srgb,var(--panel) 94%,var(--bg));backdrop-filter:blur(18px)}.agent-drawer-actions{display:flex;align-items:center;gap:4px}.agent-close{width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:22px;line-height:1;display:grid;place-items:center}.agent-close:hover{background:var(--panel2);color:var(--text)}.agent-chat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line)}.agent-messages{min-height:0;overflow:auto;padding:16px;display:grid;align-content:start;gap:11px;background:color-mix(in srgb,var(--panel2) 45%,var(--panel))}.agent-message{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);white-space:pre-wrap;overflow-wrap:anywhere}.agent-message.user{justify-self:end;background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}.agent-message.assistant{justify-self:start}.agent-message .meta{margin-top:6px}.agent-action-box{justify-self:stretch;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:var(--accent-soft);border-radius:14px;padding:12px}.agent-action-list{display:grid;gap:7px;margin-top:9px}.agent-action{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px}.agent-action-controls{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.agent-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px 14px;border-top:1px solid var(--line);align-items:end;background:var(--panel)}.agent-compose textarea{min-height:44px;max-height:130px;resize:none}.agent-help{padding:0 14px 12px}.agent-fab{position:fixed;right:26px;bottom:88px;width:48px;height:48px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:16px;background:var(--panel);color:var(--accent);font-size:21px;box-shadow:0 12px 28px rgba(0,0,0,.15);z-index:42;display:grid;place-items:center;transition:transform .16s ease,background .16s ease}.agent-fab:hover{transform:translateY(-2px);background:var(--accent-soft)}body.agent-open .agent-fab{opacity:0;pointer-events:none}body.agent-open .quick{opacity:0;pointer-events:none}.notice{padding:11px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--muted);font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:1050px){.span-8,.span-4,.span-6,.span-12{grid-column:span 12}.calendar-shell{grid-template-columns:1fr}.mini{display:none}.goal-grid{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}.today-hero{grid-template-columns:minmax(220px,1fr) auto;gap:16px}.today-agent-bar{grid-column:1/-1;grid-row:2;max-width:none;justify-self:stretch}.weather-main{grid-template-columns:1fr}.forecast-strip{grid-template-columns:repeat(4,minmax(72px,1fr))}}
-@media(max-width:760px){.app{display:block}.side{display:none}.top{height:62px;padding:0 16px}.content{padding:18px 14px 96px}.top h1{font-size:19px}.top-actions .btn:not(.primary){display:none}.hero{align-items:flex-start}.hero h2{font-size:29px}.stat-row{grid-template-columns:1fr 1fr}.count-grid,.goal-grid{grid-template-columns:1fr}.calendar-shell{display:block}.week-head{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.week-body{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.mobile-nav{position:fixed;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:5px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(18px);z-index:50}.mobile-nav button{border:0;background:transparent;padding:8px 2px;border-radius:10px;font-size:11px;font-weight:760;color:var(--muted)}.mobile-nav button.on{background:var(--accent);color:var(--accent-contrast)}.quick{right:18px;bottom:78px}}
+@media(max-width:760px){.app{display:block}.side{display:none}.top{height:62px;padding:0 16px}.content{padding:18px 14px 96px}.top h1{font-size:19px}.top-actions .btn:not(.primary){display:none}.hero{align-items:flex-start}.hero h2{font-size:29px}.stat-row{grid-template-columns:1fr 1fr}.count-grid,.goal-grid{grid-template-columns:1fr}.calendar-shell{display:block}.week-head{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.week-body{grid-template-columns:56px repeat(7,minmax(105px,1fr))}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.mobile-nav{position:fixed;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:5px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(18px);z-index:50}.mobile-nav button{border:0;background:transparent;padding:8px 2px;border-radius:10px;font-size:11px;font-weight:760;color:var(--muted)}.mobile-nav button.on{background:var(--accent);color:var(--accent-contrast)}.quick{right:18px;bottom:78px}}
 /* mobile portrait hardening */
 
 @media(max-width:760px){
@@ -283,6 +283,19 @@
 .update-checking-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:updatePulse 1s ease-in-out infinite}
 @keyframes updatePulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 @media(max-width:760px){.update-builds{grid-template-columns:1fr}.update-actions .btn{flex:1}}
+
+/* Settings workspace */
+.settings-section-nav{display:flex;gap:5px;width:max-content;max-width:100%;padding:4px;margin:0 0 18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.settings-section-nav button{border:0;background:transparent;color:var(--muted);border-radius:10px;min-height:40px;padding:7px 14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.settings-section-nav button.on{background:var(--accent-soft);color:var(--accent)}
+.settings-section-nav svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.settings-pane{display:none}.settings-pane.on{display:block}
+@media(max-width:760px){
+  #view-settings>.hero{margin-bottom:12px}
+  .settings-section-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-bottom:14px;padding:3px}
+  .settings-section-nav button{justify-content:center;min-height:44px;padding:7px 9px}
+  .settings-pane[data-settings-pane="displays"] .hero{display:none}
+}
 
 /* Unified Planner workspace */
 .planner-section-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
@@ -712,7 +725,7 @@ body.modal-open{overflow:hidden}
   .mobile-nav{
     left:0;right:0;bottom:0;
     height:calc(64px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(5,1fr);
+    grid-template-columns:repeat(4,1fr);
     gap:0;
     padding:5px 8px env(safe-area-inset-bottom);
     border:0;border-top:1px solid var(--line);
@@ -1192,7 +1205,6 @@ body.modal-open{overflow:hidden}
     <button data-view="planner">Planner</button>
     <button data-view="markets">Markets</button>
     <div class="sep"></div>
-    <button data-view="displays">Displays</button>
     <button class="nav-with-badge" data-view="settings">Settings <span class="nav-update-badge" id="settingsUpdateBadge" hidden>Update</span></button>
   </nav>
   <div class="side-foot" id="sideFoot"><div class="side-session"><div>Self-hosted • Google Calendar • E-ink</div></div></div>
@@ -1300,54 +1312,25 @@ body.modal-open{overflow:hidden}
   </div>
 </section>
 
-<section class="view" id="view-displays">
-  <div class="hero"><div><h2>E-ink display</h2><p>Choose what your FrameOS display should show and arrange each section exactly where you want it.</p></div></div>
-  <div class="settings-grid">
-    <div class="card setting-card"><div class="eyebrow">Layout</div><h3>Display content</h3>
-      <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="weekly">Weekly planner</option><option value="monthly">Monthly planner</option><option value="countdowns">Countdowns only</option></select></div>
-      <div class="setting-row"><span>Orientation</span><select id="displayLayout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
-      <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Spectra 6 (6-color e-ink)</option><option value="mono">Black & white</option></select></div>
-      <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
-      <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather location and units are managed in Settings.</div>
-      <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
-    </div>
-    <div class="card setting-card"><div class="eyebrow">Preview</div><h3>FrameOS output</h3>
-      <div class="setting-row"><span>Resolution</span><div style="display:flex;gap:7px"><input id="previewW" type="number" value="800" min="300" max="2000"><input id="previewH" type="number" value="480" min="300" max="2000"></div></div>
-      <div class="preview"><img id="displayPreview" alt="E-ink preview"></div>
-      <div class="row-actions"><button class="btn tiny" id="landPreset">800 × 480</button><button class="btn tiny" id="portPreset">480 × 800</button><button class="btn tiny" id="openFrame">Open full screen</button></div>
-    </div>
-  </div>
-
-  <div class="card eink-layout-card" id="einkLayoutCard">
-    <div class="eyebrow">Section editor</div>
-    <h3 style="margin:4px 0">Arrange this display mode</h3>
-    <p class="meta layout-help">Every mode has its own freeform canvas. Drag widgets anywhere, resize continuously from the bottom-right corner, overlap them when useful, or tap the ⚙ button inside a widget to change what it shows.</p>
-    <div class="eink-layout-toolbar">
-      <div class="meta" id="layoutEditorStatus">Custom layout is off.</div>
-      <div class="row-actions"><button class="btn tiny" id="autoArrangeSections">Arrange for resolution</button><button class="btn tiny" id="resetSectionLayout">Reset layout</button></div>
-    </div>
-    <div class="eink-layout-shell" id="einkLayoutShell">
-      <div class="eink-layout-header"><span id="layoutEditorDate">SEP 20, 2026</span><strong id="layoutEditorMode">DAY · 2:49 PM</strong></div>
-      <div class="section-layout-editor" id="sectionLayoutEditor"></div>
-      <div class="eink-layout-footer" id="layoutEditorFooter">Freeform layout</div>
-    </div>
-    <div class="widget-settings" id="widgetSettings" hidden></div>
-  </div>
-
-  <div class="card connection-box">
-    <div class="eyebrow">FrameOS connection</div><h3 style="margin:4px 0 4px">Private display sources</h3>
-    <p class="meta">Use the rendered PNG for the browser-based E-Ink layout, the SVG as a lightweight fallback, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
-    <div class="connection-row"><strong>Rendered PNG</strong><div class="connection-url" id="imageUrl"></div><button class="btn tiny" data-copy="imageUrl">Copy</button></div>
-    <div class="connection-row"><strong>SVG fallback</strong><div class="connection-url" id="svgUrl"></div><button class="btn tiny" data-copy="svgUrl">Copy</button></div>
-    <div class="connection-row"><strong>JSON feed</strong><div class="connection-url" id="feedUrl"></div><button class="btn tiny" data-copy="feedUrl">Copy</button></div>
-    <div class="connection-row"><strong>Browser preview</strong><div class="connection-url" id="viewUrl"></div><button class="btn tiny" data-copy="viewUrl">Copy</button></div>
-    <div class="row-actions"><button class="btn tiny" id="rotateDisplayToken">Rotate private token</button></div>
-  </div>
-</section>
-
 <section class="view" id="view-settings">
   <div class="hero"><div><h2>Settings</h2><p>Integrations, calendars and app maintenance.</p></div></div>
+  <nav class="settings-section-nav" aria-label="Settings sections">
+    <button class="on" type="button" data-settings-section="general" aria-selected="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.37.36.7.6 1 .3.3.7.4 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6z"></path></svg><span>General</span>
+    </button>
+    <button type="button" data-settings-section="displays" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg><span>Displays</span>
+    </button>
+  </nav>
+  <div class="settings-pane on" data-settings-pane="general">
   <div class="settings-grid">
+    <div class="card setting-card">
+      <div class="eyebrow">Date &amp; time</div><h3>Default time zone</h3>
+      <p class="meta">Controls calendar and task times, countdown dates, Navi context, and e-ink display time. Weather keeps its own location time zone.</p>
+      <div class="setting-row"><span>Time zone</span><select id="settingsTimeZone"></select></div>
+      <div class="meta" id="settingsTimeZoneStatus"></div>
+      <div class="modal-actions"><button class="btn" id="useDeviceTimeZone" type="button">Use device time zone</button><button class="btn primary" id="saveTimeZone" type="button">Save time zone</button></div>
+    </div>
     <div class="card setting-card">
       <div class="eyebrow">Appearance</div><h3>Quest Log theme</h3>
       <p class="meta">Choose how Quest Log looks. This does not change the e-ink display palette.</p>
@@ -1423,6 +1406,52 @@ body.modal-open{overflow:hidden}
       </div>
     </div>
   </div>
+  </div>
+  <div class="settings-pane" data-settings-pane="displays">
+  <div class="hero"><div><h2>E-ink display</h2><p>Choose what your FrameOS display should show and arrange each section exactly where you want it.</p></div></div>
+  <div class="settings-grid">
+    <div class="card setting-card"><div class="eyebrow">Layout</div><h3>Display content</h3>
+      <div class="setting-row"><span>Mode</span><select id="displayMode"><option value="dashboard">Dashboard</option><option value="daily">Daily planner</option><option value="weekly">Weekly planner</option><option value="monthly">Monthly planner</option><option value="countdowns">Countdowns only</option></select></div>
+      <div class="setting-row"><span>Orientation</span><select id="displayLayout"><option value="auto">Auto</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
+      <div class="setting-row"><span>Palette</span><select id="displayPalette"><option value="spectra6">Spectra 6 (6-color e-ink)</option><option value="mono">Black & white</option></select></div>
+      <div class="setting-row"><span>Refresh</span><select id="displayRefresh"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
+      <div class="meta" id="weatherConfigStatus" style="margin-top:-4px">Weather location and units are managed in Settings.</div>
+      <div class="modal-actions"><button class="btn primary" id="saveDisplay">Save display</button></div>
+    </div>
+    <div class="card setting-card"><div class="eyebrow">Preview</div><h3>FrameOS output</h3>
+      <div class="setting-row"><span>Resolution</span><div style="display:flex;gap:7px"><input id="previewW" type="number" value="800" min="300" max="2000"><input id="previewH" type="number" value="480" min="300" max="2000"></div></div>
+      <div class="preview"><img id="displayPreview" alt="E-ink preview"></div>
+      <div class="row-actions"><button class="btn tiny" id="landPreset">800 × 480</button><button class="btn tiny" id="portPreset">480 × 800</button><button class="btn tiny" id="openFrame">Open full screen</button></div>
+    </div>
+  </div>
+
+  <div class="card eink-layout-card" id="einkLayoutCard">
+    <div class="eyebrow">Section editor</div>
+    <h3 style="margin:4px 0">Arrange this display mode</h3>
+    <p class="meta layout-help">Every mode has its own freeform canvas. Drag widgets anywhere, resize continuously from the bottom-right corner, overlap them when useful, or tap the ⚙ button inside a widget to change what it shows.</p>
+    <div class="eink-layout-toolbar">
+      <div class="meta" id="layoutEditorStatus">Custom layout is off.</div>
+      <div class="row-actions"><button class="btn tiny" id="autoArrangeSections">Arrange for resolution</button><button class="btn tiny" id="resetSectionLayout">Reset layout</button></div>
+    </div>
+    <div class="eink-layout-shell" id="einkLayoutShell">
+      <div class="eink-layout-header"><span id="layoutEditorDate">SEP 20, 2026</span><strong id="layoutEditorMode">DAY · 2:49 PM</strong></div>
+      <div class="section-layout-editor" id="sectionLayoutEditor"></div>
+      <div class="eink-layout-footer" id="layoutEditorFooter">Freeform layout</div>
+    </div>
+    <div class="widget-settings" id="widgetSettings" hidden></div>
+  </div>
+
+  <div class="card connection-box">
+    <div class="eyebrow">FrameOS connection</div><h3 style="margin:4px 0 4px">Private display sources</h3>
+    <p class="meta">Use the rendered PNG for the browser-based E-Ink layout, the SVG as a lightweight fallback, the JSON feed for a custom FrameOS scene, or the browser preview for testing. Keep the token private.</p>
+    <div class="connection-row"><strong>Rendered PNG</strong><div class="connection-url" id="imageUrl"></div><button class="btn tiny" data-copy="imageUrl">Copy</button></div>
+    <div class="connection-row"><strong>SVG fallback</strong><div class="connection-url" id="svgUrl"></div><button class="btn tiny" data-copy="svgUrl">Copy</button></div>
+    <div class="connection-row"><strong>JSON feed</strong><div class="connection-url" id="feedUrl"></div><button class="btn tiny" data-copy="feedUrl">Copy</button></div>
+    <div class="connection-row"><strong>Browser preview</strong><div class="connection-url" id="viewUrl"></div><button class="btn tiny" data-copy="viewUrl">Copy</button></div>
+    <div class="row-actions"><button class="btn tiny" id="rotateDisplayToken">Rotate private token</button></div>
+  </div>
+
+  </div>
 </section>
 </div>
 </main>
@@ -1453,7 +1482,6 @@ body.modal-open{overflow:hidden}
   <button class="on" data-view="today" aria-label="Today" title="Today"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg><span class="sr-only">Today</span></button>
   <button data-view="planner" aria-label="Planner" title="Planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span class="sr-only">Planner</span></button>
   <button data-view="markets" aria-label="Markets" title="Markets"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path><path d="M2 19h22"></path></svg><span class="sr-only">Markets</span></button>
-  <button data-view="displays" aria-label="Displays" title="Displays"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg><span class="sr-only">Displays</span></button>
   <button data-view="settings" aria-label="More" title="More" class="mobile-more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg><span class="sr-only">More</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
@@ -1638,14 +1666,15 @@ function renderRuntimeSession(){
  }
 }
 
-const appTimeZone=()=>state?.weather?.timeZone||weatherData?.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+const appTimeZone=()=>state?.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||state?.weather?.timeZone||weatherData?.timeZone||'UTC';
 const calendarDateValue=v=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){const [y,m,d]=raw.split('-').map(Number);return new Date(y,m-1,d)}return new Date(v)};
 const zonedParts=(v,timeZone=appTimeZone())=>{const d=new Date(v);if(Number.isNaN(d.getTime()))return null;const parts=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))};
 const zonedDateKey=(v,timeZone=appTimeZone())=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const p=zonedParts(v,timeZone);return p?p.year+'-'+p.month+'-'+p.day:''};
 const zonedMinutes=(v,timeZone=appTimeZone())=>{const p=zonedParts(v,timeZone);return p?Number(p.hour)*60+Number(p.minute):0};
 const fmtDate=(v,o={})=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return calendarDateValue(raw).toLocaleDateString([],{month:'short',day:'numeric',...o});return new Intl.DateTimeFormat([],{month:'short',day:'numeric',timeZone:appTimeZone(),...o}).format(new Date(v))};
 const fmtTime=v=>new Intl.DateTimeFormat([],{hour:'numeric',minute:'2-digit',timeZone:appTimeZone()}).format(new Date(v));
-const localInput=v=>{if(!v)return'';const d=new Date(v);return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
+const localInput=v=>{if(!v)return'';const p=zonedParts(v);return p?p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute:''};
+const zonedInputToIso=v=>{const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(v||''));if(!match)return null;const zone=appTimeZone(),target=Date.UTC(+match[1],+match[2]-1,+match[3],+match[4],+match[5],0);let guess=target;for(let i=0;i<3;i++){const p=zonedParts(new Date(guess),zone);if(!p)break;const shown=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,0);guess+=target-shown}return new Date(guess).toISOString()};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeColor=v=>/^#[0-9a-f]{6}$/i.test(String(v||''))?String(v):'#6c5ce7';
 const safeHttpUrl=v=>{try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:''}catch{return''}};
@@ -1696,6 +1725,8 @@ async function syncGoogleTasksClient(){
 
 
 const APP_VIEWS=new Set(['today','planner','tasks','goals','markets','countdowns','displays','settings']);
+const SETTINGS_SECTIONS=new Set(['general','displays']);
+let settingsSection='general';
 const PLANNER_ROUTE_SECTIONS=Object.freeze({tasks:'tasks',goals:'goals',countdowns:'countdowns'});
 const PLANNER_SECTION_ROUTES=Object.freeze({calendar:'planner',tasks:'tasks',goals:'goals',countdowns:'countdowns'});
 const PLANNER_SECTIONS=new Set(Object.keys(PLANNER_SECTION_ROUTES));
@@ -1725,19 +1756,32 @@ function setPlannerSection(section,{render=true}={}){
  else if(section==='goals')renderGoals();
  else if(section==='countdowns')renderCountdowns();
 }
+function setSettingsSection(section,{render=true}={}){
+ if(!SETTINGS_SECTIONS.has(section))section='general';
+ settingsSection=section;
+ document.querySelectorAll('[data-settings-section]').forEach(button=>{
+   const on=button.dataset.settingsSection===section;
+   button.classList.toggle('on',on);button.setAttribute('aria-selected',on?'true':'false');
+ });
+ document.querySelectorAll('[data-settings-pane]').forEach(pane=>pane.classList.toggle('on',pane.dataset.settingsPane===section));
+ if(!render||!state)return;
+ if(section==='displays')renderDisplay();else renderSettings();
+}
 function renderAppView(name){
  if(!APP_VIEWS.has(name))name='today';
  activeAppRoute=name;
  const requestedPlannerSection=PLANNER_ROUTE_SECTIONS[name]||(name==='planner'?'calendar':null);
- const visibleView=requestedPlannerSection?'planner':name;
+ const requestedSettingsSection=name==='displays'?'displays':(name==='settings'?'general':null);
+ const visibleView=requestedPlannerSection?'planner':(requestedSettingsSection?'settings':name);
  if(visibleView!=='planner')closePlannerDrawer();
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
  document.body.classList.toggle('planner-mode',visibleView==='planner');
- $('pageTitle').textContent=visibleView==='planner'?'Planner':({today:'Today',markets:'Markets',displays:'Displays',settings:'Settings'})[visibleView]||'Quest Log';
+ $('pageTitle').textContent=visibleView==='planner'?'Planner':({today:'Today',markets:'Markets',settings:'Settings'})[visibleView]||'Quest Log';
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
- if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings();
+ if(visibleView==='settings')setSettingsSection(requestedSettingsSection||'general',{render:true});
+ if(name==='markets')renderMarkets();
 }
 function setView(name,{historyMode='push'}={}){
  if(!APP_VIEWS.has(name))name='today';
@@ -1794,6 +1838,7 @@ window.addEventListener('popstate',event=>{
 });
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-planner-section]').forEach(b=>b.onclick=()=>setView(PLANNER_SECTION_ROUTES[b.dataset.plannerSection]||'planner'));
+document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>setView(b.dataset.settingsSection==='displays'?'displays':'settings'));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
 $('topAdd').onclick=$('quickAdd').onclick=()=>openChooser();
@@ -1907,7 +1952,7 @@ async function eventModal(item=null,preset={}){
      payload.startDate=$('fEventStartDate').value;payload.endDate=$('fEventEndDate').value||payload.startDate;
    }else{
      if(!$('fEventStart').value||!$('fEventEnd').value){$('eventFormStatus').textContent='Start and end times are required.';return}
-     payload.start=new Date($('fEventStart').value).toISOString();payload.end=new Date($('fEventEnd').value).toISOString();
+     payload.start=zonedInputToIso($('fEventStart').value);payload.end=zonedInputToIso($('fEventEnd').value);
    }
    if(!editing)payload.repeat=$('fEventRepeat').value;
    const accountValue=$('fEventAccount').value,calendarValue=$('fEventCalendar').value;
@@ -1969,7 +2014,7 @@ async function taskModal(item){
    e.preventDefault();
    const b={
      title:$('fTitle').value.trim(),description:$('fDesc').value,status:$('fStatus').value,
-     priority:$('fPriority').value,due:$('fDue').value?new Date($('fDue').value).toISOString():null,
+     priority:$('fPriority').value,due:$('fDue').value?zonedInputToIso($('fDue').value):null,
      project:$('fProject').value.trim(),goalId:$('fGoal').value
    };
    if(!linked&&select.value){
@@ -1999,7 +2044,7 @@ function goalModal(item){
  <div class="field"><label>Project / list</label><input id="fProject" value="${esc(item?.project||'')}"></div>
  </div><div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save goal</button></div></form>`);
  $('fType').value=item?.type||'number';
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?new Date($('fDeadline').value).toISOString():null,project:$('fProject').value.trim()};await api(item?'/api/goals/'+encodeURIComponent(item.id):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?zonedInputToIso($('fDeadline').value):null,project:$('fProject').value.trim()};await api(item?'/api/goals/'+encodeURIComponent(item.id):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
  if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this goal?')){await api('/api/goals/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
 }
 function countdownModal(item){
@@ -2017,7 +2062,7 @@ function countdownModal(item){
  </div>
  <div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save countdown</button></div></form>`);
  $('fAccent').value=item?.accentColor||'purple';$('fTime').value=item?.timeDisplayStyle||'days';$('fProgress').value=item?.progressMode||'time';$('fShowDate').checked=item?.showExactDate!==false;$('fShowEink').checked=item?.displayEnabled!==false;$('fPinned').checked=!!item?.pinned;
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:new Date($('fEnd').value).toISOString(),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked};await api(item?'/api/countdowns/'+encodeURIComponent(item.id):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:zonedInputToIso($('fEnd').value),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked};await api(item?'/api/countdowns/'+encodeURIComponent(item.id):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
  if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this countdown?')){await api('/api/countdowns/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
 }
 
@@ -2068,8 +2113,8 @@ function renderMarketSummary(rootId){
  root.innerHTML=(marketData.quotes||[]).length?(marketData.quotes||[]).map(marketCard).join(''):'<div class="empty" style="grid-column:1/-1">No quotes available.</div>';
 }
 function renderToday(){
- const now=new Date(),hour=now.getHours();$('greeting').textContent=(hour<12?'Good morning':hour<18?'Good afternoon':'Good evening');
- $('todayDate').textContent=now.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+ const now=new Date(),parts=zonedParts(now),hour=Number(parts?.hour??now.getHours());$('greeting').textContent=(hour<12?'Good morning':hour<18?'Good afternoon':'Good evening');
+ $('todayDate').textContent=new Intl.DateTimeFormat([],{timeZone:appTimeZone(),weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(now);
  const open=state.tasks.filter(t=>t.status!=='done');$('statTasks').textContent=open.length;$('statEvents').textContent=calEvents.length;$('statGoals').textContent=state.goals.filter(g=>g.status==='active').length;$('statCountdowns').textContent=state.countdowns.filter(c=>new Date(c.end)>now).length;
  const start=new Date(now);start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);
  const todaysEvents=calEvents.filter(e=>eventOverlapsDay(e,start,end)).slice(0,6);
@@ -2778,8 +2823,8 @@ function renderSectionLayoutEditor(renderSettings=true){
  const shell=$('einkLayoutShell'),editor=$('sectionLayoutEditor');
  const w=Math.max(300,Number($('previewW').value)||800),h=Math.max(300,Number($('previewH').value)||480);shell.style.aspectRatio=w+'/'+h;
  const now=new Date(),modeLabels={dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'};
- if($('layoutEditorDate'))$('layoutEditorDate').textContent=now.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase();
- if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ if($('layoutEditorDate'))$('layoutEditorDate').textContent=new Intl.DateTimeFormat([],{timeZone:appTimeZone(),month:'short',day:'numeric',year:'numeric'}).format(now).toUpperCase();
+ if($('layoutEditorMode'))$('layoutEditorMode').textContent=(modeLabels[mode]||mode.toUpperCase())+' · '+new Intl.DateTimeFormat([],{timeZone:appTimeZone(),hour:'numeric',minute:'2-digit'}).format(now);
  if($('layoutEditorFooter'))$('layoutEditorFooter').textContent='Freeform layout · '+w+' × '+h+' preview';
  $('einkLayoutCard').classList.remove('disabled');
  editor.innerHTML=Object.keys(DISPLAY_SECTION_LABELS).map(kind=>{
@@ -2891,6 +2936,33 @@ function renderMarkets(){
 $('marketSearchButton').onclick=searchMarkets;
 $('marketSearchInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMarkets()}};
 
+function availableTimeZones(){
+ const saved=state?.timeZone||'',device=Intl.DateTimeFormat().resolvedOptions().timeZone||'';
+ let zones=[];try{zones=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):[]}catch{}
+ if(!zones.length)zones=['America/Vancouver','America/Edmonton','America/Winnipeg','America/Toronto','America/Halifax','America/St_Johns','America/Los_Angeles','America/Denver','America/Chicago','America/New_York','UTC'];
+ return [...new Set([saved,device,...zones].filter(Boolean))];
+}
+function renderTimeZoneSettings(){
+ const select=$('settingsTimeZone');if(!select)return;
+ const current=state?.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+ select.innerHTML=availableTimeZones().map(zone=>'<option value="'+esc(zone)+'">'+esc(zone.replaceAll('_',' '))+'</option>').join('');
+ if(![...select.options].some(option=>option.value===current))select.insertAdjacentHTML('afterbegin','<option value="'+esc(current)+'">'+esc(current.replaceAll('_',' '))+'</option>');
+ select.value=current;
+ const status=$('settingsTimeZoneStatus');if(status)status.textContent='Current default: '+current+'. Calendar and e-ink times use this zone.';
+}
+$('useDeviceTimeZone').onclick=()=>{const zone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';if($('settingsTimeZone'))$('settingsTimeZone').value=zone};
+$('saveTimeZone').onclick=async()=>{
+ const button=$('saveTimeZone'),zone=$('settingsTimeZone').value;button.disabled=true;button.textContent='Saving…';
+ try{
+   await api('/api/settings',{method:'PUT',body:JSON.stringify({timeZone:zone})});
+   state=await api('/api/state');plannerEventCache.clear();calendarCache={};await loadCalendarEvents();
+   renderTimeZoneSettings();renderToday();if($('view-planner').classList.contains('on')&&plannerSection==='calendar')renderPlanner();if(settingsSection==='displays')renderDisplay();
+   button.textContent='Saved';
+   setTimeout(()=>{if($('saveTimeZone'))$('saveTimeZone').textContent='Save time zone'},900);
+ }catch(error){alert(error.message);button.textContent='Save time zone'}
+ finally{button.disabled=false}
+};
+
 async function searchSettingsWeather(){
  const q=$('settingsWeatherSearch').value.trim(),root=$('settingsWeatherResults');if(q.length<2){root.innerHTML='<div class="meta">Type at least 2 characters.</div>';return}
  root.innerHTML='<div class="meta">Searching…</div>';
@@ -2973,7 +3045,7 @@ $('saveAppearance').onclick=async()=>{
  }finally{$('saveAppearance').disabled=false}
 };
 async function renderSettings(){
- renderAppearanceSettings();renderWeatherSettings();renderMarketSettings();renderAgentSettings();renderNotificationSettings();
+ renderAppearanceSettings();renderTimeZoneSettings();renderWeatherSettings();renderMarketSettings();renderAgentSettings();renderNotificationSettings();
  const box=$('googleSettings');
  const accounts=state.google.accounts||[];
  const googleSetupHint=runtimeInfo?.runtime==='cloudflare'?'Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and APP_SECRET to the Worker secrets first.':'Add Google OAuth environment variables in CasaOS first.';
@@ -3405,7 +3477,7 @@ async function loadAll(force=false){
  await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
- if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
+ if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets')renderMarkets();if(current==='settings')setSettingsSection(settingsSection,{render:true})
 }
 const initialRaw=new URLSearchParams(location.search).get('view')||'today',initial=initialRaw==='agent'?'today':(APP_VIEWS.has(initialRaw)?initialRaw:'today');
 loadAll().then(()=>{
