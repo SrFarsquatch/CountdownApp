@@ -904,6 +904,150 @@ body.modal-open{overflow:hidden}
     box-shadow:0 12px 30px rgba(0,0,0,.2);
   }
 }
+
+/* True seven-column Google-style mobile week view */
+@media(max-width:760px){
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-grid{
+    height:100%;
+    min-height:0;
+    display:grid;
+    grid-template-rows:58px auto minmax(0,1fr);
+    background:var(--panel);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-heads,
+  #calendarStage[data-calendar-mode="week-mobile"] .week-all-day,
+  #calendarStage[data-calendar-mode="week-mobile"] .week-time-grid{
+    grid-template-columns:44px repeat(7,minmax(0,1fr));
+    min-width:0;
+    width:100%;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-heads{
+    height:58px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-heads>div{
+    min-width:0;
+    padding:4px 1px;
+    border-right:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-heads>div:last-child{border-right:0}
+  #calendarStage[data-calendar-mode="week-mobile"] .week-zone-spacer{
+    padding:0!important;
+    border-right:1px solid var(--line);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-button{
+    min-height:48px;
+    padding:2px 0;
+    border-radius:0;
+    gap:2px;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-button small{
+    font-size:8px;
+    letter-spacing:.04em;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-button strong{
+    width:30px;
+    height:30px;
+    font-size:16px;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-all-day{
+    min-height:28px;
+    max-height:72px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .all-day-label{
+    min-height:28px;
+    padding:7px 3px 4px;
+    border-right:1px solid var(--line);
+    font-size:7px;
+    letter-spacing:.04em;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .all-day-cell{
+    min-height:28px;
+    max-height:72px;
+    padding:2px 1px;
+    gap:2px;
+    border-right:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+    overflow:hidden;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .all-day-cell:last-child{border-right:0}
+  #calendarStage[data-calendar-mode="week-mobile"] .all-day-chip{
+    min-width:0;
+    padding:2px 2px;
+    border-left-width:2px;
+    border-radius:4px;
+    font-size:7px;
+    line-height:1.1;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-scroll{
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-time-rail{
+    border-right:1px solid var(--line);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-hour-label{
+    right:5px;
+    font-size:8px;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-lane{
+    min-width:0;
+    border-right:1px solid color-mix(in srgb,var(--line) 82%,transparent);
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--timeline-hour-height,52px) - 1px),
+        color-mix(in srgb,var(--line) 86%,transparent) var(--timeline-hour-height,52px)
+      );
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-lane:last-child{border-right:0}
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-lane.today-lane{
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb,var(--accent) 2.5%,transparent) 0,
+        color-mix(in srgb,var(--accent) 2.5%,transparent) calc(var(--timeline-hour-height,52px) - 1px),
+        color-mix(in srgb,var(--line) 86%,transparent) var(--timeline-hour-height,52px)
+      );
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .calendar-event-block{
+    padding:2px 2px;
+    border-left-width:2px;
+    border-radius:5px;
+    min-width:0;
+    overflow:hidden;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .calendar-event-block .cal-block-title{
+    font-size:8px;
+    line-height:1.1;
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-line-clamp:4;
+    -webkit-box-orient:vertical;
+    white-space:normal;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .calendar-event-block .cal-block-time,
+  #calendarStage[data-calendar-mode="week-mobile"] .calendar-event-block .cal-block-source{
+    display:none;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .now-line{
+    z-index:7;
+  }
+}
+@media(max-width:390px){
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-heads,
+  #calendarStage[data-calendar-mode="week-mobile"] .week-all-day,
+  #calendarStage[data-calendar-mode="week-mobile"] .week-time-grid{
+    grid-template-columns:40px repeat(7,minmax(0,1fr));
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .week-day-button strong{
+    width:27px;height:27px;font-size:14px;
+  }
+}
 </style>
 </head>
 <body>
@@ -2006,18 +2150,24 @@ function renderDay(range){
  stage.dataset.calendarMode='day';stage.innerHTML=buildDayHtml(range,calEvents);bindCalendarInteractions(stage);scrollTimeline(range,stage,calEvents);
 }
 function buildMobileWeekHtml(range,anchor=plannerAnchor,eventSource=calEvents){
- const todayKey=dateKeyLocal(new Date());let selected=startOfDay(anchor);
- if(selected<range.start||selected>=range.end)selected=new Date(range.start);
- const selectedKey=dateKeyLocal(selected),next=new Date(selected);next.setDate(next.getDate()+1);
- let picker='';
- for(let i=0;i<7;i++){const day=new Date(range.start);day.setDate(range.start.getDate()+i);const key=dateKeyLocal(day);picker+='<button type="button" class="mobile-week-day '+(key===selectedKey?'on ':'')+(key===todayKey?'today':'')+'" data-week-day="'+key+'"><small>'+day.toLocaleDateString([],{weekday:'narrow'})+'</small><strong>'+day.getDate()+'</strong></button>'}
- const allDay=eventSource.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next,eventSource);
- return '<div class="planner-swipe-surface"><div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div></div>';
+ const todayKey=dateKeyLocal(new Date());
+ let heads='<div class="week-zone-spacer"></div>',all='<div class="all-day-label">All day</div>',body=timeRailHtml();
+ for(let i=0;i<7;i++){
+   const day=new Date(range.start);day.setDate(range.start.getDate()+i);
+   const next=new Date(day);next.setDate(day.getDate()+1);
+   const key=dateKeyLocal(day),isToday=key===todayKey;
+   heads+='<div class="'+(isToday?'today-head':'')+'"><button type="button" class="week-day-button" data-open-day="'+key+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'"><small>'+day.toLocaleDateString([],{weekday:'short'}).toUpperCase()+'</small><strong>'+day.getDate()+'</strong></button></div>';
+   const allDay=eventSource.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
+   all+='<div class="all-day-cell" data-day="'+key+'">'+allDay.map(allDayChip).join('')+'</div>';
+   const items=calendarItemsForDay(day,next,eventSource);
+   body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'" data-day="'+key+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
+ }
+ return '<div class="timeline-root calendar-week-root mobile-week-grid planner-swipe-surface"><div class="week-day-heads mobile-week-heads">'+heads+'</div><div class="week-all-day mobile-week-all-day">'+all+'</div><div class="timeline-scroll"><div class="week-time-grid mobile-week-time-grid">'+body+'</div></div></div>';
 }
 function renderMobileWeek(range){
  const stage=$('calendarStage');fitTimelineToStage('week-mobile');
  stage.dataset.calendarMode='week-mobile';stage.innerHTML=buildMobileWeekHtml(range,plannerAnchor,calEvents);bindCalendarInteractions(stage);
- const selected=startOfDay(plannerAnchor),next=new Date(selected);next.setDate(next.getDate()+1);scrollTimeline({start:selected,end:next},stage,calEvents);
+ scrollTimeline(range,stage,calEvents);
 }
 function renderWeek(range){
  if(window.matchMedia('(max-width:760px)').matches){renderMobileWeek(range);return}
