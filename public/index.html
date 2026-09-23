@@ -668,6 +668,75 @@ body.modal-open{overflow:hidden}
   .planner-search-result strong{display:block;font-size:13px}
   .planner-search-result span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
 }
+
+/* Icon bottom navigation + revised Planner top bar */
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@media(max-width:760px){
+  .mobile-nav{
+    left:0;right:0;bottom:0;
+    height:calc(64px + env(safe-area-inset-bottom));
+    grid-template-columns:repeat(5,1fr);
+    gap:0;
+    padding:5px 8px env(safe-area-inset-bottom);
+    border:0;border-top:1px solid var(--line);
+    border-radius:0;
+    background:color-mix(in srgb,var(--panel) 98%,transparent);
+    box-shadow:0 -8px 28px rgba(0,0,0,.06);
+  }
+  .mobile-nav button{
+    position:relative;
+    min-height:54px;
+    padding:0;
+    border-radius:12px;
+    color:var(--text);
+    display:grid;
+    place-items:center;
+  }
+  .mobile-nav button svg{
+    width:27px;height:27px;
+    fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
+  }
+  .mobile-nav button.on{background:transparent;color:var(--accent)}
+  .mobile-nav button.on:after{
+    content:"";position:absolute;bottom:2px;left:50%;
+    width:22px;height:3px;transform:translateX(-50%);
+    border-radius:99px;background:currentColor;
+  }
+  .mobile-nav button:active{background:var(--panel2)}
+  .mobile-nav .mobile-update-dot{
+    position:absolute;top:10px;left:calc(50% + 9px);
+    width:7px;height:7px;border-radius:50%;background:#d93025;border:2px solid var(--panel)
+  }
+  body:not(.planner-mode) .content{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  body.planner-mode .mobile-nav{display:grid!important}
+  body.planner-mode .agent-fab{display:none!important}
+  body.planner-mode .content{
+    height:calc(100vh - 64px - env(safe-area-inset-bottom));
+    height:calc(100dvh - 64px - env(safe-area-inset-bottom));
+    padding:max(env(safe-area-inset-top),8px) 0 0;
+  }
+  body.planner-mode .quick{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .mobile-planner-bar{
+    height:66px;
+    grid-template-columns:minmax(0,auto) 1fr 46px 46px;
+    padding:4px 10px 7px 14px;
+  }
+  .mobile-planner-period{
+    max-width:min(66vw,300px);
+    padding:0 5px;
+    font-size:23px;
+    font-weight:720;
+  }
+  .mobile-planner-caret{font-size:12px}
+  .mobile-planner-icon svg{
+    width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round
+  }
+  .planner-view-choice{
+    display:flex!important;align-items:center!important;justify-content:space-between!important;
+    min-height:54px!important;padding:0 14px!important;font-size:15px!important
+  }
+  .planner-view-choice strong{font-size:18px;color:var(--accent)}
+}
 </style>
 </head>
 <body>
@@ -719,10 +788,9 @@ body.modal-open{overflow:hidden}
 
 <section class="view" id="view-planner">
   <div class="mobile-planner-bar" id="mobilePlannerBar">
-    <button class="mobile-planner-icon" id="mobilePlannerMenu" type="button" aria-label="Open navigation">☰</button>
     <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Change calendar view"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
     <span class="mobile-planner-spacer"></span>
-    <button class="mobile-planner-icon" id="mobilePlannerSearch" type="button" aria-label="Search calendar">⌕</button>
+    <button class="mobile-planner-icon" id="mobilePlannerSearch" type="button" aria-label="Search calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg></button>
     <button class="mobile-planner-today" id="mobilePlannerToday" type="button" aria-label="Go to today"><span id="mobilePlannerTodayNumber"></span></button>
   </div>
   <div class="hero"><div><h2>Planner</h2><p>Google Calendar and scheduled tasks in one place.</p></div></div>
@@ -910,7 +978,13 @@ body.modal-open{overflow:hidden}
 </aside>
 <button class="agent-fab" id="agentFab" type="button" aria-label="Open Navi" title="Ask Navi">✦</button>
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
-<nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
+<nav class="mobile-nav" aria-label="Primary">
+  <button class="on" data-view="today" aria-label="Today" title="Today"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg><span class="sr-only">Today</span></button>
+  <button data-view="planner" aria-label="Planner" title="Planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span class="sr-only">Planner</span></button>
+  <button data-view="tasks" aria-label="Tasks" title="Tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16.5 8.5"></path></svg><span class="sr-only">Tasks</span></button>
+  <button data-view="goals" aria-label="Goals" title="Goals"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1"></circle></svg><span class="sr-only">Goals</span></button>
+  <button data-view="settings" aria-label="More" title="More" class="mobile-more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg><span class="sr-only">More</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
+</nav>
 
 <div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
 
@@ -1547,18 +1621,15 @@ function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data
 function syncMobilePlannerChrome(){
  if(!$('mobilePlannerTitle'))return;
  const a=new Date(plannerAnchor);
- $('mobilePlannerTitle').textContent=plannerView==='month'?a.toLocaleDateString([],{month:'long'}):plannerView==='week'?a.toLocaleDateString([],{month:'short',day:'numeric'}):a.toLocaleDateString([],{month:'short',day:'numeric'});
+ $('mobilePlannerTitle').textContent=plannerView==='month'
+   ?a.toLocaleDateString([],{month:'long',year:'numeric'})
+   :a.toLocaleDateString([],{month:'long',day:'numeric',year:'numeric'});
  $('mobilePlannerTodayNumber').textContent=String(new Date().getDate());
 }
 function openPlannerViewSheet(){
  const views=[['day','Day'],['week','Week'],['month','Month']];
- openActionSheet('Calendar view','<div class="mobile-sheet-actions">'+views.map(v=>'<button class="btn '+(plannerView===v[0]?'primary':'')+'" type="button" data-planner-view-choice="'+v[0]+'">'+v[1]+'</button>').join('')+'</div>');
+ openActionSheet('Calendar view','<div class="mobile-sheet-actions">'+views.map(v=>'<button class="btn planner-view-choice '+(plannerView===v[0]?'on':'')+'" type="button" data-planner-view-choice="'+v[0]+'"><span>'+v[1]+'</span><strong>'+(plannerView===v[0]?'✓':'')+'</strong></button>').join('')+'</div>');
  $('modalBody').querySelectorAll('[data-planner-view-choice]').forEach(button=>button.onclick=()=>{plannerView=button.dataset.plannerViewChoice;closeModal();syncPlannerViewButtons();renderPlanner()});
-}
-function openPlannerNavigation(){
- const items=[['today','Today'],['planner','Planner'],['tasks','Tasks'],['goals','Goals'],['countdowns','Countdowns'],['markets','Markets'],['settings','Settings']];
- openActionSheet('Quest Log','<div class="planner-mobile-nav-sheet">'+items.map(item=>'<button class="btn '+(item[0]==='planner'?'primary':'')+'" type="button" data-planner-nav="'+item[0]+'">'+item[1]+'</button>').join('')+'</div>');
- $('modalBody').querySelectorAll('[data-planner-nav]').forEach(button=>button.onclick=()=>{const view=button.dataset.plannerNav;closeModal();setView(view)});
 }
 function cachedPlannerEvents(){
  const unique=new Map();
@@ -1904,7 +1975,6 @@ $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
 const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
-$('mobilePlannerMenu').onclick=openPlannerNavigation;
 $('mobilePlannerPeriod').onclick=openPlannerViewSheet;
 $('mobilePlannerSearch').onclick=openPlannerSearch;
 $('mobilePlannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
