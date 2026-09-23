@@ -1109,6 +1109,41 @@ body.modal-open{overflow:hidden}
     min-height:var(--timeline-height,1248px);
   }
 }
+
+/* Pager owns the entire mobile calendar stage.
+   This overrides the obsolete pre-pager week-mobile stage grid. */
+@media(max-width:760px){
+  #calendarStage.planner-pager-active,
+  #calendarStage[data-calendar-mode="week-mobile"].planner-pager-active{
+    display:block!important;
+    position:relative!important;
+    height:100%!important;
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+  #calendarStage.planner-pager-active>.planner-pager-track{
+    position:absolute;
+    inset:0 auto 0 0;
+    width:300%;
+    height:100%!important;
+    min-height:0!important;
+  }
+  #calendarStage.planner-pager-active .planner-pager-page{
+    height:100%!important;
+    min-height:0!important;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-grid{
+    height:100%!important;
+    min-height:0!important;
+    grid-template-rows:58px auto minmax(0,1fr)!important;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-scroll{
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+  }
+}
 </style>
 </head>
 <body>
