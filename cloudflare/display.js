@@ -31,6 +31,7 @@ const zonedParts=(value,timeZone)=>{const d=new Date(value);if(Number.isNaN(d.ge
 const dateKey=(value,timeZone='UTC')=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const p=zonedParts(value,timeZone);return p?p.year+'-'+p.month+'-'+p.day:''};
 const addDateKey=(key,days)=>{const [y,m,d]=String(key||'').split('-').map(Number),v=new Date(Date.UTC(y,m-1,d+days,12));return[v.getUTCFullYear(),String(v.getUTCMonth()+1).padStart(2,'0'),String(v.getUTCDate()).padStart(2,'0')].join('-')};
 const zonedBoundary=(key,timeZone)=>{const zone=normalizeTimeZone(timeZone),[y,m,d]=String(key||'').split('-').map(Number),target=Date.UTC(y,m-1,d,0,0,0);let guess=target;for(let i=0;i<3;i++){const p=zonedParts(new Date(guess),zone);if(!p)break;const shown=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);guess+=target-shown}return new Date(guess)};
+const startOfDay=value=>{const d=new Date(value);d.setHours(0,0,0,0);return d};
 const displayTimeZone=data=>normalizeTimeZone(data?.timeZone||data?.weather?.timeZone||'UTC');
 const displayTime=(value,data,options={hour:'numeric',minute:'2-digit'})=>new Intl.DateTimeFormat('en-CA',{timeZone:displayTimeZone(data),...options}).format(new Date(value));
 
