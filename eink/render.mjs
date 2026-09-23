@@ -6,7 +6,7 @@ const short=(value,max=48)=>{const s=String(value??'');return s.length<=max?s:s.
 const num=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const dateKey=value=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
-const renderTimeZone=data=>data?.weather?.timeZone||'UTC';
+const renderTimeZone=data=>data?.timeZone||data?.weather?.timeZone||'UTC';
 const fmtTime=(value,data)=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('en-CA',{timeZone:renderTimeZone(data),hour:'numeric',minute:'2-digit'}).format(d)};
 const fmtDate=(value,data)=>{const raw=String(value??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){const [y,m,d]=raw.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-CA',{month:'short',day:'numeric'})}const dt=new Date(value);return Number.isNaN(dt.getTime())?'':new Intl.DateTimeFormat('en-CA',{timeZone:renderTimeZone(data),month:'short',day:'numeric'}).format(dt)};
 const modeLabel=mode=>({dashboard:'Dashboard',daily:'Today',weekly:'This Week',monthly:'This Month',countdowns:'Countdowns'})[mode]||'Planner';
