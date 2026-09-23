@@ -403,6 +403,63 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
   body.planner-mode .agent-fab{width:44px;height:44px;right:10px;bottom:64px;border-radius:14px}
 }
 
+
+/* Touch-first mobile interactions */
+body.modal-open{overflow:hidden}
+.task-swipe{position:relative;overflow:hidden;border-top:1px solid var(--line);background:var(--panel2)}
+.task-swipe:first-child{border-top:0}
+.task-swipe>.item{position:relative;z-index:2;border-top:0;background:var(--panel);transition:transform .18s cubic-bezier(.2,.75,.3,1);will-change:transform}
+.task-swipe-reveal{position:absolute;inset:0;z-index:1;display:flex;align-items:stretch;justify-content:space-between;pointer-events:none}
+.task-swipe-action{border:0;border-radius:0;min-width:94px;padding:0 14px;font-size:12px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:6px;pointer-events:auto}
+.task-swipe-complete{background:color-mix(in srgb,var(--green) 18%,var(--panel));color:var(--green)}
+.task-swipe-secondary{margin-left:auto;display:flex}
+.task-swipe-snooze{background:color-mix(in srgb,var(--orange) 14%,var(--panel));color:var(--text)}
+.task-swipe-edit{background:var(--accent-soft);color:var(--text)}
+.task-swipe.is-dragging>.item{transition:none}
+.mobile-undo{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translate(-50%,18px);width:min(430px,calc(100vw - 28px));display:flex;align-items:center;gap:12px;padding:11px 12px 11px 14px;background:var(--text);color:var(--panel);border-radius:13px;box-shadow:0 18px 42px rgba(0,0,0,.28);z-index:130;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease}
+.mobile-undo.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.mobile-undo span{min-width:0;flex:1;font-size:12px;font-weight:760;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mobile-undo button{border:0;background:transparent;color:inherit;font-weight:900;padding:7px 8px;border-radius:8px}
+.planner-swipe-surface{width:100%;height:100%;min-height:0;transition:transform .16s ease,opacity .16s ease;will-change:transform,opacity}
+#calendarStage.planner-swipe-active{touch-action:pan-y;overscroll-behavior-x:contain}
+#calendarStage.planner-swipe-active .planner-swipe-surface.dragging{transition:none}
+
+@media(min-width:761px){
+  .task-swipe{overflow:visible;background:transparent}
+  .task-swipe-reveal{display:none}
+  .task-swipe>.item{transform:none!important}
+  .mobile-undo{display:none}
+}
+
+@media(max-width:760px){
+  .modal-wrap{padding:0;align-items:flex-end;justify-content:center;overscroll-behavior:contain}
+  .modal-wrap.open{display:flex}
+  .modal{position:relative;width:100%;max-width:none;max-height:min(92vh,92dvh);border-radius:22px 22px 0 0;border-left:0;border-right:0;border-bottom:0;box-shadow:0 -18px 56px rgba(0,0,0,.24);padding-bottom:env(safe-area-inset-bottom);animation:mobileSheetIn .2s cubic-bezier(.2,.8,.3,1)}
+  .modal:before{content:"";position:absolute;top:8px;left:50%;width:38px;height:4px;transform:translateX(-50%);border-radius:999px;background:var(--line);z-index:3}
+  .modal-head{position:sticky;top:0;z-index:2;padding:22px 16px 13px;background:color-mix(in srgb,var(--panel) 96%,transparent);backdrop-filter:blur(18px)}
+  .modal-body{padding:16px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+  .modal-actions{position:sticky;bottom:0;z-index:2;margin:18px -2px -2px;padding:10px 2px calc(4px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--panel) 72%,color-mix(in srgb,var(--panel) 0%,transparent))}
+  .modal-actions .btn{min-height:44px}
+  .modal input,.modal select,.modal textarea{font-size:16px;min-height:44px}
+  .modal textarea{min-height:104px}
+  .modal-wrap.action-sheet .modal{max-height:min(72vh,560px)}
+  .modal-wrap.action-sheet .modal-body{padding-top:10px}
+  .mobile-sheet-actions{display:grid;gap:8px}
+  .mobile-sheet-actions .btn{min-height:50px;text-align:left;justify-content:flex-start;font-size:14px}
+  .mobile-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mobile-create-grid .btn{min-height:62px;font-size:14px}
+  #view-tasks>.card{padding:0 14px 8px}
+  #view-tasks>.card>.toolbar{padding-top:14px}
+  #view-tasks .task-swipe>.item{padding-top:13px;padding-bottom:13px;min-height:60px}
+  #view-tasks .task-swipe .title{font-size:14px}
+  #view-tasks .task-swipe .meta{font-size:11px}
+  #view-tasks .task-swipe-action{min-width:88px}
+  #view-tasks .task-swipe-secondary .task-swipe-action{min-width:76px}
+  #todayTasks .task-swipe>.item{padding-top:11px;padding-bottom:11px}
+  #calendarStage.planner-swipe-active{position:relative}
+  #calendarStage.planner-swipe-active:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 14px 0 22px -26px var(--text),inset -14px 0 22px -26px var(--text)}
+}
+@keyframes mobileSheetIn{from{transform:translateY(28px);opacity:.75}to{transform:translateY(0);opacity:1}}
 </style>
 </head>
 <body>
@@ -640,13 +697,15 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 <button class="quick" id="quickAdd" aria-label="Quick add">+</button>
 <nav class="mobile-nav"><button class="on" data-view="today">Today</button><button data-view="planner">Planner</button><button data-view="tasks">Tasks</button><button data-view="goals">Goals</button><button data-view="settings">More<span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button></nav>
 
+<div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
+
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
   <div class="modal-body" id="modalBody"></div>
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null;
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 function pwaStandalone(){
@@ -883,12 +942,30 @@ document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b
 $('topAdd').onclick=$('quickAdd').onclick=()=>openChooser();
 $('syncBtn').onclick=()=>loadAll(true);
 
-function openModal(title,html){$('modalTitle').textContent=title;$('modalBody').innerHTML=html;$('modalWrap').classList.add('open')}
-function closeModal(){$('modalWrap').classList.remove('open');$('modalBody').innerHTML=''}
+function isMobileUi(){return window.matchMedia('(max-width:760px)').matches}
+function openModal(title,html,options={}){
+ $('modalTitle').textContent=title;$('modalBody').innerHTML=html;
+ $('modalWrap').classList.toggle('action-sheet',Boolean(options.sheet));
+ $('modalWrap').classList.add('open');document.body.classList.add('modal-open');
+}
+function closeModal(){
+ $('modalWrap').classList.remove('open','action-sheet');$('modalBody').innerHTML='';document.body.classList.remove('modal-open');
+}
 $('modalClose').onclick=closeModal;$('modalWrap').onclick=e=>{if(e.target===$('modalWrap'))closeModal()};
 function openChooser(){
- openModal('Add something','<div class="goal-grid"><button class="btn" onclick="openCreate(\'event\')">Event</button><button class="btn" onclick="openCreate(\'task\')">Task</button><button class="btn" onclick="openCreate(\'goal\')">Goal</button><button class="btn" onclick="openCreate(\'countdown\')">Countdown</button></div>');
+ openModal('Add something','<div class="mobile-create-grid"><button class="btn" onclick="openCreate(\'event\')">Calendar event</button><button class="btn" onclick="openCreate(\'task\')">Task</button><button class="btn" onclick="openCreate(\'goal\')">Goal</button><button class="btn" onclick="openCreate(\'countdown\')">Countdown</button></div>',{sheet:true});
 }
+function showMobileUndo(message,undoAction){
+ if(!isMobileUi())return;
+ clearTimeout(mobileUndoTimer);mobileUndoAction=undoAction||null;
+ $('mobileUndoText').textContent=message;$('mobileUndo').classList.add('show');
+ mobileUndoTimer=setTimeout(()=>{mobileUndoAction=null;$('mobileUndo').classList.remove('show')},6000);
+}
+$('mobileUndoButton').onclick=async()=>{
+ const action=mobileUndoAction;clearTimeout(mobileUndoTimer);mobileUndoAction=null;$('mobileUndo').classList.remove('show');
+ if(action)try{await action()}catch(error){console.warn('Undo failed',error)}
+};
+function openActionSheet(title,html){openModal(title,html,{sheet:true})}
 function openCreate(type,item=null){
  if(type==='event')return eventModal(item);
  if(type==='task')return taskModal(item);
@@ -1146,8 +1223,77 @@ function renderToday(){
  const cds=state.countdowns.filter(c=>new Date(c.end)>now).slice(0,4);$('todayCountdowns').innerHTML=cds.length?cds.map(c=>countCard(c)).join(''):'<div class="empty">No upcoming countdowns.</div>';
  renderWeather();renderMarketSummary('todayMarkets');
 }
-function taskRow(t){const source=t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'';return `<div class="item" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>`}
-function bindTaskChecks(root){root.querySelectorAll('[data-check]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===b.dataset.check);await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PUT',body:JSON.stringify({status:t.status==='done'?'todo':'done'})});await loadAll()});root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>taskModal(state.tasks.find(x=>x.id===r.dataset.task)))}
+function taskRow(t){
+ const source=t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'',toggle=t.status==='done'?'Reopen':'Complete';
+ return `<div class="task-swipe" data-task-swipe="${esc(t.id)}">
+   <div class="task-swipe-reveal" aria-hidden="true">
+     <button class="task-swipe-action task-swipe-complete" type="button" data-task-swipe-toggle="${esc(t.id)}">✓ ${toggle}</button>
+     <div class="task-swipe-secondary"><button class="task-swipe-action task-swipe-snooze" type="button" data-task-swipe-snooze="${esc(t.id)}">Later</button><button class="task-swipe-action task-swipe-edit" type="button" data-task-swipe-edit="${esc(t.id)}">Edit</button></div>
+   </div>
+   <div class="item task-swipe-content" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>
+ </div>`;
+}
+function setTaskSwipeOffset(wrap,offset,animate=true){
+ if(!wrap)return;const content=wrap.querySelector('.task-swipe-content');if(!content)return;
+ wrap.classList.toggle('is-dragging',!animate);content.style.transform='translateX('+offset+'px)';wrap.dataset.swipeOffset=String(offset);
+ if(offset!==0)openTaskSwipe=wrap;else if(openTaskSwipe===wrap)openTaskSwipe=null;
+}
+function closeTaskSwipe(wrap=openTaskSwipe){if(wrap)setTaskSwipeOffset(wrap,0,true)}
+async function toggleTaskWithUndo(task){
+ if(!task)return;const previous=task.status||'todo',next=previous==='done'?'todo':'done';
+ await api('/api/tasks/'+encodeURIComponent(task.id),{method:'PUT',body:JSON.stringify({status:next})});
+ await loadAll();
+ showMobileUndo(next==='done'?'Task completed':'Task reopened',async()=>{await api('/api/tasks/'+encodeURIComponent(task.id),{method:'PUT',body:JSON.stringify({status:previous})});await loadAll()});
+}
+async function snoozeTask(task,days){
+ if(!task)return;const previousDue=task.due||null,base=previousDue?new Date(previousDue):new Date(),next=new Date(base.getTime()+days*86400000);
+ closeModal();await api('/api/tasks/'+encodeURIComponent(task.id),{method:'PUT',body:JSON.stringify({due:next.toISOString()})});await loadAll();
+ showMobileUndo('Task moved '+(days===1?'1 day':days+' days'),async()=>{await api('/api/tasks/'+encodeURIComponent(task.id),{method:'PUT',body:JSON.stringify({due:previousDue})});await loadAll()});
+}
+function taskSnoozeSheet(task){
+ if(!task)return;
+ openActionSheet('Move task later','<div class="mobile-sheet-actions"><button class="btn" type="button" data-snooze-days="1">1 day</button><button class="btn" type="button" data-snooze-days="3">3 days</button><button class="btn" type="button" data-snooze-days="7">1 week</button></div>');
+ $('modalBody').querySelectorAll('[data-snooze-days]').forEach(button=>button.onclick=()=>snoozeTask(task,Number(button.dataset.snoozeDays)));
+}
+function bindTaskSwipes(root){
+ if(!isMobileUi())return;
+ root.querySelectorAll('[data-task-swipe]').forEach(wrap=>{
+   const content=wrap.querySelector('.task-swipe-content');if(!content||content.dataset.swipeBound==='1')return;content.dataset.swipeBound='1';
+   let startX=0,startY=0,startOffset=0,horizontal=false,moved=false,pointerId=null;
+   content.addEventListener('pointerdown',e=>{
+     if(e.button!==undefined&&e.button!==0)return;if(e.target.closest('button,input,a,select,textarea'))return;
+     if(openTaskSwipe&&openTaskSwipe!==wrap)closeTaskSwipe(openTaskSwipe);
+     startX=e.clientX;startY=e.clientY;startOffset=Number(wrap.dataset.swipeOffset)||0;horizontal=false;moved=false;pointerId=e.pointerId;
+     try{content.setPointerCapture(pointerId)}catch{}
+   });
+   content.addEventListener('pointermove',e=>{
+     if(pointerId===null||e.pointerId!==pointerId)return;
+     const dx=e.clientX-startX,dy=e.clientY-startY;
+     if(!horizontal&&Math.abs(dy)>Math.abs(dx)+8)return;
+     if(Math.abs(dx)>7)horizontal=true;if(!horizontal)return;
+     e.preventDefault();moved=true;const next=Math.max(-156,Math.min(110,startOffset+dx));setTaskSwipeOffset(wrap,next,false);
+   });
+   const finish=e=>{
+     if(pointerId===null||(e.pointerId!==undefined&&e.pointerId!==pointerId))return;
+     const offset=Number(wrap.dataset.swipeOffset)||0;pointerId=null;wrap.classList.remove('is-dragging');
+     wrap.dataset.swipeMoved=moved?'1':'0';setTimeout(()=>{wrap.dataset.swipeMoved='0'},120);
+     if(offset>82){setTaskSwipeOffset(wrap,0,true);const task=state.tasks.find(x=>x.id===wrap.dataset.taskSwipe);if(task)toggleTaskWithUndo(task).catch(console.warn)}
+     else if(offset>34)setTaskSwipeOffset(wrap,96,true);
+     else if(offset<-34)setTaskSwipeOffset(wrap,-152,true);
+     else setTaskSwipeOffset(wrap,0,true);
+     try{content.releasePointerCapture?.(e.pointerId)}catch{}
+   };
+   content.addEventListener('pointerup',finish);content.addEventListener('pointercancel',finish);
+ });
+}
+function bindTaskChecks(root){
+ root.querySelectorAll('[data-check]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===b.dataset.check);if(!t)return;if(isMobileUi())await toggleTaskWithUndo(t);else{await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PUT',body:JSON.stringify({status:t.status==='done'?'todo':'done'})});await loadAll()}});
+ root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>{const wrap=r.closest('[data-task-swipe]');if(wrap?.dataset.swipeMoved==='1')return;const task=state.tasks.find(x=>x.id===r.dataset.task);if(task)taskModal(task)});
+ root.querySelectorAll('[data-task-swipe-toggle]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeToggle);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)toggleTaskWithUndo(task).catch(console.warn)});
+ root.querySelectorAll('[data-task-swipe-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeEdit);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)taskModal(task)});
+ root.querySelectorAll('[data-task-swipe-snooze]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeSnooze);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)taskSnoozeSheet(task)});
+ bindTaskSwipes(root);
+}
 function renderTasks(){let list=state.tasks;if(taskFilter==='open')list=list.filter(t=>t.status!=='done');if(taskFilter==='done')list=list.filter(t=>t.status==='done');$('taskCount').textContent=list.length+' task'+(list.length===1?'':'s');$('taskList').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">Nothing here yet.</div>';bindTaskChecks($('taskList'))}
 document.querySelectorAll('#taskFilters button').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.filter;document.querySelectorAll('#taskFilters button').forEach(x=>x.classList.toggle('on',x===b));renderTasks()});
 function renderGoals(){$('goalGrid').innerHTML=state.goals.length?state.goals.map(g=>`<div class="card goal-card" data-goal="${esc(g.id)}"><div class="eyebrow">${esc(g.type)}</div><h3>${esc(g.title)}</h3><div class="goal-number">${g.type==='number'?`${g.current} / ${g.target} ${esc(g.unit||'')}`:`${Math.round(g.progress||0)}%`}</div><div class="progress" style="margin:10px 0"><i style="width:${Math.round(g.progress||0)}%"></i></div><div class="meta">${g.deadline?'Target '+fmtDate(g.deadline,{year:'numeric'}):'No deadline'}${g.project?' · '+esc(g.project):''}</div><div class="goal-actions"><button class="btn tiny" onclick="event.stopPropagation();goalModal(state.goals.find(x=>x.id==='${esc(g.id)}'))">Edit</button></div></div>`).join(''):'<div class="card empty">Create your first goal.</div>'}
@@ -1333,7 +1479,7 @@ function renderDay(range){
  fitTimelineToStage('day');
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
  const items=calendarItemsForDay(day,next);
- let h='<div class="timeline-root calendar-day-root">';
+ let h='<div class="timeline-root calendar-day-root planner-swipe-surface">';
  h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div></div>';
  h+='<div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div></div>';
  stage.dataset.calendarMode='day';stage.innerHTML=h;bindCalendarInteractions();scrollTimeline(range);
@@ -1347,7 +1493,7 @@ function renderMobileWeek(range){
  for(let i=0;i<7;i++){const day=new Date(range.start);day.setDate(range.start.getDate()+i);const key=dateKeyLocal(day);picker+='<button type="button" class="mobile-week-day '+(key===selectedKey?'on ':'')+(key===todayKey?'today':'')+'" data-week-day="'+key+'"><small>'+day.toLocaleDateString([],{weekday:'narrow'})+'</small><strong>'+day.getDate()+'</strong></button>'}
  const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next);
  stage.dataset.calendarMode='week-mobile';
- stage.innerHTML='<div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div>';
+ stage.innerHTML='<div class="planner-swipe-surface"><div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div></div>';
  stage.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=()=>{plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  bindCalendarInteractions();scrollTimeline({start:selected,end:next});
 }
@@ -1364,7 +1510,7 @@ function renderWeek(range){
    const items=calendarItemsForDay(day,next);
    body+='<div class="timeline-lane '+(isToday?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div>';
  }
- stage.dataset.calendarMode='week';stage.innerHTML='<div class="timeline-root calendar-week-root"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="timeline-scroll"><div class="week-time-grid">'+body+'</div></div></div>';
+ stage.dataset.calendarMode='week';stage.innerHTML='<div class="timeline-root calendar-week-root planner-swipe-surface"><div class="week-day-heads">'+heads+'</div><div class="week-all-day">'+all+'</div><div class="timeline-scroll"><div class="week-time-grid">'+body+'</div></div></div>';
  bindCalendarInteractions();scrollTimeline(range);
 }
 function monthEventChip(e){
@@ -1373,7 +1519,7 @@ function monthEventChip(e){
 }
 function renderMonth(range){
  const stage=$('calendarStage'),mobile=window.matchMedia('(max-width:760px)').matches,limit=mobile?2:3;
- let h='<div class="month-head">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
+ let h='<div class="planner-swipe-surface"><div class="month-head">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
  const today=new Date(),month=plannerAnchor.getMonth();
  for(let i=0;i<42;i++){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
@@ -1384,20 +1530,87 @@ function renderMonth(range){
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
    h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
  }
- h+='</div>';stage.dataset.calendarMode='month';stage.innerHTML=h;
+ h+='</div></div>';stage.dataset.calendarMode='month';stage.innerHTML=h;
  stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
  bindCalendarInteractions();
 }
 async function renderPlanner(){
  renderMini();syncPlannerViewButtons();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
  try{calEvents=state.google.connected?(await api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))).events||[]:[]}catch(e){console.warn(e);calEvents=[]}
- $('connectInline').textContent=state.google.connected?'Google Calendar connected':(window.matchMedia('(max-width:760px)').matches?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
+ $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
  if(plannerView==='day')renderDay(range);else if(plannerView==='month')renderMonth(range);else renderWeek(range);
+ bindPlannerSwipe();
+}
+function shiftPlannerAnchor(direction){
+ const x=new Date(plannerAnchor);
+ if(plannerView==='day')x.setDate(x.getDate()+direction);
+ else if(plannerView==='week')x.setDate(x.getDate()+direction*7);
+ else x.setMonth(x.getMonth()+direction);
+ plannerAnchor=x;
+}
+async function navigatePlanner(direction,gesture=false){
+ if(plannerSwipeNavigating)return;plannerSwipeNavigating=true;
+ const stage=$('calendarStage'),outgoing=stage?.querySelector('.planner-swipe-surface');
+ try{
+   if(gesture&&outgoing){
+     outgoing.classList.remove('dragging');outgoing.style.transition='transform .12s ease,opacity .12s ease';
+     outgoing.style.transform='translateX('+(direction>0?'-28%':'28%')+')';outgoing.style.opacity='.28';
+     await new Promise(resolve=>setTimeout(resolve,115));
+   }
+   shiftPlannerAnchor(direction);
+   await renderPlanner();
+   if(gesture){
+     const incoming=$('calendarStage')?.querySelector('.planner-swipe-surface');
+     if(incoming){
+       incoming.style.transition='none';incoming.style.transform='translateX('+(direction>0?'16%':'-16%')+')';incoming.style.opacity='.55';
+       requestAnimationFrame(()=>requestAnimationFrame(()=>{incoming.style.transition='transform .16s ease,opacity .16s ease';incoming.style.transform='translateX(0)';incoming.style.opacity='1'}));
+     }
+   }
+ }finally{plannerSwipeNavigating=false}
+}
+function bindPlannerSwipe(){
+ const stage=$('calendarStage');if(!stage)return;
+ stage.classList.toggle('planner-swipe-active',isMobileUi());
+ if(stage.dataset.plannerSwipeBound==='1')return;stage.dataset.plannerSwipeBound='1';
+ let startX=0,startY=0,lastX=0,startTime=0,pointerId=null,horizontal=false,surface=null;
+ stage.addEventListener('pointerdown',e=>{
+   if(!isMobileUi()||plannerSwipeNavigating)return;
+   if(e.clientX<=24||e.clientX>=window.innerWidth-24)return;
+   if(e.target.closest('button,input,textarea,select,a,[data-event-key],[data-cal-task]'))return;
+   surface=stage.querySelector('.planner-swipe-surface');if(!surface)return;
+   startX=lastX=e.clientX;startY=e.clientY;startTime=performance.now();pointerId=e.pointerId;horizontal=false;
+   surface.classList.add('dragging');
+   try{stage.setPointerCapture(pointerId)}catch{}
+ });
+ stage.addEventListener('pointermove',e=>{
+   if(pointerId===null||e.pointerId!==pointerId||!surface)return;
+   const dx=e.clientX-startX,dy=e.clientY-startY;lastX=e.clientX;
+   if(!horizontal&&Math.abs(dy)>Math.abs(dx)+9)return;
+   if(Math.abs(dx)>8)horizontal=true;if(!horizontal)return;
+   e.preventDefault();
+   const max=stage.clientWidth*.34,offset=Math.max(-max,Math.min(max,dx));
+   surface.style.transform='translateX('+offset+'px)';surface.style.opacity=String(Math.max(.68,1-Math.abs(offset)/Math.max(1,stage.clientWidth)*.65));
+ });
+ const finish=e=>{
+   if(pointerId===null||(e.pointerId!==undefined&&e.pointerId!==pointerId))return;
+   const dx=lastX-startX,elapsed=Math.max(1,performance.now()-startTime),velocity=Math.abs(dx)/elapsed,threshold=Math.max(58,Math.min(94,stage.clientWidth*.18)),active=horizontal&&(Math.abs(dx)>=threshold||velocity>.52);
+   const currentSurface=surface;pointerId=null;horizontal=false;surface=null;
+   try{stage.releasePointerCapture?.(e.pointerId)}catch{}
+   if(currentSurface)currentSurface.classList.remove('dragging');
+   if(active){
+     plannerSwipeSuppressUntil=Date.now()+260;
+     navigatePlanner(dx<0?1:-1,true).catch(console.warn);
+   }else if(currentSurface){
+     currentSurface.style.transition='transform .16s ease,opacity .16s ease';currentSurface.style.transform='translateX(0)';currentSurface.style.opacity='1';
+   }
+ };
+ stage.addEventListener('pointerup',finish);stage.addEventListener('pointercancel',finish);
+ stage.addEventListener('click',e=>{if(Date.now()<plannerSwipeSuppressUntil){e.preventDefault();e.stopPropagation()}},true);
 }
 document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=()=>{plannerView=b.dataset.calview;syncPlannerViewButtons();renderPlanner()});
 $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
-$('plannerPrev').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()-1);else if(plannerView==='week')x.setDate(x.getDate()-7);else x.setMonth(x.getMonth()-1);plannerAnchor=x;renderPlanner()};
-$('plannerNext').onclick=()=>{const x=new Date(plannerAnchor);if(plannerView==='day')x.setDate(x.getDate()+1);else if(plannerView==='week')x.setDate(x.getDate()+7);else x.setMonth(x.getMonth()+1);plannerAnchor=x;renderPlanner()};
+$('plannerPrev').onclick=()=>navigatePlanner(-1,false);
+$('plannerNext').onclick=()=>navigatePlanner(1,false);
 const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
 let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-planner').classList.contains('on')||plannerView==='month')return;cancelAnimationFrame(plannerResizeFrame);plannerResizeFrame=requestAnimationFrame(()=>{const range=plannerRange();if(plannerView==='day')renderDay(range);else renderWeek(range)})});
 
