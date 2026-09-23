@@ -812,6 +812,40 @@ body.modal-open{overflow:hidden}
     transform:translateX(16px);background:var(--accent-contrast)
   }
 }
+
+/* Native-feeling three-page Planner pager */
+@media(max-width:760px){
+  #calendarStage.planner-pager-active{
+    overflow:hidden!important;
+    touch-action:pan-y;
+    overscroll-behavior-x:contain;
+    contain:layout paint;
+  }
+  .planner-pager-track{
+    width:300%;
+    height:100%;
+    display:flex;
+    align-items:stretch;
+    will-change:transform;
+    transform:translate3d(0,0,0);
+    backface-visibility:hidden;
+  }
+  .planner-pager-page{
+    flex:0 0 33.333333%;
+    width:33.333333%;
+    height:100%;
+    min-width:0;
+    min-height:0;
+    overflow:hidden;
+    contain:layout paint;
+  }
+  .planner-pager-page>.planner-swipe-surface{
+    height:100%;
+    min-height:0;
+  }
+  .planner-pager-track.dragging{transition:none!important}
+  .planner-pager-page .timeline-scroll{-webkit-overflow-scrolling:touch}
+}
 </style>
 </head>
 <body>
@@ -1841,36 +1875,37 @@ function timedBlockHtml(item){
  const e=item.data,color=eventColorFor(e);
  return'<button type="button" class="calendar-event-block'+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||'Google Calendar')+'</div></button>';
 }
-function calendarItemsForDay(day,next){
- const events=calEvents.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
+function calendarItemsForDay(day,next,eventSource=calEvents){
+ const events=eventSource.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
  const tasks=plannerShowTasks?state.tasks.filter(t=>t.status!=='done').map(t=>({task:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.task,start:x.span.start,end:x.span.end})):[];
  return layoutTimedItems([...events,...tasks],day,next);
 }
 function allDayChip(e){
  return'<button type="button" class="all-day-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</button>';
 }
-function timelineFocusDate(range){
+function timelineFocusDate(range,eventSource=calEvents){
  const now=new Date();if(now>=range.start&&now<range.end)return now;
  const candidates=[];
- calEvents.forEach(e=>{if(e.allDay)return;const d=new Date(e.start);if(!Number.isNaN(d.getTime())&&d>=range.start&&d<range.end)candidates.push(d)});
+ eventSource.forEach(e=>{if(e.allDay)return;const d=new Date(e.start);if(!Number.isNaN(d.getTime())&&d>=range.start&&d<range.end)candidates.push(d)});
  if(plannerShowTasks)state.tasks.filter(t=>t.status!=='done'&&t.start).forEach(t=>{const span=taskCalendarSpan(t);if(span&&span.start>=range.start&&span.start<range.end)candidates.push(span.start)});
  if(candidates.length)return new Date(Math.min(...candidates.map(d=>d.getTime())));
  const fallback=new Date(range.start);fallback.setHours(8,0,0,0);return fallback;
 }
-function scrollTimeline(range){
+function scrollTimeline(range,root=$('calendarStage'),eventSource=calEvents){
  requestAnimationFrame(()=>{
-   const stage=$('calendarStage');if(!stage)return;
-   const scroller=stage.querySelector('.timeline-scroll');if(!scroller)return;
-   const focus=timelineFocusDate(range),hour=focus.getHours()+focus.getMinutes()/60;
+   if(!root)return;
+   const scroller=root.querySelector('.timeline-scroll');if(!scroller)return;
+   const focus=timelineFocusDate(range,eventSource),hour=focus.getHours()+focus.getMinutes()/60;
    const target=Math.max(0,(hour-2)*HOUR_HEIGHT);
    scroller.scrollTop=target;
  });
 }
-function bindCalendarInteractions(){
- const root=$('calendarStage');if(!root)return;
- root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=calEvents.find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
+function bindCalendarInteractions(root=$('calendarStage')){
+ if(!root)return;
+ root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=cachedPlannerEvents().find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
  root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
  root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);plannerView='day';syncPlannerViewButtons();renderPlanner()});
+ root.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
    if(e.target.closest('[data-event-key],[data-cal-task],button'))return;
    const rect=lane.getBoundingClientRect(),raw=(e.clientY-rect.top)/HOUR_HEIGHT*60;
@@ -1898,28 +1933,32 @@ function calendarEventModal(e){
  if(canEdit&&$('editGoogleEvent'))$('editGoogleEvent').onclick=()=>eventModal(e);
  if(link&&$('openGoogleEvent'))$('openGoogleEvent').onclick=()=>window.open(link,'_blank','noopener');
 }
-function renderDay(range){
- const stage=$('calendarStage'),day=new Date(range.start),next=new Date(range.end),dayKey=dateKeyLocal(day);
- fitTimelineToStage('day');
- const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
- const items=calendarItemsForDay(day,next);
+function buildDayHtml(range,eventSource=calEvents){
+ const day=new Date(range.start),next=new Date(range.end),dayKey=dateKeyLocal(day);
+ const allDay=eventSource.filter(e=>e.allDay&&eventOverlapsDay(e,day,next));
+ const items=calendarItemsForDay(day,next,eventSource);
  let h='<div class="timeline-root calendar-day-root planner-swipe-surface">';
  h+='<div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+dayKey+'">'+allDay.map(allDayChip).join('')+'</div></div>';
  h+='<div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(day.toDateString()===new Date().toDateString()?'today-lane':'')+'" data-day="'+dayKey+'">'+nowLineHtml(day)+items.map(timedBlockHtml).join('')+'</div></div></div></div>';
- stage.dataset.calendarMode='day';stage.innerHTML=h;bindCalendarInteractions();scrollTimeline(range);
+ return h;
 }
-function renderMobileWeek(range){
- const stage=$('calendarStage'),todayKey=dateKeyLocal(new Date());let selected=startOfDay(plannerAnchor);
+function renderDay(range){
+ const stage=$('calendarStage');fitTimelineToStage('day');
+ stage.dataset.calendarMode='day';stage.innerHTML=buildDayHtml(range,calEvents);bindCalendarInteractions(stage);scrollTimeline(range,stage,calEvents);
+}
+function buildMobileWeekHtml(range,anchor=plannerAnchor,eventSource=calEvents){
+ const todayKey=dateKeyLocal(new Date());let selected=startOfDay(anchor);
  if(selected<range.start||selected>=range.end)selected=new Date(range.start);
  const selectedKey=dateKeyLocal(selected),next=new Date(selected);next.setDate(next.getDate()+1);
- fitTimelineToStage('week-mobile');
  let picker='';
  for(let i=0;i<7;i++){const day=new Date(range.start);day.setDate(range.start.getDate()+i);const key=dateKeyLocal(day);picker+='<button type="button" class="mobile-week-day '+(key===selectedKey?'on ':'')+(key===todayKey?'today':'')+'" data-week-day="'+key+'"><small>'+day.toLocaleDateString([],{weekday:'narrow'})+'</small><strong>'+day.getDate()+'</strong></button>'}
- const allDay=calEvents.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next);
- stage.dataset.calendarMode='week-mobile';
- stage.innerHTML='<div class="planner-swipe-surface"><div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div></div>';
- stage.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=()=>{plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
- bindCalendarInteractions();scrollTimeline({start:selected,end:next});
+ const allDay=eventSource.filter(e=>e.allDay&&eventOverlapsDay(e,selected,next)),items=calendarItemsForDay(selected,next,eventSource);
+ return '<div class="planner-swipe-surface"><div class="mobile-week-strip">'+picker+'</div><div class="timeline-root calendar-day-root"><div class="timeline-day-all-day"><div class="all-day-label">All day</div><div class="all-day-cell" data-day="'+selectedKey+'">'+allDay.map(allDayChip).join('')+'</div></div><div class="timeline-scroll"><div class="day-time-grid">'+timeRailHtml()+'<div class="timeline-lane '+(selectedKey===todayKey?'today-lane':'')+'" data-day="'+selectedKey+'">'+nowLineHtml(selected)+items.map(timedBlockHtml).join('')+'</div></div></div></div></div>';
+}
+function renderMobileWeek(range){
+ const stage=$('calendarStage');fitTimelineToStage('week-mobile');
+ stage.dataset.calendarMode='week-mobile';stage.innerHTML=buildMobileWeekHtml(range,plannerAnchor,calEvents);bindCalendarInteractions(stage);
+ const selected=startOfDay(plannerAnchor),next=new Date(selected);next.setDate(next.getDate()+1);scrollTimeline({start:selected,end:next},stage,calEvents);
 }
 function renderWeek(range){
  if(window.matchMedia('(max-width:760px)').matches){renderMobileWeek(range);return}
@@ -1941,23 +1980,26 @@ function monthEventChip(e){
  const prefix=e.allDay?'':fmtTime(e.start)+' ';
  return'<button type="button" class="month-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(prefix+e.title)+'</button>';
 }
-function renderMonth(range){
- const stage=$('calendarStage'),mobile=window.matchMedia('(max-width:760px)').matches,limit=mobile?2:3;
- const dayNames=isMobileUi()&&plannerWeekStartsSunday?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function buildMonthHtml(range,anchor=plannerAnchor,eventSource=calEvents){
+ const mobile=isMobileUi(),limit=mobile?2:3;
+ const dayNames=mobile&&plannerWeekStartsSunday?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
  let h='<div class="planner-swipe-surface"><div class="month-head">'+dayNames.map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
- const today=new Date(),month=plannerAnchor.getMonth();
+ const today=new Date(),month=new Date(anchor).getMonth();
  for(let i=0;i<42;i++){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
    const entries=[];
-   calEvents.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
+   eventSource.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
    if(plannerShowTasks)state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
    entries.sort((a,b)=>a.sort-b.sort);const visible=entries.slice(0,limit),remaining=Math.max(0,entries.length-visible.length);
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
    h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
  }
- h+='</div></div>';stage.dataset.calendarMode='month';stage.innerHTML=h;
+ return h+'</div></div>';
+}
+function renderMonth(range){
+ const stage=$('calendarStage');stage.dataset.calendarMode='month';stage.innerHTML=buildMonthHtml(range,plannerAnchor,calEvents);
  stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
- bindCalendarInteractions();
+ bindCalendarInteractions(stage);
 }
 function plannerRangeKey(range){return range.start.toISOString()+'|'+range.end.toISOString()}
 async function fetchPlannerEvents(range){
@@ -1966,7 +2008,7 @@ async function fetchPlannerEvents(range){
  if(cached?.events)return cached.events;
  if(cached?.promise)return cached.promise;
  const promise=api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))
-   .then(data=>{const events=data.events||[];plannerEventCache.set(key,{events,at:Date.now()});while(plannerEventCache.size>12)plannerEventCache.delete(plannerEventCache.keys().next().value);return events})
+   .then(data=>{const events=data.events||[];plannerEventCache.set(key,{events,at:Date.now()});while(plannerEventCache.size>28)plannerEventCache.delete(plannerEventCache.keys().next().value);return events})
    .catch(error=>{plannerEventCache.delete(key);throw error});
  plannerEventCache.set(key,{promise,at:Date.now()});
  return promise;
@@ -1992,6 +2034,96 @@ function prefetchPlannerNeighbors(){
    fetchPlannerEvents(range).catch(()=>{});
  }
 }
+
+function cachedEventsForRange(range){
+ const entry=plannerEventCache.get(plannerRangeKey(range));
+ return Array.isArray(entry?.events)?entry.events:[];
+}
+function plannerPageMarkup(anchor,range,eventSource){
+ if(plannerView==='day')return buildDayHtml(range,eventSource);
+ if(plannerView==='month')return buildMonthHtml(range,anchor,eventSource);
+ return buildMobileWeekHtml(range,anchor,eventSource);
+}
+function plannerPageMode(){return plannerView==='month'?'month':plannerView==='week'?'week-mobile':'day'}
+function plannerPageAnchorValue(anchor){return String(new Date(anchor).getTime())}
+function plannerPageAnchorFrom(page){return new Date(Number(page?.dataset?.anchor||Date.now()))}
+function refreshPlannerPagerPage(page,anchor,range,eventSource){
+ if(!page)return;
+ page.dataset.anchor=plannerPageAnchorValue(anchor);
+ page.dataset.rangeKey=plannerRangeKey(range);
+ page.innerHTML=plannerPageMarkup(anchor,range,eventSource);
+ bindCalendarInteractions(page);
+ const current=$('calendarStage')?.querySelector('.planner-pager-page[data-current="1"] .timeline-scroll');
+ const scroller=page.querySelector('.timeline-scroll');
+ if(scroller&&current&&page.dataset.current!=='1')scroller.scrollTop=current.scrollTop;
+ else if(scroller)scrollTimeline(range,page,eventSource);
+}
+async function hydratePlannerPagerPage(page,anchor){
+ if(!page)return;
+ const range=rangeForAnchor(anchor,plannerView),key=plannerRangeKey(range);
+ page.dataset.rangeKey=key;page.dataset.anchor=plannerPageAnchorValue(anchor);
+ try{
+   const events=await fetchPlannerEvents(range);
+   if(page.dataset.rangeKey!==key||page.dataset.anchor!==plannerPageAnchorValue(anchor))return;
+   refreshPlannerPagerPage(page,anchor,range,events);
+   if(page.dataset.current==='1')calEvents=events;
+ }catch(error){console.warn('Planner page preload failed',error)}
+}
+function renderMobilePlannerPager(currentRange,currentEvents){
+ const stage=$('calendarStage');if(!stage)return;
+ fitTimelineToStage(plannerPageMode());
+ stage.dataset.calendarMode=plannerPageMode();
+ stage.classList.add('planner-pager-active');
+ const anchors=[shiftedAnchor(plannerAnchor,-1,plannerView),new Date(plannerAnchor),shiftedAnchor(plannerAnchor,1,plannerView)];
+ const pages=anchors.map((anchor,index)=>{
+   const range=rangeForAnchor(anchor,plannerView),events=index===1?currentEvents:cachedEventsForRange(range);
+   return '<div class="planner-pager-page" data-current="'+(index===1?'1':'0')+'" data-anchor="'+plannerPageAnchorValue(anchor)+'" data-range-key="'+plannerRangeKey(range)+'">'+plannerPageMarkup(anchor,range,events)+'</div>';
+ });
+ stage.innerHTML='<div class="planner-pager-track">'+pages.join('')+'</div>';
+ const track=stage.querySelector('.planner-pager-track'),width=stage.clientWidth;
+ track.style.transition='none';track.style.transform='translate3d('+(-width)+'px,0,0)';
+ stage.querySelectorAll('.planner-pager-page').forEach(page=>bindCalendarInteractions(page));
+ const center=stage.querySelector('.planner-pager-page[data-current="1"]');
+ scrollTimeline(currentRange,center,currentEvents);
+ requestAnimationFrame(()=>{
+   const top=center?.querySelector('.timeline-scroll')?.scrollTop||0;
+   stage.querySelectorAll('.planner-pager-page:not([data-current="1"]) .timeline-scroll').forEach(scroller=>scroller.scrollTop=top);
+ });
+ const pageEls=[...stage.querySelectorAll('.planner-pager-page')];
+ hydratePlannerPagerPage(pageEls[0],anchors[0]);hydratePlannerPagerPage(pageEls[2],anchors[2]);
+ for(const direction of [-2,2])fetchPlannerEvents(rangeForAnchor(shiftedAnchor(plannerAnchor,direction,plannerView),plannerView)).catch(()=>{});
+ bindPlannerSwipe();
+}
+async function recyclePlannerPager(direction){
+ const stage=$('calendarStage'),track=stage?.querySelector('.planner-pager-track');if(!stage||!track)return;
+ const width=stage.clientWidth,pages=[...track.children];
+ track.style.transition='none';
+ let recycled;
+ if(direction>0){recycled=pages[0];track.append(recycled)}
+ else{recycled=pages[2];track.prepend(recycled)}
+ [...track.children].forEach((page,index)=>page.dataset.current=index===1?'1':'0');
+ track.style.transform='translate3d('+(-width)+'px,0,0)';
+ plannerAnchor=shiftedAnchor(plannerAnchor,direction,plannerView);
+ const current=track.children[1],currentRange=rangeForAnchor(plannerAnchor,plannerView),currentEntry=plannerEventCache.get(current.dataset.rangeKey);
+ calEvents=Array.isArray(currentEntry?.events)?currentEntry.events:[];
+ renderMini();syncPlannerViewButtons();syncMobilePlannerChrome();$('plannerRange').textContent=plannerLabel(currentRange);
+ const farAnchor=shiftedAnchor(plannerAnchor,direction,plannerView),farRange=rangeForAnchor(farAnchor,plannerView),cached=cachedEventsForRange(farRange);
+ refreshPlannerPagerPage(recycled,farAnchor,farRange,cached);
+ hydratePlannerPagerPage(recycled,farAnchor);
+ fetchPlannerEvents(rangeForAnchor(shiftedAnchor(plannerAnchor,direction*2,plannerView),plannerView)).catch(()=>{});
+}
+async function completePlannerPagerSwipe(direction,animate=true){
+ const stage=$('calendarStage'),track=stage?.querySelector('.planner-pager-track');if(!track||plannerSwipeNavigating)return;
+ plannerSwipeNavigating=true;
+ try{
+   const width=stage.clientWidth,target=-width-direction*width;
+   track.classList.remove('dragging');
+   track.style.transition=animate?'transform .17s cubic-bezier(.22,.78,.28,1)':'none';
+   track.style.transform='translate3d('+target+'px,0,0)';
+   if(animate)await new Promise(resolve=>setTimeout(resolve,178));
+   await recyclePlannerPager(direction);
+ }finally{plannerSwipeNavigating=false}
+}
 async function renderPlanner(){
  const seq=++plannerRenderSeq;
  renderMini();syncPlannerViewButtons();syncMobilePlannerChrome();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
@@ -2001,71 +2133,61 @@ async function renderPlanner(){
    calEvents=events;
  }catch(e){if(seq!==plannerRenderSeq)return;console.warn(e);calEvents=[]}
  $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
- if(plannerView==='day')renderDay(range);else if(plannerView==='month')renderMonth(range);else renderWeek(range);
- bindPlannerSwipe();
- setTimeout(prefetchPlannerNeighbors,0);
+ const stage=$('calendarStage');stage?.classList.remove('planner-pager-active');
+ if(isMobileUi())renderMobilePlannerPager(range,calEvents);
+ else{
+   if(plannerView==='day')renderDay(range);else if(plannerView==='month')renderMonth(range);else renderWeek(range);
+   setTimeout(prefetchPlannerNeighbors,0);
+ }
 }
 function shiftPlannerAnchor(direction){
- const x=new Date(plannerAnchor);
- if(plannerView==='day')x.setDate(x.getDate()+direction);
- else if(plannerView==='week')x.setDate(x.getDate()+direction*7);
- else x.setMonth(x.getMonth()+direction);
- plannerAnchor=x;
+ plannerAnchor=shiftedAnchor(plannerAnchor,direction,plannerView);
 }
 async function navigatePlanner(direction,gesture=false){
+ if(isMobileUi()&&$('calendarStage')?.querySelector('.planner-pager-track'))return completePlannerPagerSwipe(direction,gesture);
  if(plannerSwipeNavigating)return;plannerSwipeNavigating=true;
- const stage=$('calendarStage'),outgoing=stage?.querySelector('.planner-swipe-surface');
- try{
-   if(gesture&&outgoing){
-     outgoing.classList.remove('dragging');outgoing.style.transition='transform .12s ease,opacity .12s ease';
-     outgoing.style.transform='translateX('+(direction>0?'-28%':'28%')+')';outgoing.style.opacity='.28';
-     await new Promise(resolve=>setTimeout(resolve,115));
-   }
-   shiftPlannerAnchor(direction);
-   await renderPlanner();
-   if(gesture){
-     const incoming=$('calendarStage')?.querySelector('.planner-swipe-surface');
-     if(incoming){
-       incoming.style.transition='none';incoming.style.transform='translateX('+(direction>0?'16%':'-16%')+')';incoming.style.opacity='.55';
-       requestAnimationFrame(()=>requestAnimationFrame(()=>{incoming.style.transition='transform .16s ease,opacity .16s ease';incoming.style.transform='translateX(0)';incoming.style.opacity='1'}));
-     }
-   }
- }finally{plannerSwipeNavigating=false}
+ try{shiftPlannerAnchor(direction);await renderPlanner()}finally{plannerSwipeNavigating=false}
 }
 function bindPlannerSwipe(){
- const stage=$('calendarStage');if(!stage)return;
- stage.classList.toggle('planner-swipe-active',isMobileUi());
- if(stage.dataset.plannerSwipeBound==='1')return;stage.dataset.plannerSwipeBound='1';
- let startX=0,startY=0,lastX=0,startTime=0,pointerId=null,horizontal=false,surface=null;
+ const stage=$('calendarStage');if(!stage||!isMobileUi())return;
+ stage.classList.add('planner-swipe-active','planner-pager-active');
+ if(stage.dataset.plannerPagerSwipeBound==='1')return;stage.dataset.plannerPagerSwipeBound='1';
+ let startX=0,startY=0,lastX=0,startTime=0,pointerId=null,horizontal=false,raf=0,pendingDx=0,activeTrack=null;
+ const paint=()=>{
+   raf=0;if(pointerId===null||!horizontal||!activeTrack?.isConnected)return;
+   const width=stage.clientWidth,dx=Math.max(-width*.94,Math.min(width*.94,pendingDx));
+   activeTrack.style.transform='translate3d('+(-width+dx)+'px,0,0)';
+ };
  stage.addEventListener('pointerdown',e=>{
-   if(!isMobileUi()||plannerSwipeNavigating)return;
+   if(plannerSwipeNavigating||!isMobileUi())return;
+   activeTrack=stage.querySelector('.planner-pager-track');if(!activeTrack)return;
    if(e.clientX<=24||e.clientX>=window.innerWidth-24)return;
-   if(e.target.closest('button,input,textarea,select,a,[data-event-key],[data-cal-task]'))return;
-   surface=stage.querySelector('.planner-swipe-surface');if(!surface)return;
-   startX=lastX=e.clientX;startY=e.clientY;startTime=performance.now();pointerId=e.pointerId;horizontal=false;
-   surface.classList.add('dragging');
+   if(e.target.closest('input,textarea,select'))return;
+   startX=lastX=e.clientX;startY=e.clientY;startTime=performance.now();pointerId=e.pointerId;horizontal=false;pendingDx=0;
+   activeTrack.classList.add('dragging');activeTrack.style.transition='none';
    try{stage.setPointerCapture(pointerId)}catch{}
  });
  stage.addEventListener('pointermove',e=>{
-   if(pointerId===null||e.pointerId!==pointerId||!surface)return;
+   if(pointerId===null||e.pointerId!==pointerId||!activeTrack?.isConnected)return;
    const dx=e.clientX-startX,dy=e.clientY-startY;lastX=e.clientX;
    if(!horizontal&&Math.abs(dy)>Math.abs(dx)+9)return;
-   if(Math.abs(dx)>8)horizontal=true;if(!horizontal)return;
-   e.preventDefault();
-   const max=stage.clientWidth*.34,offset=Math.max(-max,Math.min(max,dx));
-   surface.style.transform='translateX('+offset+'px)';surface.style.opacity=String(Math.max(.68,1-Math.abs(offset)/Math.max(1,stage.clientWidth)*.65));
+   if(Math.abs(dx)>7)horizontal=true;if(!horizontal)return;
+   e.preventDefault();pendingDx=dx;
+   if(!raf)raf=requestAnimationFrame(paint);
  });
  const finish=e=>{
    if(pointerId===null||(e.pointerId!==undefined&&e.pointerId!==pointerId))return;
-   const dx=lastX-startX,elapsed=Math.max(1,performance.now()-startTime),velocity=Math.abs(dx)/elapsed,threshold=Math.max(58,Math.min(94,stage.clientWidth*.18)),active=horizontal&&(Math.abs(dx)>=threshold||velocity>.52);
-   const currentSurface=surface;pointerId=null;horizontal=false;surface=null;
+   if(raf){cancelAnimationFrame(raf);raf=0}
+   const dx=lastX-startX,elapsed=Math.max(1,performance.now()-startTime),velocity=Math.abs(dx)/elapsed,width=stage.clientWidth,track=activeTrack;
+   const threshold=Math.max(48,Math.min(86,width*.16)),active=horizontal&&(Math.abs(dx)>=threshold||velocity>.42);
+   pointerId=null;horizontal=false;activeTrack=null;
+   if(track?.isConnected)track.classList.remove('dragging');
    try{stage.releasePointerCapture?.(e.pointerId)}catch{}
-   if(currentSurface)currentSurface.classList.remove('dragging');
    if(active){
      plannerSwipeSuppressUntil=Date.now()+260;
-     navigatePlanner(dx<0?1:-1,true).catch(console.warn);
-   }else if(currentSurface){
-     currentSurface.style.transition='transform .16s ease,opacity .16s ease';currentSurface.style.transform='translateX(0)';currentSurface.style.opacity='1';
+     completePlannerPagerSwipe(dx<0?1:-1,true).catch(console.warn);
+   }else if(track?.isConnected){
+     track.style.transition='transform .15s ease-out';track.style.transform='translate3d('+(-width)+'px,0,0)';
    }
  };
  stage.addEventListener('pointerup',finish);stage.addEventListener('pointercancel',finish);
