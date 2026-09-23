@@ -1080,8 +1080,9 @@ body.modal-open{overflow:hidden}
   #calendarStage[data-calendar-mode="day"] .timeline-scroll{
     position:relative;
     min-height:0;
-    height:100%;
-    overflow-y:scroll!important;
+    height:auto!important;
+    align-self:stretch;
+    overflow-y:auto!important;
     overflow-x:hidden!important;
     touch-action:pan-y!important;
     -webkit-overflow-scrolling:touch;
@@ -1090,6 +1091,21 @@ body.modal-open{overflow:hidden}
   }
   #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-time-grid,
   #calendarStage[data-calendar-mode="day"] .day-time-grid{
+    min-height:var(--timeline-height,1248px);
+  }
+}
+
+@media(max-width:760px){
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-grid{
+    overflow:hidden;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .timeline-scroll{
+    grid-row:3;
+    min-block-size:0;
+    max-block-size:100%;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-time-grid{
+    height:var(--timeline-height,1248px);
     min-height:var(--timeline-height,1248px);
   }
 }
