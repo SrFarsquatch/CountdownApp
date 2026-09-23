@@ -1,5 +1,5 @@
 import {
-  num, clamp, en, goalProgress, normalizeSectionLayout, normalizeModeSections,
+  num, clamp, en, goalProgress, normalizeTimeZone, normalizeSectionLayout, normalizeModeSections,
   normalizeSectionOrder, DISPLAY_MODES, DISPLAY_KEYS
 } from './state.js';
 
@@ -27,9 +27,11 @@ function einkAccent(value,palette,fallback='blue'){
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=(value,max=40)=>{const s=String(value??'');return s.length<=max?s:s.slice(0,Math.max(1,max-1))+'…'};
-const dateKey=value=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
-const startOfDay=value=>{const d=new Date(value);d.setHours(0,0,0,0);return d};
-const displayTimeZone=data=>data?.weather?.timeZone||'UTC';
+const zonedParts=(value,timeZone)=>{const d=new Date(value);if(Number.isNaN(d.getTime()))return null;const parts=new Intl.DateTimeFormat('en-CA',{timeZone:normalizeTimeZone(timeZone),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d);return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))};
+const dateKey=(value,timeZone='UTC')=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const p=zonedParts(value,timeZone);return p?p.year+'-'+p.month+'-'+p.day:''};
+const addDateKey=(key,days)=>{const [y,m,d]=String(key||'').split('-').map(Number),v=new Date(Date.UTC(y,m-1,d+days,12));return[v.getUTCFullYear(),String(v.getUTCMonth()+1).padStart(2,'0'),String(v.getUTCDate()).padStart(2,'0')].join('-')};
+const zonedBoundary=(key,timeZone)=>{const zone=normalizeTimeZone(timeZone),[y,m,d]=String(key||'').split('-').map(Number),target=Date.UTC(y,m-1,d,0,0,0);let guess=target;for(let i=0;i<3;i++){const p=zonedParts(new Date(guess),zone);if(!p)break;const shown=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);guess+=target-shown}return new Date(guess)};
+const displayTimeZone=data=>normalizeTimeZone(data?.timeZone||data?.weather?.timeZone||'UTC');
 const displayTime=(value,data,options={hour:'numeric',minute:'2-digit'})=>new Intl.DateTimeFormat('en-CA',{timeZone:displayTimeZone(data),...options}).format(new Date(value));
 
 function countdownView(item,now=Date.now()){
@@ -48,17 +50,17 @@ function taskSort(a,b){
   const ad=a.due?new Date(a.due).getTime():Infinity,bd=b.due?new Date(b.due).getTime():Infinity;
   return ad-bd||String(a.created||'').localeCompare(String(b.created||''));
 }
-function rangeFor(scope,days=30){
-  const now=new Date(),start=startOfDay(now);
-  if(scope==='today'){const end=new Date(start);end.setDate(end.getDate()+1);return{start,end}}
-  if(scope==='week'){start.setDate(start.getDate()-((start.getDay()+6)%7));const end=new Date(start);end.setDate(end.getDate()+7);return{start,end}}
-  if(scope==='month'){const a=new Date(now.getFullYear(),now.getMonth(),1),b=new Date(now.getFullYear(),now.getMonth()+1,1);return{start:a,end:b}}
+function rangeFor(scope,days=30,timeZone='UTC'){
+  const now=new Date(),todayKey=dateKey(now,timeZone);
+  if(scope==='today')return{start:zonedBoundary(todayKey,timeZone),end:zonedBoundary(addDateKey(todayKey,1),timeZone)};
+  if(scope==='week'){const dow=new Date(todayKey+'T12:00:00Z').getUTCDay(),monday=addDateKey(todayKey,-((dow+6)%7));return{start:zonedBoundary(monday,timeZone),end:zonedBoundary(addDateKey(monday,7),timeZone)}}
+  if(scope==='month'){const first=todayKey.slice(0,8)+'01',[y,m]=first.split('-').map(Number),next=new Date(Date.UTC(y,m,1,12)),nextKey=[next.getUTCFullYear(),String(next.getUTCMonth()+1).padStart(2,'0'),'01'].join('-');return{start:zonedBoundary(first,timeZone),end:zonedBoundary(nextKey,timeZone)}}
   return{start:now,end:new Date(now.getTime()+clamp(num(days,30),1,365)*86400000)};
 }
 export function displayRange(state){
-  const mode=en(state.display?.mode,DISPLAY_MODES,'daily');
+  const mode=en(state.display?.mode,DISPLAY_MODES,'daily'),timeZone=normalizeTimeZone(state.timeZone||state.weather?.timeZone||'UTC');
   const sections=normalizeModeSections(state.display?.modeSections||{})[mode];
-  return sections?.agenda?.enabled?rangeFor(sections.agenda.scope,state.google?.countdownWindowDays):null;
+  return sections?.agenda?.enabled?rangeFor(sections.agenda.scope,state.google?.countdownWindowDays,timeZone):null;
 }
 export function buildDisplayFeed(state,{events=[],weather=null,markets=null,calendarError=null,weatherError=null,marketError=null}={}){
   const mode=en(state.display?.mode,DISPLAY_MODES,'daily'),allSections=normalizeModeSections(state.display?.modeSections||{}),sections=allSections[mode];
@@ -74,6 +76,7 @@ export function buildDisplayFeed(state,{events=[],weather=null,markets=null,cale
   const countdowns=(state.countdowns||[]).filter(c=>c.displayEnabled!==false&&new Date(c.end).getTime()>now).sort((a,b)=>Number(Boolean(b.pinned))-Number(Boolean(a.pinned))||new Date(a.end)-new Date(b.end)).map(c=>countdownView(c,now));
   return{
     generatedAt:new Date().toISOString(),
+    timeZone:normalizeTimeZone(state.timeZone||state.weather?.timeZone||'UTC'),
     title:state.display?.title||'Today',
     calendarError,weatherError,marketError,weather,markets,
     nextEvent:events.find(e=>new Date(e.end||e.start).getTime()>=now)||null,
@@ -182,14 +185,14 @@ function money(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(
 export function renderDisplaySvg(data,width=800,height=480){
   const w=clamp(Math.round(num(width,800)),300,2000),h=clamp(Math.round(num(height,480)),300,2000),palette=data.display?.palette||'spectra6';
   const pad=Math.max(12,Math.round(Math.min(w,h)*.026)),top=pad+31,available=h-top-18,contentWidth=w-pad*2,black=HEX.black,muted=HEX.black,rule=HEX.black;
-  const now=new Date(),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
+  const now=new Date(),timeZone=displayTimeZone(data),mode=data.display?.mode||'daily',modeLabel=({dashboard:'DASHBOARD',daily:'DAY',weekly:'WEEK',monthly:'MONTH',countdowns:'COUNTDOWNS'})[mode]||'PLANNER';
   let svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="100%" height="100%" fill="#FFFFFF"/><style>text{font-family:Arial,Helvetica,sans-serif}.k{font-size:11px;font-weight:750;letter-spacing:1.35px}.muted{fill:'+muted+'}.line{stroke:'+rule+';stroke-width:1}.section-box{fill:#fff;stroke:'+rule+';stroke-width:1.1}</style>';
   const frameA=palette==='mono'?black:HEX.blue,frameB=palette==='mono'?black:HEX.yellow;
   svg+='<rect x="4.5" y="4.5" width="'+(w-9)+'" height="'+(h-9)+'" rx="13" fill="none" stroke="'+black+'" stroke-width="1.2"/>';
   svg+='<path d="M9 18V9h9M'+(w-18)+' 9h9v9M9 '+(h-18)+'v9h9M'+(w-18)+' '+(h-9)+'h9v-9" fill="none" stroke="'+frameA+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
   svg+='<circle cx="9" cy="'+(h/2)+'" r="2.1" fill="'+frameB+'" stroke="'+black+'" stroke-width=".7"/><circle cx="'+(w-9)+'" cy="'+(h/2)+'" r="2.1" fill="'+frameB+'" stroke="'+black+'" stroke-width=".7"/>';
-  svg+='<text x="'+pad+'" y="'+(pad+15)+'" font-size="12" font-weight="800" letter-spacing="1">'+esc(now.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'}).toUpperCase())+'</text>';
-  svg+='<text x="'+(w-pad)+'" y="'+(pad+15)+'" text-anchor="end" font-size="11" font-weight="800" letter-spacing="1">'+esc(modeLabel+' · '+now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text>';
+  svg+='<text x="'+pad+'" y="'+(pad+15)+'" font-size="12" font-weight="800" letter-spacing="1">'+esc(new Intl.DateTimeFormat('en-CA',{timeZone,weekday:'short',month:'short',day:'numeric',year:'numeric'}).format(now).toUpperCase())+'</text>';
+  svg+='<text x="'+(w-pad)+'" y="'+(pad+15)+'" text-anchor="end" font-size="11" font-weight="800" letter-spacing="1">'+esc(modeLabel+' · '+new Intl.DateTimeFormat('en-CA',{timeZone,hour:'numeric',minute:'2-digit'}).format(now))+'</text>';
   svg+='<line x1="'+pad+'" y1="'+(pad+23)+'" x2="'+(w-pad)+'" y2="'+(pad+23)+'" class="line"/>';
 
   const sections=data.display?.modeSections||{},layout=normalizeSectionLayout(data.display?.modeLayout,mode),order=normalizeSectionOrder(data.display?.sectionOrder);
@@ -231,7 +234,7 @@ export function renderDisplaySvg(data,width=800,height=480){
         const timeline=cfg.style==='timeline';
         for(const entry of items.slice(0,cfg.limit||12)){
           if(cy+31>y+bh)break;
-          const d=new Date(entry.event.start),when=entry.event.allDay?'All day':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}),accent=eventAccent(entry.event,palette);
+          const d=new Date(entry.event.start),when=entry.event.allDay?'All day':displayTime(entry.event.start,data),accent=eventAccent(entry.event,palette);
           svg+='<line x1="'+x+'" y1="'+cy+'" x2="'+(x+bw)+'" y2="'+cy+'" class="line"/>';
           if(timeline){
             svg+='<text x="'+x+'" y="'+(cy+20)+'" font-size="10" class="muted">'+esc(when)+'</text><circle cx="'+(x+61)+'" cy="'+(cy+16)+'" r="4" fill="'+accent+'"/><text x="'+(x+72)+'" y="'+(cy+20)+'" font-size="13" font-weight="700">'+esc(short(entry.event.title,Math.max(12,Math.floor((bw-74)/7))))+'</text>';
@@ -293,6 +296,6 @@ export function renderDisplaySvg(data,width=800,height=480){
     }
     svg+='</g>';
   }
-  svg+='<text x="'+pad+'" y="'+(h-9)+'" font-size="9" class="muted">Updated '+esc(new Date(data.generatedAt).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</text><text x="'+(w-pad)+'" y="'+(h-9)+'" text-anchor="end" font-size="9" class="muted">Quest Log Cloud</text></svg>';
+  svg+='<text x="'+pad+'" y="'+(h-9)+'" font-size="9" class="muted">Updated '+esc(new Intl.DateTimeFormat('en-CA',{timeZone:displayTimeZone(data),hour:'numeric',minute:'2-digit'}).format(new Date(data.generatedAt)))+'</text><text x="'+(w-pad)+'" y="'+(h-9)+'" text-anchor="end" font-size="9" class="muted">Quest Log Cloud</text></svg>';
   return svg;
 }
