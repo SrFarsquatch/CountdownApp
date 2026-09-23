@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f5f4f1">
+<meta name="theme-color" content="#f3f2ef">
 <title>Quest Log</title>
 <link id="appFavicon" rel="icon" type="image/svg+xml" href="/branding/icon-quest.svg">
 <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
@@ -23,6 +23,10 @@
   document.documentElement.dataset.colorMode=resolved;
   document.documentElement.dataset.theme=theme;
   document.documentElement.dataset.density=density;
+  const initialView=new URLSearchParams(location.search).get('view')||'today';
+  const plannerChrome=['planner','tasks','goals','countdowns'].includes(initialView);
+  const themeMeta=document.querySelector('meta[name="theme-color"]');
+  if(themeMeta)themeMeta.content=resolved==='dark'?(plannerChrome?'#1d1d1a':'#141412'):(plannerChrome?'#ffffff':'#f3f2ef');
   const favicon=document.getElementById('appFavicon');
   if(favicon)favicon.href='/branding/icon-'+theme+'.svg';
 }catch{}}
@@ -280,6 +284,36 @@
 @keyframes updatePulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 @media(max-width:760px){.update-builds{grid-template-columns:1fr}.update-actions .btn{flex:1}}
 
+/* Unified Planner workspace */
+.planner-section-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.planner-section-nav button{min-width:0;min-height:42px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;padding:7px 10px;font-weight:800;transition:background .14s ease,color .14s ease,transform .14s ease}
+.planner-section-nav button:hover{background:var(--panel2);color:var(--text)}
+.planner-section-nav button:active{transform:scale(.985)}
+.planner-section-nav button.on{background:var(--accent-soft);color:var(--accent)}
+.planner-section-nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.planner-pane{display:none;min-width:0;min-height:0}
+.planner-pane.on{display:block}
+.planner-pane[data-planner-pane="calendar"].on{display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px;height:100%;min-height:0}
+.planner-pane:not([data-planner-pane="calendar"]).on{height:100%;min-height:0;overflow:auto;padding:2px 1px 72px;scrollbar-gutter:stable}
+.planner-pane-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:4px 2px 12px}
+.planner-pane-head h2{margin:0;font-size:25px;letter-spacing:-.035em}
+.planner-pane-head p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.planner-pane-card{box-shadow:none}
+@media(max-width:760px){
+  body.planner-mode .planner-section-nav{margin:0;padding:3px 6px 5px;gap:2px;border:0;border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent);border-radius:0;box-shadow:none;background:var(--panel);z-index:24}
+  body.planner-mode .planner-section-nav button{min-height:48px;padding:3px 2px;border-radius:10px;display:grid;grid-template-rows:24px auto;place-items:center;gap:1px;font-size:9px;line-height:1.05}
+  body.planner-mode .planner-section-nav svg{width:22px;height:22px}
+  body.planner-mode .planner-pane[data-planner-pane="calendar"].on{grid-template-rows:minmax(0,1fr);gap:0}
+  body.planner-mode .planner-pane:not([data-planner-pane="calendar"]).on{padding:10px 12px calc(92px + env(safe-area-inset-bottom));background:var(--bg)}
+  body.planner-mode .planner-pane-head{align-items:center;padding:2px 2px 10px}
+  body.planner-mode .planner-pane-head h2{font-size:22px}
+  body.planner-mode .planner-pane-head p{display:none}
+  body.planner-mode .planner-pane-head .btn{min-height:40px;padding:8px 11px}
+  body.planner-mode .planner-pane-card{border-radius:14px}
+  body.planner-mode .mobile-planner-bar.section-mode{grid-template-columns:minmax(0,1fr);padding-right:14px}
+  body.planner-mode .mobile-planner-bar.section-mode .mobile-planner-spacer{display:none}
+}
+
 /* Compact single-screen Planner */
 body.planner-mode{overflow:hidden}
 body.planner-mode .top{height:58px;padding:0 18px}
@@ -448,13 +482,13 @@ body.modal-open{overflow:hidden}
   .mobile-sheet-actions .btn{min-height:50px;text-align:left;justify-content:flex-start;font-size:14px}
   .mobile-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .mobile-create-grid .btn{min-height:62px;font-size:14px}
-  #view-tasks>.card{padding:0 14px 8px}
-  #view-tasks>.card>.toolbar{padding-top:14px}
-  #view-tasks .task-swipe>.item{padding-top:13px;padding-bottom:13px;min-height:60px}
-  #view-tasks .task-swipe .title{font-size:14px}
-  #view-tasks .task-swipe .meta{font-size:11px}
-  #view-tasks .task-swipe-action{min-width:88px}
-  #view-tasks .task-swipe-secondary .task-swipe-action{min-width:76px}
+  #view-planner [data-planner-pane="tasks"]>.card{padding:0 14px 8px}
+  #view-planner [data-planner-pane="tasks"]>.card>.toolbar{padding-top:14px}
+  #view-planner [data-planner-pane="tasks"] .task-swipe>.item{padding-top:13px;padding-bottom:13px;min-height:60px}
+  #view-planner [data-planner-pane="tasks"] .task-swipe .title{font-size:14px}
+  #view-planner [data-planner-pane="tasks"] .task-swipe .meta{font-size:11px}
+  #view-planner [data-planner-pane="tasks"] .task-swipe-action{min-width:88px}
+  #view-planner [data-planner-pane="tasks"] .task-swipe-secondary .task-swipe-action{min-width:76px}
   #todayTasks .task-swipe>.item{padding-top:11px;padding-bottom:11px}
   #calendarStage.planner-swipe-active{position:relative}
   #calendarStage.planner-swipe-active:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 14px 0 22px -26px var(--text),inset -14px 0 22px -26px var(--text)}
@@ -473,14 +507,14 @@ body.modal-open{overflow:hidden}
   }
   body.planner-mode #view-planner.on{
     display:grid;
-    grid-template-rows:auto minmax(0,1fr);
+    grid-template-rows:auto auto minmax(0,1fr);
     gap:0;
     height:100%;
     padding:0;
     overflow:hidden;
   }
   body.planner-mode #view-planner>.hero,
-  body.planner-mode #view-planner>.calendar-toolbar{display:none!important}
+  body.planner-mode #view-planner [data-planner-pane="calendar"]>.calendar-toolbar{display:none!important}
   body.planner-mode #view-planner .calendar-shell{
     height:100%;
     min-height:0;
@@ -1153,10 +1187,7 @@ body.modal-open{overflow:hidden}
   <nav class="nav">
     <button class="on" data-view="today">Today</button>
     <button data-view="planner">Planner</button>
-    <button data-view="tasks">Tasks</button>
-    <button data-view="goals">Goals</button>
     <button data-view="markets">Markets</button>
-    <button data-view="countdowns">Countdowns</button>
     <div class="sep"></div>
     <button data-view="displays">Displays</button>
     <button class="nav-with-badge" data-view="settings">Settings <span class="nav-update-badge" id="settingsUpdateBadge" hidden>Update</span></button>
@@ -1212,25 +1243,48 @@ body.modal-open{overflow:hidden}
     </div>
   </div>
   <button class="planner-agent-fab" id="plannerAgentFab" type="button" aria-label="Open Navi" title="Ask Navi">✦</button>
-  <div class="hero"><div><h2>Planner</h2><p>Google Calendar and scheduled tasks in one place.</p></div></div>
-  <div class="calendar-toolbar">
-    <div class="calendar-nav"><button class="btn tiny" id="plannerPrev">‹</button><button class="btn tiny" id="plannerToday">Today</button><button class="btn tiny" id="plannerNext">›</button><div class="calendar-title" id="plannerRange"></div></div>
-    <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="plannerViews"><button data-calview="day">Day</button><button class="on" data-calview="week">Week</button><button data-calview="month">Month</button></div><button class="btn" id="connectInline">Connect Google Calendar</button></div>
-  </div>
-  <div class="calendar-shell" style="margin-top:14px">
-    <div class="card mini"><div class="mini-head"><strong id="miniMonth"></strong><span class="meta">Navigate</span></div><div class="mini-grid" id="miniCalendar"></div></div>
-    <div class="card calendar-stage" id="calendarStage"></div>
-  </div>
-</section>
+  <div class="hero"><div><h2>Planner</h2><p>Calendar, tasks, goals and countdowns in one workspace.</p></div></div>
 
-<section class="view" id="view-tasks">
-  <div class="hero"><div><h2>Tasks</h2><p>Plan, prioritize and finish what matters.</p></div><button class="btn primary" data-create="task">New task</button></div>
-  <div class="card"><div class="toolbar"><div class="seg" id="taskFilters"><button class="on" data-filter="open">Open</button><button data-filter="all">All</button><button data-filter="done">Completed</button></div><span class="meta" id="taskCount"></span></div><div id="taskList" class="list"></div></div>
-</section>
+  <nav class="planner-section-nav" aria-label="Planner sections">
+    <button class="on" type="button" data-planner-section="calendar" aria-selected="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span>Calendar</span>
+    </button>
+    <button type="button" data-planner-section="tasks" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16.5 8.5"></path></svg><span>Tasks</span>
+    </button>
+    <button type="button" data-planner-section="goals" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1"></circle></svg><span>Goals</span>
+    </button>
+    <button type="button" data-planner-section="countdowns" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10"></path><path d="M8 3c0 4 1.5 6 4 8-2.5 2-4 4-4 8h8c0-4-1.5-6-4-8 2.5-2 4-4 4-8"></path></svg><span>Countdowns</span>
+    </button>
+  </nav>
 
-<section class="view" id="view-goals">
-  <div class="hero"><div><h2>Goals</h2><p>Track measurable outcomes and deadlines.</p></div><button class="btn primary" data-create="goal">New goal</button></div>
-  <div id="goalGrid" class="goal-grid"></div>
+  <div class="planner-pane on" data-planner-pane="calendar">
+    <div class="calendar-toolbar">
+      <div class="calendar-nav"><button class="btn tiny" id="plannerPrev">‹</button><button class="btn tiny" id="plannerToday">Today</button><button class="btn tiny" id="plannerNext">›</button><div class="calendar-title" id="plannerRange"></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="plannerViews"><button data-calview="day">Day</button><button class="on" data-calview="week">Week</button><button data-calview="month">Month</button></div><button class="btn" id="connectInline">Connect Google Calendar</button></div>
+    </div>
+    <div class="calendar-shell" style="margin-top:14px">
+      <div class="card mini"><div class="mini-head"><strong id="miniMonth"></strong><span class="meta">Navigate</span></div><div class="mini-grid" id="miniCalendar"></div></div>
+      <div class="card calendar-stage" id="calendarStage"></div>
+    </div>
+  </div>
+
+  <div class="planner-pane" data-planner-pane="tasks">
+    <div class="planner-pane-head"><div><h2>Tasks</h2><p>Plan, prioritize and finish what matters.</p></div><button class="btn primary" data-create="task">New task</button></div>
+    <div class="card planner-pane-card"><div class="toolbar"><div class="seg" id="taskFilters"><button class="on" data-filter="open">Open</button><button data-filter="all">All</button><button data-filter="done">Completed</button></div><span class="meta" id="taskCount"></span></div><div id="taskList" class="list"></div></div>
+  </div>
+
+  <div class="planner-pane" data-planner-pane="goals">
+    <div class="planner-pane-head"><div><h2>Goals</h2><p>Track measurable outcomes and deadlines.</p></div><button class="btn primary" data-create="goal">New goal</button></div>
+    <div id="goalGrid" class="goal-grid"></div>
+  </div>
+
+  <div class="planner-pane" data-planner-pane="countdowns">
+    <div class="planner-pane-head"><div><h2>Countdowns</h2><p>Important dates, milestones and events.</p></div><button class="btn primary" data-create="countdown">New countdown</button></div>
+    <div id="countGrid" class="goal-grid"></div>
+  </div>
 </section>
 
 <section class="view" id="view-markets">
@@ -1241,11 +1295,6 @@ body.modal-open{overflow:hidden}
     <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Quest Log to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
     <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Yahoo Finance</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
   </div>
-</section>
-
-<section class="view" id="view-countdowns">
-  <div class="hero"><div><h2>Countdowns</h2><p>Important dates, milestones and events.</p></div><button class="btn primary" data-create="countdown">New countdown</button></div>
-  <div id="countGrid" class="goal-grid"></div>
 </section>
 
 <section class="view" id="view-displays">
@@ -1400,8 +1449,8 @@ body.modal-open{overflow:hidden}
 <nav class="mobile-nav" aria-label="Primary">
   <button class="on" data-view="today" aria-label="Today" title="Today"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg><span class="sr-only">Today</span></button>
   <button data-view="planner" aria-label="Planner" title="Planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span class="sr-only">Planner</span></button>
-  <button data-view="tasks" aria-label="Tasks" title="Tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16.5 8.5"></path></svg><span class="sr-only">Tasks</span></button>
-  <button data-view="goals" aria-label="Goals" title="Goals"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1"></circle></svg><span class="sr-only">Goals</span></button>
+  <button data-view="markets" aria-label="Markets" title="Markets"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path><path d="M2 19h22"></path></svg><span class="sr-only">Markets</span></button>
+  <button data-view="displays" aria-label="Displays" title="Displays"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg><span class="sr-only">Displays</span></button>
   <button data-view="settings" aria-label="More" title="More" class="mobile-more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg><span class="sr-only">More</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
@@ -1414,7 +1463,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,backExitRestoreTimer=null;
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,backExitRestoreTimer=null,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 function pwaStandalone(){
@@ -1618,8 +1667,7 @@ function applyAppearance(value,persistCache=true){
  const iconPath='/branding/icon-'+a.theme+'.svg';
  const favicon=$('appFavicon');if(favicon)favicon.href=iconPath;
  const brandIcon=$('appBrandIcon');if(brandIcon)brandIcon.src=iconPath;
- const themeMeta=document.querySelector('meta[name="theme-color"]');
- if(themeMeta)themeMeta.content=resolved==='dark'?'#141412':'#f3f2ef';
+ syncBrowserChromeTheme();
  if(persistCache)try{localStorage.setItem('questlog-appearance',JSON.stringify(a))}catch{}
  return a;
 }
@@ -1645,18 +1693,48 @@ async function syncGoogleTasksClient(){
 
 
 const APP_VIEWS=new Set(['today','planner','tasks','goals','markets','countdowns','displays','settings']);
+const PLANNER_ROUTE_SECTIONS=Object.freeze({tasks:'tasks',goals:'goals',countdowns:'countdowns'});
+const PLANNER_SECTION_ROUTES=Object.freeze({calendar:'planner',tasks:'tasks',goals:'goals',countdowns:'countdowns'});
+const PLANNER_SECTIONS=new Set(Object.keys(PLANNER_SECTION_ROUTES));
+function syncBrowserChromeTheme(){
+ const themeMeta=document.querySelector('meta[name="theme-color"]');if(!themeMeta)return;
+ const rootStyles=getComputedStyle(document.documentElement);
+ const surface=document.body?.classList.contains('planner-mode')?'--panel':'--bg';
+ themeMeta.content=rootStyles.getPropertyValue(surface).trim()||(surface==='--panel'?'#ffffff':'#f3f2ef');
+}
 function appViewUrl(name){
  const url=new URL(location.href);url.searchParams.set('view',name);return url.pathname+url.search+url.hash;
 }
-function currentAppView(){return document.querySelector('.view.on')?.id.replace('view-','')||'today'}
+function currentAppView(){return activeAppRoute||'today'}
+function setPlannerSection(section,{render=true}={}){
+ if(!PLANNER_SECTIONS.has(section))section='calendar';
+ plannerSection=section;
+ document.body.dataset.plannerSection=section;
+ document.querySelectorAll('[data-planner-section]').forEach(button=>{
+   const on=button.dataset.plannerSection===section;
+   button.classList.toggle('on',on);button.setAttribute('aria-selected',on?'true':'false');
+ });
+ document.querySelectorAll('[data-planner-pane]').forEach(pane=>pane.classList.toggle('on',pane.dataset.plannerPane===section));
+ syncMobilePlannerChrome();
+ if(!render||!state)return;
+ if(section==='calendar')renderPlanner();
+ else if(section==='tasks')renderTasks();
+ else if(section==='goals')renderGoals();
+ else if(section==='countdowns')renderCountdowns();
+}
 function renderAppView(name){
  if(!APP_VIEWS.has(name))name='today';
- if(name!=='planner')closePlannerDrawer();
- document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));
- document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));
- document.body.classList.toggle('planner-mode',name==='planner');
- $('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';
- if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings();
+ activeAppRoute=name;
+ const requestedPlannerSection=PLANNER_ROUTE_SECTIONS[name]||(name==='planner'?'calendar':null);
+ const visibleView=requestedPlannerSection?'planner':name;
+ if(visibleView!=='planner')closePlannerDrawer();
+ document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
+ document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
+ document.body.classList.toggle('planner-mode',visibleView==='planner');
+ $('pageTitle').textContent=visibleView==='planner'?'Planner':({today:'Today',markets:'Markets',displays:'Displays',settings:'Settings'})[visibleView]||'Quest Log';
+ syncBrowserChromeTheme();
+ if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
+ if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings();
 }
 function setView(name,{historyMode='push'}={}){
  if(!APP_VIEWS.has(name))name='today';
@@ -1712,6 +1790,7 @@ window.addEventListener('popstate',event=>{
  if(APP_VIEWS.has(urlView))renderAppView(urlView);
 });
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+document.querySelectorAll('[data-planner-section]').forEach(b=>b.onclick=()=>setView(PLANNER_SECTION_ROUTES[b.dataset.plannerSection]||'planner'));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
 $('topAdd').onclick=$('quickAdd').onclick=()=>openChooser();
@@ -2106,12 +2185,17 @@ function renderMini(){
 function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.classList.toggle('on',b.dataset.calview===plannerView))}
 function syncMobilePlannerChrome(){
  if(!$('mobilePlannerTitle'))return;
- const a=new Date(plannerAnchor);
- $('mobilePlannerTitle').textContent=plannerView==='month'
-   ?a.toLocaleDateString([],{month:'long',year:'numeric'})
-   :a.toLocaleDateString([],{month:'long',day:'numeric',year:'numeric'});
+ const isCalendar=plannerSection==='calendar',a=new Date(plannerAnchor);
+ const sectionTitle={tasks:'Tasks',goals:'Goals',countdowns:'Countdowns'}[plannerSection]||'Planner';
+ $('mobilePlannerTitle').textContent=isCalendar
+   ?(plannerView==='month'?a.toLocaleDateString([],{month:'long',year:'numeric'}):a.toLocaleDateString([],{month:'long',day:'numeric',year:'numeric'}))
+   :sectionTitle;
  $('mobilePlannerTodayNumber').textContent=String(new Date().getDate());
- syncPlannerDrawer();
+ const search=$('mobilePlannerSearch'),today=$('mobilePlannerToday'),period=$('mobilePlannerPeriod'),bar=$('mobilePlannerBar'),caret=period?.querySelector('.mobile-planner-caret');
+ if(search)search.hidden=!isCalendar;if(today)today.hidden=!isCalendar;if(caret)caret.hidden=!isCalendar;
+ if(period){period.setAttribute('aria-label',isCalendar?'Calendar options':sectionTitle);period.setAttribute('aria-expanded','false')}
+ if(bar)bar.classList.toggle('section-mode',!isCalendar);
+ if(isCalendar)syncPlannerDrawer();else closePlannerDrawer();
 }
 function syncPlannerDrawer(){
  const drawer=$('mobilePlannerDrawer');if(!drawer)return;
@@ -2579,8 +2663,8 @@ document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=(
 $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
-const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
-$('mobilePlannerPeriod').onclick=e=>{e.stopPropagation();togglePlannerDrawer()};
+const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on')){if(plannerSection==='calendar')renderPlanner();else syncMobilePlannerChrome()}});
+$('mobilePlannerPeriod').onclick=e=>{e.stopPropagation();if(plannerSection==='calendar')togglePlannerDrawer()};
 $('mobilePlannerSearch').onclick=()=>{closePlannerDrawer();openPlannerSearch()};
 $('mobilePlannerToday').onclick=()=>{closePlannerDrawer();plannerAnchor=new Date();renderPlanner()};
 $('mobilePlannerDrawer').querySelectorAll('[data-planner-drawer-view]').forEach(button=>button.onclick=async e=>{
@@ -2599,7 +2683,7 @@ document.addEventListener('pointerdown',e=>{
  closePlannerDrawer();
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePlannerDrawer()});
-let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-planner').classList.contains('on')||plannerView==='month')return;cancelAnimationFrame(plannerResizeFrame);plannerResizeFrame=requestAnimationFrame(()=>{const range=plannerRange();if(plannerView==='day')renderDay(range);else renderWeek(range)})});
+let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-planner').classList.contains('on')||plannerSection!=='calendar'||plannerView==='month')return;cancelAnimationFrame(plannerResizeFrame);plannerResizeFrame=requestAnimationFrame(()=>{const range=plannerRange();if(plannerView==='day')renderDay(range);else renderWeek(range)})});
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
 const DISPLAY_SECTION_STYLES={
@@ -3318,7 +3402,7 @@ async function loadAll(force=false){
  await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
- if(current==='planner')renderPlanner();if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
+ if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets')renderMarkets();if(current==='displays')renderDisplay();if(current==='settings')renderSettings()
 }
 const initialRaw=new URLSearchParams(location.search).get('view')||'today',initial=initialRaw==='agent'?'today':(APP_VIEWS.has(initialRaw)?initialRaw:'today');
 loadAll().then(()=>{
