@@ -5,9 +5,10 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const short=(value,max=48)=>{const s=String(value??'');return s.length<=max?s:s.slice(0,Math.max(1,max-1))+'…'};
 const num=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
-const dateKey=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
-const fmtTime=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'})};
-const fmtDate=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleDateString('en-CA',{month:'short',day:'numeric'})};
+const dateKey=value=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
+const renderTimeZone=data=>data?.weather?.timeZone||'UTC';
+const fmtTime=(value,data)=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('en-CA',{timeZone:renderTimeZone(data),hour:'numeric',minute:'2-digit'}).format(d)};
+const fmtDate=(value,data)=>{const raw=String(value??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){const [y,m,d]=raw.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-CA',{month:'short',day:'numeric'})}const dt=new Date(value);return Number.isNaN(dt.getTime())?'':new Intl.DateTimeFormat('en-CA',{timeZone:renderTimeZone(data),month:'short',day:'numeric'}).format(dt)};
 const modeLabel=mode=>({dashboard:'Dashboard',daily:'Today',weekly:'This Week',monthly:'This Month',countdowns:'Countdowns'})[mode]||'Planner';
 const sectionLabel=kind=>({agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'})[kind]||kind;
 
@@ -52,7 +53,7 @@ function countdownLabel(item){
   if(item?.timeDisplayStyle==='weeks')return Math.floor(num(r.days,0)/7)+'w '+(num(r.days,0)%7)+'d';
   if(item?.timeDisplayStyle==='compact')return num(r.days,0)+'d '+String(num(r.hours,0)).padStart(2,'0')+'h';
   if(item?.timeDisplayStyle==='full'||item?.timeDisplayStyle==='precise')return num(r.days,0)+'d '+String(num(r.hours,0)).padStart(2,'0')+'h '+String(num(r.minutes,0)).padStart(2,'0')+'m';
-  if(item?.timeDisplayStyle==='date')return fmtDate(item.end);
+  if(item?.timeDisplayStyle==='date')return fmtDate(item.end,data);
   return num(item?.daysRemaining,0)+' '+(num(item?.daysRemaining,0)===1?'day':'days');
 }
 function sectionStyle(rect){
@@ -72,6 +73,14 @@ function nativeColor(value,palette='spectra6',fallback=HEX.blue){
   return best;
 }
 function eventColor(event,palette){return nativeColor(event?.eventColor||event?.calendarColor,palette,HEX.blue)}
+function eventOnDateKey(event,key){
+  if(event?.allDay){
+    const startKey=String(event.start||'').slice(0,10),endKey=String(event.end||'').slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(startKey))return false;
+    return endKey>startKey?startKey<=key&&key<endKey:key===startKey;
+  }
+  return dateKey(event?.start)===key;
+}
 function taskColor(task,palette){return palette==='mono'?HEX.black:({urgent:HEX.red,high:HEX.red,medium:HEX.yellow,low:HEX.green})[String(task?.priority||'').toLowerCase()]||HEX.black}
 
 function renderAgenda(data,cfg,palette){
@@ -81,7 +90,7 @@ function renderAgenda(data,cfg,palette){
     const first=new Date(now.getFullYear(),now.getMonth(),1),start=new Date(first);start.setDate(1-((first.getDay()+6)%7));
     let html='<div class="month-grid"><div class="dow">M</div><div class="dow">T</div><div class="dow">W</div><div class="dow">T</div><div class="dow">F</div><div class="dow">S</div><div class="dow">S</div>';
     for(let i=0;i<42;i++){
-      const d=new Date(start);d.setDate(start.getDate()+i);const key=dateKey(d),matches=events.filter(e=>dateKey(e.start)===key).slice(0,3);
+      const d=new Date(start);d.setDate(start.getDate()+i);const key=dateKey(d),matches=events.filter(e=>eventOnDateKey(e,key)).slice(0,3);
       html+='<div class="day '+(d.getMonth()===now.getMonth()?'':'muted-day')+'"><b>'+d.getDate()+'</b><div class="dots">'+matches.map(e=>'<i style="background:'+eventColor(e,palette)+'"></i>').join('')+'</div></div>';
     }
     return html+'</div>';
@@ -90,14 +99,14 @@ function renderAgenda(data,cfg,palette){
     const monday=new Date(now);monday.setHours(0,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
     let html='<div class="week-list">';
     for(let i=0;i<7;i++){
-      const d=new Date(monday);d.setDate(monday.getDate()+i);const matches=events.filter(e=>dateKey(e.start)===dateKey(d)).slice(0,2);
+      const d=new Date(monday);d.setDate(monday.getDate()+i);const matches=events.filter(e=>eventOnDateKey(e,dateKey(d))).slice(0,2);
       html+='<div class="week-day"><div class="week-name">'+d.toLocaleDateString('en-CA',{weekday:'short'}).toUpperCase()+' <b>'+d.getDate()+'</b></div><div class="week-events">'+(matches.length?matches.map(e=>'<span><i style="background:'+eventColor(e,palette)+'"></i>'+esc(short(e.title,28))+'</span>').join(''):'<em>—</em>')+'</div></div>';
     }
     return html+'</div>';
   }
   if(!events.length)return '<div class="empty"><b>Open schedule</b><span>No upcoming calendar events</span></div>';
   return '<div class="agenda-list '+esc(style)+'">'+events.slice(0,limit).map(event=>{
-    const when=event.allDay?'ALL DAY':fmtTime(event.start),detail=event.location||event.calendarName||event.calendarSummary||'';
+    const when=event.allDay?'ALL DAY':fmtTime(event.start,data),detail=event.location||event.calendarName||event.calendarSummary||'';
     return '<div class="agenda-row"><time>'+esc(when)+'</time><i class="event-dot" style="background:'+eventColor(event,palette)+'"></i><div class="event-main"><b>'+esc(short(event.title,52))+'</b>'+(detail?'<span>'+esc(short(detail,52))+'</span>':'')+'</div></div>';
   }).join('')+'</div>';
 }
@@ -113,11 +122,11 @@ function renderWeather(data,cfg,palette){
 function renderTasks(data,cfg,palette){
   const tasks=Array.isArray(data.tasks)?data.tasks:[],limit=clamp(num(cfg?.limit,4),1,20),style=cfg?.style||'checklist';
   if(!tasks.length)return '<div class="empty"><b>All clear</b><span>No open tasks</span></div>';
-  return '<div class="task-list '+esc(style)+'">'+tasks.slice(0,limit).map(task=>'<div class="task-row"><span class="check"></span><i class="priority" style="background:'+taskColor(task,palette)+'"></i><div><b>'+esc(short(task.title,42))+'</b>'+(style!=='compact'&&task.project?'<small>'+esc(short(task.project,32))+'</small>':'')+'</div>'+(task.due?'<time>'+esc(fmtDate(task.due))+'</time>':'')+'</div>').join('')+'</div>';
+  return '<div class="task-list '+esc(style)+'">'+tasks.slice(0,limit).map(task=>'<div class="task-row"><span class="check"></span><i class="priority" style="background:'+taskColor(task,palette)+'"></i><div><b>'+esc(short(task.title,42))+'</b>'+(style!=='compact'&&task.project?'<small>'+esc(short(task.project,32))+'</small>':'')+'</div>'+(task.due?'<time>'+esc(fmtDate(task.due,data))+'</time>':'')+'</div>').join('')+'</div>';
 }
 function goalMetric(goal){
   if(goal?.type==='checklist'){const total=goal.checklist?.length||0,done=(goal.checklist||[]).filter(x=>x.done).length;return done+'/'+total+' steps'}
-  if(goal?.type==='deadline'&&goal.deadline)return'Due '+fmtDate(goal.deadline);
+  if(goal?.type==='deadline'&&goal.deadline)return'Due '+fmtDate(goal.deadline,data);
   if(num(goal?.target,0)>0)return num(goal.current,0)+' / '+num(goal.target,0)+(goal.unit?' '+goal.unit:'');
   return'';
 }
@@ -129,7 +138,7 @@ function renderGoals(data,cfg,palette){
 function renderCountdowns(data,cfg,palette){
   const items=Array.isArray(data.countdowns)?data.countdowns:[],limit=clamp(num(cfg?.limit,3),1,20),style=cfg?.style||'detailed';
   if(!items.length)return '<div class="empty"><b>Nothing counting down</b><span>Add a date worth watching</span></div>';
-  return '<div class="countdown-list '+esc(style)+'">'+items.slice(0,limit).map(item=>{const c=namedAccent(item.accentColor,palette,HEX.red);return '<div class="countdown-row"><i style="background:'+c+'"></i><div><b>'+esc(short(item.name,34))+'</b>'+(style!=='compact'&&item.showExactDate!==false?'<small>'+esc(fmtDate(item.end))+'</small>':'')+'</div><strong>'+esc(countdownLabel(item))+'</strong>'+(style!=='compact'&&item.showProgressBar!==false?progressBar(item.progress,c):'')+'</div>'}).join('')+'</div>';
+  return '<div class="countdown-list '+esc(style)+'">'+items.slice(0,limit).map(item=>{const c=namedAccent(item.accentColor,palette,HEX.red);return '<div class="countdown-row"><i style="background:'+c+'"></i><div><b>'+esc(short(item.name,34))+'</b>'+(style!=='compact'&&item.showExactDate!==false?'<small>'+esc(fmtDate(item.end,data))+'</small>':'')+'</div><strong>'+esc(countdownLabel(item))+'</strong>'+(style!=='compact'&&item.showProgressBar!==false?progressBar(item.progress,c):'')+'</div>'}).join('')+'</div>';
 }
 function renderMarkets(data,cfg,palette){
   const quotes=Array.isArray(data.markets?.quotes)?data.markets.quotes:[],limit=clamp(num(cfg?.limit,4),1,20),style=cfg?.style||'summary';

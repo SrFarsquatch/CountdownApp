@@ -27,8 +27,10 @@ function einkAccent(value,palette,fallback='blue'){
 }
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=(value,max=40)=>{const s=String(value??'');return s.length<=max?s:s.slice(0,Math.max(1,max-1))+'…'};
-const dateKey=value=>{const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
+const dateKey=value=>{const raw=typeof value==='string'?value.trim():'';if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(value);return Number.isNaN(d.getTime())?'':[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 const startOfDay=value=>{const d=new Date(value);d.setHours(0,0,0,0);return d};
+const displayTimeZone=data=>data?.weather?.timeZone||'UTC';
+const displayTime=(value,data,options={hour:'numeric',minute:'2-digit'})=>new Intl.DateTimeFormat('en-CA',{timeZone:displayTimeZone(data),...options}).format(new Date(value));
 
 function countdownView(item,now=Date.now()){
   const end=new Date(item.end).getTime(),ms=Math.max(0,end-now),totalSeconds=Math.floor(ms/1000);
@@ -159,8 +161,15 @@ function agendaEntries(data){
   return(data.calendarEvents||data.events||[]).map(event=>({kind:'event',when:new Date(event.start).getTime(),event})).sort((a,b)=>a.when-b.when);
 }
 function eventsForDay(data,day){
-  const a=startOfDay(day),b=new Date(a);b.setDate(b.getDate()+1);
-  return(data.calendarEvents||data.events||[]).filter(e=>new Date(e.start)<b&&new Date(e.end||e.start)>a);
+  const a=startOfDay(day),b=new Date(a);b.setDate(b.getDate()+1),key=dateKey(day);
+  return(data.calendarEvents||data.events||[]).filter(e=>{
+    if(e.allDay){
+      const startKey=String(e.start||'').slice(0,10),endKey=String(e.end||'').slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(startKey))return false;
+      return endKey>startKey?startKey<=key&&key<endKey:key===startKey;
+    }
+    return new Date(e.start)<b&&new Date(e.end||e.start)>a;
+  });
 }
 function tasksForDay(data,day){
   const key=dateKey(day);return(data.agendaTasks||data.plannerTasks||data.tasks||[]).filter(t=>t.status!=='done'&&t.due&&dateKey(t.due)===key);

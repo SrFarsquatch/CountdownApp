@@ -566,7 +566,7 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
       <div class="notice" id="agentSettingsStatus" style="display:none;margin-top:10px"></div>
     </div>
     <div class="card setting-card"><div class="eyebrow">Integration</div><h3>Google services</h3><p class="meta">Calendar events and selected Google Task lists sync with Quest Log.</p><div id="googleSettings"></div></div>
-    <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><input id="settingsWeatherCountryCode" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" id="settingsWeatherProvider" style="margin-top:8px">Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.</div></div>
+    <div class="card setting-card"><div class="eyebrow">Weather</div><h3>Weather location</h3><p class="meta">Used by the Today dashboard and any e-ink weather widget.</p><div class="weather-search"><div class="weather-search-row"><input id="settingsWeatherSearch" placeholder="Search city or town"><button class="btn tiny" id="settingsWeatherSearchButton" type="button">Search</button></div><div id="settingsWeatherResults" class="weather-search-results"></div><div id="settingsWeatherSelected" class="weather-selected">No location selected.</div><div class="setting-row"><span>Units</span><select id="settingsWeatherUnits"><option value="metric">°C / metric</option><option value="imperial">°F / imperial</option></select></div><input id="settingsWeatherLocationLabel" type="hidden"><input id="settingsWeatherLatitude" type="hidden"><input id="settingsWeatherLongitude" type="hidden"><input id="settingsWeatherCountryCode" type="hidden"><input id="settingsWeatherTimeZone" type="hidden"><div class="modal-actions"><button class="btn primary" id="saveWeatherSettings" type="button">Save weather</button></div></div><div class="meta" id="settingsWeatherProvider" style="margin-top:8px">Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.</div></div>
     <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Yahoo Finance</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div><div class="meta" style="margin-top:8px">Yahoo Finance is accessed server-side and does not require an API key. Quest Log caches responses to reduce repeated requests.</div></div>
     <div class="card setting-card" id="pwaInstallCard">
       <div class="eyebrow">Install</div><h3>Quest Log app</h3>
@@ -818,15 +818,20 @@ function renderRuntimeSession(){
  }
 }
 
-const fmtDate=(v,o={})=>new Date(v).toLocaleDateString([],{month:'short',day:'numeric',...o});
-const fmtTime=v=>new Date(v).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+const appTimeZone=()=>state?.weather?.timeZone||weatherData?.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+const calendarDateValue=v=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){const [y,m,d]=raw.split('-').map(Number);return new Date(y,m-1,d)}return new Date(v)};
+const zonedParts=(v,timeZone=appTimeZone())=>{const d=new Date(v);if(Number.isNaN(d.getTime()))return null;const parts=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);return Object.fromEntries(parts.filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))};
+const zonedDateKey=(v,timeZone=appTimeZone())=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const p=zonedParts(v,timeZone);return p?p.year+'-'+p.month+'-'+p.day:''};
+const zonedMinutes=(v,timeZone=appTimeZone())=>{const p=zonedParts(v,timeZone);return p?Number(p.hour)*60+Number(p.minute):0};
+const fmtDate=(v,o={})=>{const raw=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return calendarDateValue(raw).toLocaleDateString([],{month:'short',day:'numeric',...o});return new Intl.DateTimeFormat([],{month:'short',day:'numeric',timeZone:appTimeZone(),...o}).format(new Date(v))};
+const fmtTime=v=>new Intl.DateTimeFormat([],{hour:'numeric',minute:'2-digit',timeZone:appTimeZone()}).format(new Date(v));
 const localInput=v=>{if(!v)return'';const d=new Date(v);return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeColor=v=>/^#[0-9a-f]{6}$/i.test(String(v||''))?String(v):'#6c5ce7';
 const safeHttpUrl=v=>{try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:''}catch{return''}};
 const eventColorFor=e=>safeColor(e?.eventColor||e?.calendarColor);
 const eventKey=e=>[e.accountId||'',e.calendarId||'',e.id||'',e.start||''].join('|');
-const dateKeyLocal=d=>{const x=new Date(d);return [x.getFullYear(),String(x.getMonth()+1).padStart(2,'0'),String(x.getDate()).padStart(2,'0')].join('-')};
+const dateKeyLocal=d=>{const raw=String(d??'');if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const x=new Date(d);return [x.getFullYear(),String(x.getMonth()+1).padStart(2,'0'),String(x.getDate()).padStart(2,'0')].join('-')};
 const parseDateKey=v=>{const [y,m,d]=String(v||'').split('-').map(Number);return new Date(y,m-1,d)};
 const addDateKey=(v,days)=>{const d=parseDateKey(v);d.setDate(d.getDate()+days);return dateKeyLocal(d)};
 const APPEARANCE_MODES=['system','light','dark'],APPEARANCE_THEMES=['classic','quest','moss','ember','arcane','slate'],APPEARANCE_DENSITIES=['comfortable','compact'];
@@ -1193,7 +1198,16 @@ function fitTimelineToStage(){
  stage.style.setProperty('--timeline-height',TIMELINE_HEIGHT+'px');
  stage.dataset.timelineDense='false';
 }
-function eventOverlapsDay(e,day,next){const s=new Date(e.start),end=new Date(e.end||e.start);return s<next&&end>day}
+function eventOverlapsDay(e,day,next){
+ const key=dateKeyLocal(day);
+ if(e?.allDay){
+   const startKey=String(e.start||'').slice(0,10),endKey=String(e.end||'').slice(0,10);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(startKey))return false;
+   return endKey>startKey?(startKey<=key&&key<endKey):key===startKey;
+ }
+ const startKey=zonedDateKey(e.start),endKey=zonedDateKey(new Date(e.end||e.start).getTime()-1);
+ return Boolean(startKey)&&(startKey<=key&&key<=endKey);
+}
 function taskCalendarSpan(t){
  const startValue=t.start||t.due;if(!startValue)return null;
  const start=new Date(startValue);if(Number.isNaN(start.getTime()))return null;
@@ -1204,6 +1218,12 @@ function taskCalendarSpan(t){
 function layoutTimedItems(items,day,next){
  const dayMs=day.getTime(),nextMs=next.getTime();
  const sorted=items.map(item=>{
+   if(item.kind==='event'&&Number.isFinite(item.zonedStartMinutes)&&Number.isFinite(item.zonedEndMinutes)){
+     const dayKey=dateKeyLocal(day),startKey=zonedDateKey(item.data.start),endKey=zonedDateKey(new Date(item.data.end||item.data.start).getTime()-1);
+     let startMin=startKey<dayKey?0:item.zonedStartMinutes,endMin=endKey>dayKey?24*60:item.zonedEndMinutes;
+     if(endMin<=startMin&&endKey>startKey)endMin=24*60;
+     return{...item,startMs:dayMs+startMin*60000,endMs:dayMs+endMin*60000};
+   }
    const startMs=Math.max(dayMs,item.start.getTime()),endMs=Math.min(nextMs,item.end.getTime());
    return{...item,startMs,endMs};
  }).filter(item=>item.endMs>item.startMs).sort((a,b)=>a.startMs-b.startMs||b.endMs-a.endMs);
@@ -1252,7 +1272,7 @@ function timedBlockHtml(item){
  return'<button type="button" class="calendar-event-block'+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||'Google Calendar')+'</div></button>';
 }
 function calendarItemsForDay(day,next){
- const events=calEvents.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start)}));
+ const events=calEvents.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
  const tasks=state.tasks.filter(t=>t.status!=='done').map(t=>({task:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.task,start:x.span.start,end:x.span.end}));
  return layoutTimedItems([...events,...tasks],day,next);
 }
@@ -1592,7 +1612,7 @@ async function searchSettingsWeather(){
    root.innerHTML=results.length?results.map((r,i)=>'<button type="button" class="weather-result" data-settings-weather="'+i+'"><strong>'+esc(r.label||r.name)+'</strong><div class="meta">'+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4)+(r.timezone?' · '+esc(r.timezone):'')+'</div></button>').join(''):'<div class="meta">No matching locations.</div>';
    root.querySelectorAll('[data-settings-weather]').forEach(btn=>btn.onclick=()=>{
      const r=results[Number(btn.dataset.settingsWeather)];if(!r)return;
-     $('settingsWeatherLocationLabel').value=r.label||r.name;$('settingsWeatherLatitude').value=r.latitude;$('settingsWeatherLongitude').value=r.longitude;$('settingsWeatherCountryCode').value=r.countryCode||'';$('settingsWeatherSearch').value=r.label||r.name;
+     $('settingsWeatherLocationLabel').value=r.label||r.name;$('settingsWeatherLatitude').value=r.latitude;$('settingsWeatherLongitude').value=r.longitude;$('settingsWeatherCountryCode').value=r.countryCode||'';$('settingsWeatherTimeZone').value=r.timezone||'';$('settingsWeatherSearch').value=r.label||r.name;
      $('settingsWeatherSelected').textContent=(r.label||r.name)+' · '+Number(r.latitude).toFixed(4)+', '+Number(r.longitude).toFixed(4);
      root.innerHTML='';
    });
@@ -1601,14 +1621,14 @@ async function searchSettingsWeather(){
 function renderWeatherSettings(){
  if($('settingsWeatherProvider'))$('settingsWeatherProvider').textContent=runtimeInfo?.runtime==='cloudflare'?'Cloud weather: Open-Meteo forecast and current conditions. No API key required.':'Canada: Environment Canada observations + Open-Meteo forecast · elsewhere: Open-Meteo. No API key required.';
  const wc=state.weather||{};
- $('settingsWeatherLocationLabel').value=wc.locationLabel||'';$('settingsWeatherLatitude').value=wc.latitude??'';$('settingsWeatherLongitude').value=wc.longitude??'';$('settingsWeatherCountryCode').value=wc.countryCode||'';$('settingsWeatherUnits').value=wc.units||'metric';
+ $('settingsWeatherLocationLabel').value=wc.locationLabel||'';$('settingsWeatherLatitude').value=wc.latitude??'';$('settingsWeatherLongitude').value=wc.longitude??'';$('settingsWeatherCountryCode').value=wc.countryCode||'';$('settingsWeatherTimeZone').value=wc.timeZone||weatherData?.timeZone||'';$('settingsWeatherUnits').value=wc.units||'metric';
  $('settingsWeatherSelected').textContent=(wc.locationLabel&&wc.latitude!=null&&wc.longitude!=null)?wc.locationLabel+' · '+Number(wc.latitude).toFixed(4)+', '+Number(wc.longitude).toFixed(4):'No location selected.';
  if(!$('settingsWeatherSearch').value)$('settingsWeatherSearch').value=wc.locationLabel||'';
 }
 $('settingsWeatherSearchButton').onclick=searchSettingsWeather;
 $('settingsWeatherSearch').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchSettingsWeather()}};
 $('saveWeatherSettings').onclick=async()=>{
- await api('/api/settings',{method:'PUT',body:JSON.stringify({weatherLocationLabel:$('settingsWeatherLocationLabel').value.trim(),weatherLatitude:$('settingsWeatherLatitude').value,weatherLongitude:$('settingsWeatherLongitude').value,weatherCountryCode:$('settingsWeatherCountryCode').value,weatherUnits:$('settingsWeatherUnits').value})});
+ await api('/api/settings',{method:'PUT',body:JSON.stringify({weatherLocationLabel:$('settingsWeatherLocationLabel').value.trim(),weatherLatitude:$('settingsWeatherLatitude').value,weatherLongitude:$('settingsWeatherLongitude').value,weatherCountryCode:$('settingsWeatherCountryCode').value,weatherTimeZone:$('settingsWeatherTimeZone').value.trim(),weatherUnits:$('settingsWeatherUnits').value})});
  state=await api('/api/state');await loadWeather();renderWeatherSettings();renderToday();
 };
 function renderMarketSettings(){

@@ -138,7 +138,7 @@ export function normalizeGoal(x={}){
 }
 export function normalizeWeather(x={}){
   const lat=x.latitude===''||x.latitude==null?null:Number(x.latitude),lon=x.longitude===''||x.longitude==null?null:Number(x.longitude);
-  return{latitude:Number.isFinite(lat)&&lat>=-90&&lat<=90?lat:null,longitude:Number.isFinite(lon)&&lon>=-180&&lon<=180?lon:null,locationLabel:cleanText(x.locationLabel,100),countryCode:cleanText(x.countryCode,8).toUpperCase(),units:en(x.units,WEATHER_UNITS,'metric')};
+  return{latitude:Number.isFinite(lat)&&lat>=-90&&lat<=90?lat:null,longitude:Number.isFinite(lon)&&lon>=-180&&lon<=180?lon:null,locationLabel:cleanText(x.locationLabel,100),countryCode:cleanText(x.countryCode,8).toUpperCase(),timeZone:cleanText(x.timeZone||x.timezone,100),units:en(x.units,WEATHER_UNITS,'metric')};
 }
 export const normalizeAppearance=x=>({mode:en(x?.mode,APPEARANCE_MODES,'system'),theme:en(x?.theme,UI_THEMES,'quest'),density:en(x?.density,UI_DENSITIES,'comfortable')});
 export function normalizeMarkets(x={}){

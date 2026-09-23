@@ -276,7 +276,7 @@ function defaults() {
     tasks: [],
     goals: [],
     google: { accounts: [], countdownWindowDays: 30 },
-    weather: { latitude: null, longitude: null, locationLabel: '', units: 'metric' },
+    weather: { latitude: null, longitude: null, locationLabel: '', countryCode: '', timeZone: '', units: 'metric' },
     appearance: { mode: 'system', theme: 'quest', density: 'comfortable' },
     markets: { watchlist: defaultMarketWatchlist(), refreshMinutes: 15 },
     marketCache: null,
@@ -374,6 +374,7 @@ function normalizeWeather(x = {}) {
     longitude: Number.isFinite(rawLon) && rawLon >= -180 && rawLon <= 180 ? rawLon : null,
     locationLabel: cleanText(x.locationLabel, 100),
     countryCode: cleanText(x.countryCode, 8).toUpperCase(),
+    timeZone: cleanText(x.timeZone || x.timezone, 100),
     units: en(x.units, WEATHER_UNITS, 'metric')
   };
 }
@@ -2271,7 +2272,7 @@ async function weatherData() {
     locationLabel: db.weather.locationLabel || eccc?.locationName || '',
     units,
     unitSymbol: units === 'imperial' ? '°F' : '°C',
-    timeZone: cleanText(raw.timezone || '', 100),
+    timeZone: cleanText(raw.timezone || db.weather.timeZone || '', 100),
     sourceStatus: {
       environmentCanada: Boolean(eccc),
       openMeteo: true,
@@ -2614,15 +2615,26 @@ function sectionTitle(label, x, y, kind, palette) {
     '<text x="' + (x + 14) + '" y="' + y + '" class="k">' + esc(label) + '</text>';
 }
 function plannerDateKey(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const d = value instanceof Date ? value : new Date(value);
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
 function plannerStartOfDay(value) {
   const d = new Date(value); d.setHours(0, 0, 0, 0); return d;
 }
+function plannerTimeZone(data) { return cleanText(data?.weather?.timeZone || db.weather?.timeZone || process.env.TZ || 'UTC', 100); }
+function plannerTime(value, data, options = { hour:'numeric', minute:'2-digit' }) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: plannerTimeZone(data), ...options }).format(new Date(value));
+}
 function plannerEventsForDay(data, day) {
-  const start = plannerStartOfDay(day), end = new Date(start); end.setDate(end.getDate() + 1);
+  const start = plannerStartOfDay(day), end = new Date(start); end.setDate(end.getDate() + 1), key = plannerDateKey(day);
   return (data.calendarEvents || data.events || []).filter(event => {
+    if (event.allDay) {
+      const startKey = String(event.start || '').slice(0, 10), endKey = String(event.end || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startKey)) return false;
+      return endKey > startKey ? startKey <= key && key < endKey : key === startKey;
+    }
     const a = new Date(event.start), b = new Date(event.end || event.start);
     return a < end && b > start;
   });
@@ -3707,13 +3719,14 @@ const server = http.createServer(async (req, res) => {
         marketCache = { key: '', expiresAt: 0, data: null };
         db.marketCache = null;
       }
-      if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherCountryCode !== undefined || incoming.weatherUnits !== undefined) {
+      if (incoming.weatherLatitude !== undefined || incoming.weatherLongitude !== undefined || incoming.weatherLocationLabel !== undefined || incoming.weatherCountryCode !== undefined || incoming.weatherTimeZone !== undefined || incoming.weatherUnits !== undefined) {
         db.weather = normalizeWeather({
           ...db.weather,
           latitude: incoming.weatherLatitude !== undefined ? incoming.weatherLatitude : db.weather.latitude,
           longitude: incoming.weatherLongitude !== undefined ? incoming.weatherLongitude : db.weather.longitude,
           locationLabel: incoming.weatherLocationLabel !== undefined ? incoming.weatherLocationLabel : db.weather.locationLabel,
           countryCode: incoming.weatherCountryCode !== undefined ? incoming.weatherCountryCode : db.weather.countryCode,
+          timeZone: incoming.weatherTimeZone !== undefined ? incoming.weatherTimeZone : db.weather.timeZone,
           units: incoming.weatherUnits !== undefined ? incoming.weatherUnits : db.weather.units
         });
         weatherCache = { key: '', expiresAt: 0, data: null };

@@ -174,7 +174,7 @@ async function weatherSearch(query){
   const response=await fetch(url);
   if(!response.ok)throw new Error('Weather location search failed.');
   const data=await response.json();
-  return(data.results||[]).map(x=>({name:x.name,admin1:x.admin1||'',country:x.country||'',countryCode:x.country_code||'',latitude:x.latitude,longitude:x.longitude,label:[x.name,x.admin1,x.country].filter(Boolean).join(', ')}));
+  return(data.results||[]).map(x=>({name:x.name,admin1:x.admin1||'',country:x.country||'',countryCode:x.country_code||'',latitude:x.latitude,longitude:x.longitude,timezone:x.timezone||'',label:[x.name,x.admin1,x.country].filter(Boolean).join(', ')}));
 }
 async function weatherData(state){
   const cfg=normalizeWeather(state.weather);
@@ -194,7 +194,7 @@ async function weatherData(state){
   const data=await response.json(),c=data.current||{},d=data.daily||{};
   const info=weatherCodeInfo(c.weather_code);
   return{
-    provider:'Open-Meteo',location:cfg.locationLabel||'Saved location',units:cfg.units,
+    provider:'Open-Meteo',location:cfg.locationLabel||'Saved location',units:cfg.units,timeZone:cleanText(data.timezone||cfg.timeZone||'',100),
     current:{temperature:c.temperature_2m,feelsLike:c.apparent_temperature,humidity:c.relative_humidity_2m,precipitation:c.precipitation,windSpeed:c.wind_speed_10m,windGust:c.wind_gusts_10m,isDay:Boolean(c.is_day),weatherCode:c.weather_code,...info},
     forecast:(d.time||[]).map((date,i)=>({date,weatherCode:d.weather_code?.[i],...weatherCodeInfo(d.weather_code?.[i]),high:d.temperature_2m_max?.[i],low:d.temperature_2m_min?.[i],precipitationProbability:d.precipitation_probability_max?.[i],sunrise:d.sunrise?.[i],sunset:d.sunset?.[i]})),
     official:null,alerts:[]
@@ -338,8 +338,8 @@ async function handleApi(request,env,identity){
     if(incoming.showCountdowns!==undefined)state.display.showCountdowns=Boolean(incoming.showCountdowns);
     if(incoming.showWeather!==undefined)state.display.showWeather=Boolean(incoming.showWeather);
     if(incoming.weatherStyle!==undefined)state.display.weatherStyle=en(incoming.weatherStyle,WEATHER_STYLES,'forecast');
-    if(incoming.weatherLatitude!==undefined||incoming.weatherLongitude!==undefined||incoming.weatherLocationLabel!==undefined||incoming.weatherCountryCode!==undefined||incoming.weatherUnits!==undefined){
-      state.weather=normalizeWeather({...state.weather,latitude:incoming.weatherLatitude??state.weather.latitude,longitude:incoming.weatherLongitude??state.weather.longitude,locationLabel:incoming.weatherLocationLabel??state.weather.locationLabel,countryCode:incoming.weatherCountryCode??state.weather.countryCode,units:incoming.weatherUnits??state.weather.units});
+    if(incoming.weatherLatitude!==undefined||incoming.weatherLongitude!==undefined||incoming.weatherLocationLabel!==undefined||incoming.weatherCountryCode!==undefined||incoming.weatherTimeZone!==undefined||incoming.weatherUnits!==undefined){
+      state.weather=normalizeWeather({...state.weather,latitude:incoming.weatherLatitude??state.weather.latitude,longitude:incoming.weatherLongitude??state.weather.longitude,locationLabel:incoming.weatherLocationLabel??state.weather.locationLabel,countryCode:incoming.weatherCountryCode??state.weather.countryCode,timeZone:incoming.weatherTimeZone??state.weather.timeZone,units:incoming.weatherUnits??state.weather.units});
     }
     if(incoming.marketWatchlist!==undefined||incoming.marketSymbols!==undefined||incoming.marketRefreshMinutes!==undefined){
       state.markets=normalizeMarkets({...state.markets,watchlist:incoming.marketWatchlist??incoming.marketSymbols??state.markets.watchlist,refreshMinutes:incoming.marketRefreshMinutes??state.markets.refreshMinutes});
