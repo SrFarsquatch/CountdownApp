@@ -460,6 +460,214 @@ body.modal-open{overflow:hidden}
   #calendarStage.planner-swipe-active:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;box-shadow:inset 14px 0 22px -26px var(--text),inset -14px 0 22px -26px var(--text)}
 }
 @keyframes mobileSheetIn{from{transform:translateY(28px);opacity:.75}to{transform:translateY(0);opacity:1}}
+
+/* Google Calendar-inspired mobile Planner */
+.mobile-planner-bar{display:none}
+@media(max-width:760px){
+  body.planner-mode{background:var(--panel)}
+  body.planner-mode .top{display:none}
+  body.planner-mode .content{
+    height:100vh;height:100dvh;
+    padding:max(env(safe-area-inset-top),8px) 0 0;
+    overflow:hidden;
+  }
+  body.planner-mode #view-planner.on{
+    display:grid;
+    grid-template-rows:auto minmax(0,1fr);
+    gap:0;
+    height:100%;
+    padding:0;
+    overflow:hidden;
+  }
+  body.planner-mode #view-planner>.hero,
+  body.planner-mode #view-planner>.calendar-toolbar{display:none!important}
+  body.planner-mode #view-planner .calendar-shell{
+    height:100%;
+    min-height:0;
+    margin:0!important;
+    display:block;
+  }
+  body.planner-mode #view-planner .calendar-stage{
+    height:100%;
+    max-height:none;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+    background:var(--panel2);
+    overflow:hidden;
+  }
+  body.planner-mode .mobile-nav,
+  body.planner-mode .agent-fab{display:none!important}
+  body.planner-mode .quick{
+    display:grid;
+    place-items:center;
+    width:58px;height:58px;
+    right:18px;
+    bottom:calc(20px + env(safe-area-inset-bottom));
+    border-radius:18px;
+    font-size:32px;
+    font-weight:300;
+    z-index:60;
+    box-shadow:0 10px 24px rgba(0,0,0,.24);
+  }
+  .mobile-planner-bar{
+    height:64px;
+    flex:none;
+    display:grid;
+    grid-template-columns:46px auto 1fr 46px 46px;
+    align-items:center;
+    gap:2px;
+    padding:4px 10px 7px;
+    background:var(--panel);
+    color:var(--text);
+    border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent);
+    z-index:25;
+  }
+  .mobile-planner-icon,.mobile-planner-today,.mobile-planner-period{
+    border:0;background:transparent;color:inherit;
+    min-height:44px;
+  }
+  .mobile-planner-icon{
+    width:44px;height:44px;padding:0;
+    border-radius:50%;
+    display:grid;place-items:center;
+    font-size:25px;line-height:1;
+  }
+  .mobile-planner-icon:active,.mobile-planner-today:active,.mobile-planner-period:active{background:var(--panel2)}
+  .mobile-planner-period{
+    display:flex;align-items:center;gap:7px;
+    padding:0 8px;
+    border-radius:12px;
+    font-size:25px;font-weight:690;
+    letter-spacing:-.025em;
+    max-width:220px;
+  }
+  .mobile-planner-period span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-planner-caret{font-size:13px;color:var(--muted)}
+  .mobile-planner-today{
+    position:relative;width:42px;height:42px;
+    border-radius:50%;
+    font-size:12px;font-weight:850;
+    display:grid;place-items:center;
+  }
+  .mobile-planner-today:before{
+    content:"";position:absolute;inset:8px 7px 6px;
+    border:2px solid currentColor;border-radius:5px;
+  }
+  .mobile-planner-today:after{
+    content:"";position:absolute;left:11px;right:11px;top:13px;border-top:2px solid currentColor;
+  }
+  .mobile-planner-today span{position:relative;z-index:1;margin-top:5px}
+  #calendarStage[data-calendar-mode="month"]{background:var(--panel2)}
+  #calendarStage[data-calendar-mode="month"] .planner-swipe-surface{
+    height:100%;display:grid;grid-template-rows:38px minmax(0,1fr);
+    background:var(--panel2);
+  }
+  #calendarStage[data-calendar-mode="month"] .month-head{
+    height:38px;
+    display:grid;
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    background:var(--panel);
+    border-bottom:0;
+    gap:2px;
+    padding:0 3px;
+  }
+  #calendarStage[data-calendar-mode="month"] .month-head div{
+    display:grid;place-items:center;
+    padding:0;
+    border:0;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:760;
+  }
+  #calendarStage[data-calendar-mode="month"] .month-grid{
+    height:auto;
+    min-height:0;
+    display:grid;
+    grid-template-columns:repeat(7,minmax(0,1fr));
+    grid-template-rows:repeat(6,minmax(0,1fr));
+    gap:2px;
+    padding:0 3px 3px;
+    background:var(--panel2);
+  }
+  #calendarStage[data-calendar-mode="month"] .month-cell{
+    position:relative;
+    min-height:0;
+    padding:7px 2px 2px;
+    overflow:hidden;
+    border:0;
+    border-radius:6px;
+    background:var(--panel);
+    opacity:1;
+  }
+  #calendarStage[data-calendar-mode="month"] .month-cell.muted-day{
+    opacity:.54;
+  }
+  #calendarStage[data-calendar-mode="month"] .month-date-button{
+    display:grid;place-items:center;
+    min-width:25px;height:25px;
+    margin:0 auto 3px;
+    padding:0 4px;
+    border-radius:50%;
+    font-size:12px;font-weight:780;
+  }
+  #calendarStage[data-calendar-mode="month"] .today-cell .month-date-button{
+    background:var(--accent);color:var(--accent-contrast);
+  }
+  #calendarStage[data-calendar-mode="month"] .month-chip{
+    width:100%;
+    height:20px;
+    margin:2px 0 0;
+    padding:2px 4px;
+    border:0;
+    border-left:3px solid var(--event-color,var(--accent));
+    border-radius:5px;
+    background:color-mix(in srgb,var(--event-color,var(--accent)) 22%,var(--panel));
+    color:var(--text);
+    font-size:9px;
+    line-height:16px;
+    font-weight:690;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #calendarStage[data-calendar-mode="month"] .month-chip.task{
+    border-left-color:var(--accent);
+    background:var(--accent-soft);
+  }
+  #calendarStage[data-calendar-mode="month"] .month-more{
+    padding:2px 3px;font-size:8px;font-weight:780;color:var(--muted)
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .planner-swipe-surface,
+  #calendarStage[data-calendar-mode="day"] .planner-swipe-surface{height:100%;min-height:0}
+  #calendarStage[data-calendar-mode="week-mobile"] .planner-swipe-surface{
+    display:grid;grid-template-rows:auto minmax(0,1fr)
+  }
+  .mobile-week-strip{
+    padding:4px 5px 5px;
+    gap:2px;
+    background:var(--panel);
+  }
+  .mobile-week-day{min-height:48px;border-radius:14px}
+  .mobile-week-day small{font-size:10px}
+  .mobile-week-day strong{font-size:14px}
+  .mobile-week-day.on{background:var(--accent-soft)}
+  .mobile-week-day.today strong{
+    width:28px;height:28px;border-radius:50%;
+    display:grid;place-items:center;
+    background:var(--accent);color:var(--accent-contrast)
+  }
+  .mobile-week-day.today{box-shadow:none}
+  .planner-mobile-nav-sheet{display:grid;gap:4px}
+  .planner-mobile-nav-sheet .btn{min-height:50px;text-align:left;justify-content:flex-start}
+  .planner-search-box{display:grid;gap:10px}
+  .planner-search-box input{font-size:16px;min-height:48px}
+  .planner-search-results{display:grid;gap:6px;max-height:48vh;overflow:auto}
+  .planner-search-result{
+    border:1px solid var(--line);background:var(--panel);
+    color:var(--text);border-radius:12px;padding:10px 12px;text-align:left
+  }
+  .planner-search-result strong{display:block;font-size:13px}
+  .planner-search-result span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -510,6 +718,13 @@ body.modal-open{overflow:hidden}
 </section>
 
 <section class="view" id="view-planner">
+  <div class="mobile-planner-bar" id="mobilePlannerBar">
+    <button class="mobile-planner-icon" id="mobilePlannerMenu" type="button" aria-label="Open navigation">☰</button>
+    <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Change calendar view"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
+    <span class="mobile-planner-spacer"></span>
+    <button class="mobile-planner-icon" id="mobilePlannerSearch" type="button" aria-label="Search calendar">⌕</button>
+    <button class="mobile-planner-today" id="mobilePlannerToday" type="button" aria-label="Go to today"><span id="mobilePlannerTodayNumber"></span></button>
+  </div>
   <div class="hero"><div><h2>Planner</h2><p>Google Calendar and scheduled tasks in one place.</p></div></div>
   <div class="calendar-toolbar">
     <div class="calendar-nav"><button class="btn tiny" id="plannerPrev">‹</button><button class="btn tiny" id="plannerToday">Today</button><button class="btn tiny" id="plannerNext">›</button><div class="calendar-title" id="plannerRange"></div></div>
@@ -705,7 +920,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0;
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0;
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 function pwaStandalone(){
@@ -940,7 +1155,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.data
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
 $('topAdd').onclick=$('quickAdd').onclick=()=>openChooser();
-$('syncBtn').onclick=()=>loadAll(true);
+$('syncBtn').onclick=()=>{plannerEventCache.clear();loadAll(true)};
 
 function isMobileUi(){return window.matchMedia('(max-width:760px)').matches}
 function openModal(title,html,options={}){
@@ -1311,7 +1526,7 @@ function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==fal
 function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" onclick="countdownModal(state.countdowns.find(x=>x.id==='${esc(c.id)}'))">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>'}
 
 function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
-function weekStart(d=new Date()){const x=startOfDay(d),day=x.getDay();x.setDate(x.getDate()-(day===0?6:day-1));return x}
+function weekStart(d=new Date()){const x=startOfDay(d),day=x.getDay();x.setDate(x.getDate()-(isMobileUi()?day:(day===0?6:day-1)));return x}
 function monthRange(d){const first=new Date(d.getFullYear(),d.getMonth(),1);const start=weekStart(first);const end=new Date(start);end.setDate(end.getDate()+42);return{start,end}}
 function plannerRange(){
  const a=new Date(plannerAnchor);
@@ -1329,6 +1544,43 @@ function renderMini(){
  $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=parseDateKey(x.dataset.miniDate);plannerView='day';syncPlannerViewButtons();renderPlanner()})
 }
 function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.classList.toggle('on',b.dataset.calview===plannerView))}
+function syncMobilePlannerChrome(){
+ if(!$('mobilePlannerTitle'))return;
+ const a=new Date(plannerAnchor);
+ $('mobilePlannerTitle').textContent=plannerView==='month'?a.toLocaleDateString([],{month:'long'}):plannerView==='week'?a.toLocaleDateString([],{month:'short',day:'numeric'}):a.toLocaleDateString([],{month:'short',day:'numeric'});
+ $('mobilePlannerTodayNumber').textContent=String(new Date().getDate());
+}
+function openPlannerViewSheet(){
+ const views=[['day','Day'],['week','Week'],['month','Month']];
+ openActionSheet('Calendar view','<div class="mobile-sheet-actions">'+views.map(v=>'<button class="btn '+(plannerView===v[0]?'primary':'')+'" type="button" data-planner-view-choice="'+v[0]+'">'+v[1]+'</button>').join('')+'</div>');
+ $('modalBody').querySelectorAll('[data-planner-view-choice]').forEach(button=>button.onclick=()=>{plannerView=button.dataset.plannerViewChoice;closeModal();syncPlannerViewButtons();renderPlanner()});
+}
+function openPlannerNavigation(){
+ const items=[['today','Today'],['planner','Planner'],['tasks','Tasks'],['goals','Goals'],['countdowns','Countdowns'],['markets','Markets'],['settings','Settings']];
+ openActionSheet('Quest Log','<div class="planner-mobile-nav-sheet">'+items.map(item=>'<button class="btn '+(item[0]==='planner'?'primary':'')+'" type="button" data-planner-nav="'+item[0]+'">'+item[1]+'</button>').join('')+'</div>');
+ $('modalBody').querySelectorAll('[data-planner-nav]').forEach(button=>button.onclick=()=>{const view=button.dataset.plannerNav;closeModal();setView(view)});
+}
+function cachedPlannerEvents(){
+ const unique=new Map();
+ for(const entry of plannerEventCache.values()){
+   const events=Array.isArray(entry?.events)?entry.events:[];
+   events.forEach(event=>unique.set(eventKey(event),event));
+ }
+ calEvents.forEach(event=>unique.set(eventKey(event),event));
+ return [...unique.values()];
+}
+function openPlannerSearch(){
+ openActionSheet('Search calendar','<div class="planner-search-box"><input id="plannerSearchInput" type="search" autocomplete="off" placeholder="Search events"><div class="planner-search-results" id="plannerSearchResults"><div class="meta">Type to search loaded calendar events.</div></div></div>');
+ const input=$('plannerSearchInput'),root=$('plannerSearchResults');
+ const run=()=>{
+   const q=input.value.trim().toLowerCase();
+   if(!q){root.innerHTML='<div class="meta">Type to search loaded calendar events.</div>';return}
+   const hits=cachedPlannerEvents().filter(e=>[e.title,e.location,e.calendarName,e.description].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>String(a.start).localeCompare(String(b.start))).slice(0,40);
+   root.innerHTML=hits.length?hits.map(e=>'<button class="planner-search-result" type="button" data-search-event="'+esc(eventKey(e))+'"><strong>'+esc(e.title||'Untitled event')+'</strong><span>'+(e.allDay?'All day · ':'')+esc(fmtDate(e.start,{weekday:'short',month:'short',day:'numeric'}))+(e.allDay?'':' · '+esc(fmtTime(e.start)))+'</span></button>').join(''):'<div class="meta">No matching events in the loaded calendar.</div>';
+   root.querySelectorAll('[data-search-event]').forEach(button=>button.onclick=()=>{const item=cachedPlannerEvents().find(e=>eventKey(e)===button.dataset.searchEvent);if(item){closeModal();calendarEventModal(item)}});
+ };
+ input.oninput=run;setTimeout(()=>input.focus(),50);
+}
 function plannerLabel(range){
  if(plannerView==='day')return range.start.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
  if(plannerView==='month')return plannerAnchor.toLocaleDateString([],{month:'long',year:'numeric'});
@@ -1519,7 +1771,8 @@ function monthEventChip(e){
 }
 function renderMonth(range){
  const stage=$('calendarStage'),mobile=window.matchMedia('(max-width:760px)').matches,limit=mobile?2:3;
- let h='<div class="planner-swipe-surface"><div class="month-head">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
+ const dayNames=isMobileUi()?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+ let h='<div class="planner-swipe-surface"><div class="month-head">'+dayNames.map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
  const today=new Date(),month=plannerAnchor.getMonth();
  for(let i=0;i<42;i++){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
@@ -1534,12 +1787,51 @@ function renderMonth(range){
  stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
  bindCalendarInteractions();
 }
+function plannerRangeKey(range){return range.start.toISOString()+'|'+range.end.toISOString()}
+async function fetchPlannerEvents(range){
+ if(!state.google.connected)return[];
+ const key=plannerRangeKey(range),cached=plannerEventCache.get(key);
+ if(cached?.events)return cached.events;
+ if(cached?.promise)return cached.promise;
+ const promise=api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))
+   .then(data=>{const events=data.events||[];plannerEventCache.set(key,{events,at:Date.now()});while(plannerEventCache.size>12)plannerEventCache.delete(plannerEventCache.keys().next().value);return events})
+   .catch(error=>{plannerEventCache.delete(key);throw error});
+ plannerEventCache.set(key,{promise,at:Date.now()});
+ return promise;
+}
+function shiftedAnchor(anchor,direction,view=plannerView){
+ const x=new Date(anchor);
+ if(view==='day')x.setDate(x.getDate()+direction);
+ else if(view==='week')x.setDate(x.getDate()+direction*7);
+ else x.setMonth(x.getMonth()+direction);
+ return x;
+}
+function rangeForAnchor(anchor,view=plannerView){
+ const savedAnchor=plannerAnchor,savedView=plannerView;
+ plannerAnchor=new Date(anchor);plannerView=view;
+ const range=plannerRange();
+ plannerAnchor=savedAnchor;plannerView=savedView;
+ return range;
+}
+function prefetchPlannerNeighbors(){
+ if(!state.google.connected)return;
+ for(const direction of [-1,1]){
+   const anchor=shiftedAnchor(plannerAnchor,direction,plannerView),range=rangeForAnchor(anchor,plannerView);
+   fetchPlannerEvents(range).catch(()=>{});
+ }
+}
 async function renderPlanner(){
- renderMini();syncPlannerViewButtons();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
- try{calEvents=state.google.connected?(await api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))).events||[]:[]}catch(e){console.warn(e);calEvents=[]}
+ const seq=++plannerRenderSeq;
+ renderMini();syncPlannerViewButtons();syncMobilePlannerChrome();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
+ try{
+   const events=await fetchPlannerEvents(range);
+   if(seq!==plannerRenderSeq)return;
+   calEvents=events;
+ }catch(e){if(seq!==plannerRenderSeq)return;console.warn(e);calEvents=[]}
  $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
  if(plannerView==='day')renderDay(range);else if(plannerView==='month')renderMonth(range);else renderWeek(range);
  bindPlannerSwipe();
+ setTimeout(prefetchPlannerNeighbors,0);
 }
 function shiftPlannerAnchor(direction){
  const x=new Date(plannerAnchor);
@@ -1612,6 +1904,10 @@ $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
 const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
+$('mobilePlannerMenu').onclick=openPlannerNavigation;
+$('mobilePlannerPeriod').onclick=openPlannerViewSheet;
+$('mobilePlannerSearch').onclick=openPlannerSearch;
+$('mobilePlannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-planner').classList.contains('on')||plannerView==='month')return;cancelAnimationFrame(plannerResizeFrame);plannerResizeFrame=requestAnimationFrame(()=>{const range=plannerRange();if(plannerView==='day')renderDay(range);else renderWeek(range)})});
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
