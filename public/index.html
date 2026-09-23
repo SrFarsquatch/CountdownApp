@@ -1048,6 +1048,28 @@ body.modal-open{overflow:hidden}
     width:27px;height:27px;font-size:14px;
   }
 }
+
+/* Preserve native vertical scrolling inside mobile Planner timelines */
+@media(max-width:760px){
+  #calendarStage.planner-pager-active .timeline-scroll{
+    height:100%;
+    min-height:0;
+    overflow-y:scroll!important;
+    overflow-x:hidden!important;
+    touch-action:pan-y!important;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-grid{
+    overflow:hidden;
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .mobile-week-time-grid{
+    min-height:var(--timeline-height,1248px);
+  }
+  #calendarStage[data-calendar-mode="week-mobile"] .planner-pager-page{
+    touch-action:pan-y;
+  }
+}
 </style>
 </head>
 <body>
@@ -2361,9 +2383,9 @@ function bindPlannerSwipe(){
  const stage=$('calendarStage');if(!stage||!isMobileUi())return;
  stage.classList.add('planner-swipe-active','planner-pager-active');
  if(stage.dataset.plannerPagerSwipeBound==='1')return;stage.dataset.plannerPagerSwipeBound='1';
- let startX=0,startY=0,lastX=0,startTime=0,pointerId=null,horizontal=false,raf=0,pendingDx=0,activeTrack=null;
+ let startX=0,startY=0,lastX=0,startTime=0,pointerId=null,axis=null,raf=0,pendingDx=0,activeTrack=null;
  const paint=()=>{
-   raf=0;if(pointerId===null||!horizontal||!activeTrack?.isConnected)return;
+   raf=0;if(pointerId===null||axis!=='horizontal'||!activeTrack?.isConnected)return;
    const width=stage.clientWidth,dx=Math.max(-width*.94,Math.min(width*.94,pendingDx));
    activeTrack.style.transform='translate3d('+(-width+dx)+'px,0,0)';
  };
@@ -2372,30 +2394,39 @@ function bindPlannerSwipe(){
    activeTrack=stage.querySelector('.planner-pager-track');if(!activeTrack)return;
    if(e.clientX<=24||e.clientX>=window.innerWidth-24)return;
    if(e.target.closest('input,textarea,select'))return;
-   startX=lastX=e.clientX;startY=e.clientY;startTime=performance.now();pointerId=e.pointerId;horizontal=false;pendingDx=0;
-   activeTrack.classList.add('dragging');activeTrack.style.transition='none';
-   try{stage.setPointerCapture(pointerId)}catch{}
+   startX=lastX=e.clientX;startY=e.clientY;startTime=performance.now();pointerId=e.pointerId;axis=null;pendingDx=0;
  });
  stage.addEventListener('pointermove',e=>{
    if(pointerId===null||e.pointerId!==pointerId||!activeTrack?.isConnected)return;
    const dx=e.clientX-startX,dy=e.clientY-startY;lastX=e.clientX;
-   if(!horizontal&&Math.abs(dy)>Math.abs(dx)+9)return;
-   if(Math.abs(dx)>7)horizontal=true;if(!horizontal)return;
+   if(axis===null){
+     if(Math.hypot(dx,dy)<11)return;
+     if(Math.abs(dy)>Math.abs(dx)*1.12){
+       axis='vertical';
+       return;
+     }
+     if(Math.abs(dx)>Math.abs(dy)*1.12){
+       axis='horizontal';
+       activeTrack.classList.add('dragging');activeTrack.style.transition='none';
+       try{stage.setPointerCapture(pointerId)}catch{}
+     }else return;
+   }
+   if(axis!=='horizontal')return;
    e.preventDefault();pendingDx=dx;
    if(!raf)raf=requestAnimationFrame(paint);
  });
  const finish=e=>{
    if(pointerId===null||(e.pointerId!==undefined&&e.pointerId!==pointerId))return;
    if(raf){cancelAnimationFrame(raf);raf=0}
-   const dx=lastX-startX,elapsed=Math.max(1,performance.now()-startTime),velocity=Math.abs(dx)/elapsed,width=stage.clientWidth,track=activeTrack;
-   const threshold=Math.max(48,Math.min(86,width*.16)),active=horizontal&&(Math.abs(dx)>=threshold||velocity>.42);
-   pointerId=null;horizontal=false;activeTrack=null;
+   const dx=lastX-startX,elapsed=Math.max(1,performance.now()-startTime),velocity=Math.abs(dx)/elapsed,width=stage.clientWidth,track=activeTrack,wasHorizontal=axis==='horizontal';
+   const threshold=Math.max(48,Math.min(86,width*.16)),active=wasHorizontal&&(Math.abs(dx)>=threshold||velocity>.42);
+   pointerId=null;axis=null;activeTrack=null;
    if(track?.isConnected)track.classList.remove('dragging');
    try{stage.releasePointerCapture?.(e.pointerId)}catch{}
    if(active){
      plannerSwipeSuppressUntil=Date.now()+260;
      completePlannerPagerSwipe(dx<0?1:-1,true).catch(console.warn);
-   }else if(track?.isConnected){
+   }else if(wasHorizontal&&track?.isConnected){
      track.style.transition='transform .15s ease-out';track.style.transform='translate3d('+(-width)+'px,0,0)';
    }
  };
