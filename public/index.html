@@ -737,6 +737,81 @@ body.modal-open{overflow:hidden}
   }
   .planner-view-choice strong{font-size:18px;color:var(--accent)}
 }
+
+/* Compact Planner date drawer */
+@media(max-width:760px){
+  .mobile-planner-bar{position:relative;overflow:visible}
+  .mobile-planner-period.drawer-open .mobile-planner-caret{transform:rotate(180deg)}
+  .mobile-planner-caret{display:inline-block;transition:transform .16s ease}
+  .mobile-planner-drawer{
+    position:absolute;
+    top:58px;left:12px;
+    width:min(310px,calc(100vw - 24px));
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:0 0 16px 16px;
+    background:color-mix(in srgb,var(--panel) 98%,transparent);
+    box-shadow:0 16px 34px rgba(0,0,0,.16);
+    backdrop-filter:blur(18px);
+    opacity:0;
+    transform:translateY(-10px) scale(.985);
+    transform-origin:top left;
+    pointer-events:none;
+    transition:opacity .14s ease,transform .18s cubic-bezier(.2,.8,.3,1);
+    z-index:80;
+  }
+  .mobile-planner-drawer.open{
+    opacity:1;transform:translateY(0) scale(1);pointer-events:auto;
+  }
+  .mobile-planner-view-row{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:5px;
+    padding-bottom:9px;border-bottom:1px solid var(--line);
+  }
+  .mobile-planner-view-row button{
+    min-height:38px;border:0;border-radius:10px;
+    background:transparent;color:var(--text);
+    font-size:12px;font-weight:800;
+  }
+  .mobile-planner-view-row button.on{
+    background:var(--accent-soft);color:var(--accent);
+  }
+  .mobile-planner-view-row button:active{transform:scale(.97)}
+  .mobile-planner-drawer-settings{display:grid;padding-top:4px}
+  .mobile-planner-drawer-settings label{
+    min-height:54px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    gap:14px;align-items:center;
+    padding:7px 4px;
+    border-top:1px solid color-mix(in srgb,var(--line) 58%,transparent);
+  }
+  .mobile-planner-drawer-settings label:first-child{border-top:0}
+  .mobile-planner-drawer-settings strong{
+    display:block;font-size:12px;line-height:1.2
+  }
+  .mobile-planner-drawer-settings small{
+    display:block;margin-top:3px;
+    color:var(--muted);font-size:9px;line-height:1.25
+  }
+  .mobile-planner-drawer-settings input[type="checkbox"]{
+    appearance:none;-webkit-appearance:none;
+    width:38px;height:22px;min-height:22px;
+    border:1px solid var(--line);
+    border-radius:999px;background:var(--panel2);
+    position:relative;transition:background .15s ease,border-color .15s ease;
+  }
+  .mobile-planner-drawer-settings input[type="checkbox"]:after{
+    content:"";position:absolute;top:2px;left:2px;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--text);
+    transition:transform .16s ease,background .16s ease;
+  }
+  .mobile-planner-drawer-settings input[type="checkbox"]:checked{
+    background:var(--accent);border-color:var(--accent)
+  }
+  .mobile-planner-drawer-settings input[type="checkbox"]:checked:after{
+    transform:translateX(16px);background:var(--accent-contrast)
+  }
+}
 </style>
 </head>
 <body>
@@ -788,10 +863,21 @@ body.modal-open{overflow:hidden}
 
 <section class="view" id="view-planner">
   <div class="mobile-planner-bar" id="mobilePlannerBar">
-    <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Change calendar view"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
+    <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Calendar options" aria-expanded="false"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
     <span class="mobile-planner-spacer"></span>
     <button class="mobile-planner-icon" id="mobilePlannerSearch" type="button" aria-label="Search calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg></button>
     <button class="mobile-planner-today" id="mobilePlannerToday" type="button" aria-label="Go to today"><span id="mobilePlannerTodayNumber"></span></button>
+    <div class="mobile-planner-drawer" id="mobilePlannerDrawer" aria-hidden="true">
+      <div class="mobile-planner-view-row" aria-label="Calendar view">
+        <button type="button" data-planner-drawer-view="day">Day</button>
+        <button type="button" data-planner-drawer-view="week">Week</button>
+        <button type="button" data-planner-drawer-view="month">Month</button>
+      </div>
+      <div class="mobile-planner-drawer-settings">
+        <label><span><strong>Show tasks</strong><small>Scheduled tasks appear on the calendar</small></span><input id="plannerDrawerShowTasks" type="checkbox"></label>
+        <label><span><strong>Week starts Sunday</strong><small>Applies to week and month views</small></span><input id="plannerDrawerSundayStart" type="checkbox"></label>
+      </div>
+    </div>
   </div>
   <div class="hero"><div><h2>Planner</h2><p>Google Calendar and scheduled tasks in one place.</p></div></div>
   <div class="calendar-toolbar">
@@ -994,7 +1080,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0;
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 function pwaStandalone(){
@@ -1224,7 +1310,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));document.body.classList.toggle('planner-mode',name==='planner');$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
+function setView(name){if(name!=='planner')closePlannerDrawer();document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+name));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===name));document.body.classList.toggle('planner-mode',name==='planner');$('pageTitle').textContent=({today:'Today',planner:'Planner',tasks:'Tasks',goals:'Goals',markets:'Markets',countdowns:'Countdowns',displays:'Displays',settings:'Settings'})[name]||'Planner';history.replaceState(null,'','?view='+name);if(name==='planner')renderPlanner();if(name==='markets')renderMarkets();if(name==='displays')renderDisplay();if(name==='settings')renderSettings()}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
@@ -1600,7 +1686,7 @@ function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==fal
 function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" onclick="countdownModal(state.countdowns.find(x=>x.id==='${esc(c.id)}'))">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>'}
 
 function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
-function weekStart(d=new Date()){const x=startOfDay(d),day=x.getDay();x.setDate(x.getDate()-(isMobileUi()?day:(day===0?6:day-1)));return x}
+function weekStart(d=new Date()){const x=startOfDay(d),day=x.getDay(),sundayFirst=isMobileUi()&&plannerWeekStartsSunday;x.setDate(x.getDate()-(sundayFirst?day:(day===0?6:day-1)));return x}
 function monthRange(d){const first=new Date(d.getFullYear(),d.getMonth(),1);const start=weekStart(first);const end=new Date(start);end.setDate(end.getDate()+42);return{start,end}}
 function plannerRange(){
  const a=new Date(plannerAnchor);
@@ -1625,12 +1711,27 @@ function syncMobilePlannerChrome(){
    ?a.toLocaleDateString([],{month:'long',year:'numeric'})
    :a.toLocaleDateString([],{month:'long',day:'numeric',year:'numeric'});
  $('mobilePlannerTodayNumber').textContent=String(new Date().getDate());
+ syncPlannerDrawer();
 }
-function openPlannerViewSheet(){
- const views=[['day','Day'],['week','Week'],['month','Month']];
- openActionSheet('Calendar view','<div class="mobile-sheet-actions">'+views.map(v=>'<button class="btn planner-view-choice '+(plannerView===v[0]?'on':'')+'" type="button" data-planner-view-choice="'+v[0]+'"><span>'+v[1]+'</span><strong>'+(plannerView===v[0]?'✓':'')+'</strong></button>').join('')+'</div>');
- $('modalBody').querySelectorAll('[data-planner-view-choice]').forEach(button=>button.onclick=()=>{plannerView=button.dataset.plannerViewChoice;closeModal();syncPlannerViewButtons();renderPlanner()});
+function syncPlannerDrawer(){
+ const drawer=$('mobilePlannerDrawer');if(!drawer)return;
+ drawer.querySelectorAll('[data-planner-drawer-view]').forEach(button=>{
+   const on=button.dataset.plannerDrawerView===plannerView;
+   button.classList.toggle('on',on);button.setAttribute('aria-pressed',on?'true':'false');
+ });
+ if($('plannerDrawerShowTasks'))$('plannerDrawerShowTasks').checked=plannerShowTasks;
+ if($('plannerDrawerSundayStart'))$('plannerDrawerSundayStart').checked=plannerWeekStartsSunday;
 }
+function setPlannerDrawer(open){
+ const drawer=$('mobilePlannerDrawer'),trigger=$('mobilePlannerPeriod');if(!drawer||!trigger)return;
+ const show=Boolean(open)&&isMobileUi();
+ drawer.classList.toggle('open',show);drawer.setAttribute('aria-hidden',show?'false':'true');trigger.setAttribute('aria-expanded',show?'true':'false');
+ trigger.classList.toggle('drawer-open',show);
+ if(show)syncPlannerDrawer();
+}
+function togglePlannerDrawer(){setPlannerDrawer(!$('mobilePlannerDrawer')?.classList.contains('open'))}
+function closePlannerDrawer(){setPlannerDrawer(false)}
+
 function cachedPlannerEvents(){
  const unique=new Map();
  for(const entry of plannerEventCache.values()){
@@ -1742,7 +1843,7 @@ function timedBlockHtml(item){
 }
 function calendarItemsForDay(day,next){
  const events=calEvents.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
- const tasks=state.tasks.filter(t=>t.status!=='done').map(t=>({task:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.task,start:x.span.start,end:x.span.end}));
+ const tasks=plannerShowTasks?state.tasks.filter(t=>t.status!=='done').map(t=>({task:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.task,start:x.span.start,end:x.span.end})):[];
  return layoutTimedItems([...events,...tasks],day,next);
 }
 function allDayChip(e){
@@ -1752,7 +1853,7 @@ function timelineFocusDate(range){
  const now=new Date();if(now>=range.start&&now<range.end)return now;
  const candidates=[];
  calEvents.forEach(e=>{if(e.allDay)return;const d=new Date(e.start);if(!Number.isNaN(d.getTime())&&d>=range.start&&d<range.end)candidates.push(d)});
- state.tasks.filter(t=>t.status!=='done'&&t.start).forEach(t=>{const span=taskCalendarSpan(t);if(span&&span.start>=range.start&&span.start<range.end)candidates.push(span.start)});
+ if(plannerShowTasks)state.tasks.filter(t=>t.status!=='done'&&t.start).forEach(t=>{const span=taskCalendarSpan(t);if(span&&span.start>=range.start&&span.start<range.end)candidates.push(span.start)});
  if(candidates.length)return new Date(Math.min(...candidates.map(d=>d.getTime())));
  const fallback=new Date(range.start);fallback.setHours(8,0,0,0);return fallback;
 }
@@ -1842,14 +1943,14 @@ function monthEventChip(e){
 }
 function renderMonth(range){
  const stage=$('calendarStage'),mobile=window.matchMedia('(max-width:760px)').matches,limit=mobile?2:3;
- const dayNames=isMobileUi()?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+ const dayNames=isMobileUi()&&plannerWeekStartsSunday?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
  let h='<div class="planner-swipe-surface"><div class="month-head">'+dayNames.map(x=>'<div>'+x+'</div>').join('')+'</div><div class="month-grid">';
  const today=new Date(),month=plannerAnchor.getMonth();
  for(let i=0;i<42;i++){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
    const entries=[];
    calEvents.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
-   state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
+   if(plannerShowTasks)state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
    entries.sort((a,b)=>a.sort-b.sort);const visible=entries.slice(0,limit),remaining=Math.max(0,entries.length-visible.length);
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
    h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
@@ -1975,9 +2076,25 @@ $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
 const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on'))renderPlanner()});
-$('mobilePlannerPeriod').onclick=openPlannerViewSheet;
-$('mobilePlannerSearch').onclick=openPlannerSearch;
-$('mobilePlannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
+$('mobilePlannerPeriod').onclick=e=>{e.stopPropagation();togglePlannerDrawer()};
+$('mobilePlannerSearch').onclick=()=>{closePlannerDrawer();openPlannerSearch()};
+$('mobilePlannerToday').onclick=()=>{closePlannerDrawer();plannerAnchor=new Date();renderPlanner()};
+$('mobilePlannerDrawer').querySelectorAll('[data-planner-drawer-view]').forEach(button=>button.onclick=async e=>{
+ e.stopPropagation();const next=button.dataset.plannerDrawerView;if(!next||next===plannerView){closePlannerDrawer();return}
+ plannerView=next;syncPlannerViewButtons();closePlannerDrawer();await renderPlanner();
+});
+$('plannerDrawerShowTasks').onchange=async e=>{
+ plannerShowTasks=e.target.checked;localStorage.setItem('questlog.planner.showTasks',plannerShowTasks?'1':'0');syncPlannerDrawer();await renderPlanner();
+};
+$('plannerDrawerSundayStart').onchange=async e=>{
+ plannerWeekStartsSunday=e.target.checked;localStorage.setItem('questlog.planner.weekStartsSunday',plannerWeekStartsSunday?'1':'0');plannerEventCache.clear();syncPlannerDrawer();await renderPlanner();
+};
+document.addEventListener('pointerdown',e=>{
+ const drawer=$('mobilePlannerDrawer');if(!drawer?.classList.contains('open'))return;
+ if(e.target.closest('#mobilePlannerDrawer,#mobilePlannerPeriod'))return;
+ closePlannerDrawer();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePlannerDrawer()});
 let plannerResizeFrame=0;window.addEventListener('resize',()=>{if(!$('view-planner').classList.contains('on')||plannerView==='month')return;cancelAnimationFrame(plannerResizeFrame);plannerResizeFrame=requestAnimationFrame(()=>{const range=plannerRange();if(plannerView==='day')renderDay(range);else renderWeek(range)})});
 
 const DISPLAY_SECTION_LABELS={agenda:'Agenda',weather:'Weather',tasks:'Tasks',goals:'Goals',countdowns:'Countdowns',markets:'Markets'};
