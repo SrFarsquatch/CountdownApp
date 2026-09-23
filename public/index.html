@@ -847,19 +847,50 @@ body.modal-open{overflow:hidden}
   .planner-pager-page .timeline-scroll{-webkit-overflow-scrolling:touch}
 }
 
-/* Keep Planner floating actions consistent with the rest of mobile Quest Log */
+
+/* Harden Planner chrome and floating controls */
+.planner-agent-fab{display:none}
 @media(max-width:760px){
-  body.planner-mode .agent-fab{
-    display:grid!important;
+  body.planner-mode #mobilePlannerBar{
+    position:sticky!important;
+    top:0!important;
+    z-index:120!important;
+    min-height:66px;
+    flex:0 0 66px;
+    background:var(--panel);
+    isolation:isolate;
+    transform:translateZ(0);
+    backface-visibility:hidden;
+  }
+  body.planner-mode #view-planner .calendar-shell{
+    position:relative;
+    z-index:1;
+  }
+  body.planner-mode #calendarStage{
+    position:relative;
+    z-index:1;
+  }
+  body.planner-mode #agentFab{display:none!important}
+  body.planner-mode .planner-agent-fab{
+    position:fixed;
     right:18px;
     bottom:calc(146px + env(safe-area-inset-bottom));
     width:48px;
     height:48px;
+    border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));
     border-radius:16px;
+    background:var(--panel);
+    color:var(--accent);
     font-size:21px;
-    z-index:42;
+    box-shadow:0 12px 28px rgba(0,0,0,.15);
+    z-index:72;
+    display:grid;
+    place-items:center;
+    transition:transform .16s ease,background .16s ease,opacity .16s ease;
   }
-  body.planner-mode .quick{
+  body.planner-mode .planner-agent-fab:active{transform:scale(.96);background:var(--accent-soft)}
+  body.agent-open .planner-agent-fab{opacity:0;pointer-events:none}
+  body.planner-mode #quickAdd{
     display:grid;
     place-items:center;
     right:16px;
@@ -869,7 +900,7 @@ body.modal-open{overflow:hidden}
     border-radius:18px;
     font-size:26px;
     font-weight:400;
-    z-index:40;
+    z-index:71;
     box-shadow:0 12px 30px rgba(0,0,0,.2);
   }
 }
@@ -940,6 +971,7 @@ body.modal-open{overflow:hidden}
       </div>
     </div>
   </div>
+  <button class="planner-agent-fab" id="plannerAgentFab" type="button" aria-label="Open Navi" title="Ask Navi">✦</button>
   <div class="hero"><div><h2>Planner</h2><p>Google Calendar and scheduled tasks in one place.</p></div></div>
   <div class="calendar-toolbar">
     <div class="calendar-nav"><button class="btn tiny" id="plannerPrev">‹</button><button class="btn tiny" id="plannerToday">Today</button><button class="btn tiny" id="plannerNext">›</button><div class="calendar-title" id="plannerRange"></div></div>
@@ -2934,6 +2966,7 @@ $('agentSend').onclick=()=>sendAgentMessage();
 $('agentInput').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMessage()}};
 $('agentClearChat').onclick=()=>{agentMessages=[];saveAgentHistory();renderAgent()};
 $('agentFab').onclick=()=>openAgentDrawer();
+$('plannerAgentFab').onclick=()=>openAgentDrawer();
 $('agentDrawerClose').onclick=closeAgentDrawer;
 $('agentDrawerBackdrop').onclick=closeAgentDrawer;
 $('todayAgentForm').onsubmit=e=>{e.preventDefault();submitTodayAgent()};
