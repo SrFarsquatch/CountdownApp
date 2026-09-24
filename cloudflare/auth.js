@@ -152,6 +152,7 @@ export async function signup(request,env,payload={}){
  await verifyTurnstile(request,env,payload.turnstileToken);
  let user=await env.DB.prepare('SELECT * FROM questlog_users WHERE lower(primary_email)=?').bind(email).first();
  if(user?.password_hash){const e=new Error('An account already exists for that email.');e.status=409;throw e}
+ if(user&&!payload.legacyVerified){const e=new Error('This email is reserved for an existing Quest Log identity. Complete the owner migration before removing Cloudflare Access.');e.status=409;throw e}
  const salt=crypto.getRandomValues(new Uint8Array(16)),hash=await passwordHash(password,salt),userId=user?.user_id||crypto.randomUUID();
  if(user){
   await env.DB.prepare(`
@@ -166,7 +167,7 @@ export async function signup(request,env,payload={}){
  }
  await clearRateLimit(request,env,email,'signup');
  const legacyOwner=emailValue(env.LEGACY_OWNER_EMAIL);
- if(legacyOwner&&legacyOwner===email){
+ if(legacyOwner&&legacyOwner===email&&payload.legacyVerified){
   const target='user:'+userId;
   const existing=await env.DB.prepare('SELECT workspace_id FROM questlog_state WHERE workspace_id=?').bind(target).first().catch(()=>null);
   const legacy=await env.DB.prepare("SELECT state_json FROM questlog_state WHERE workspace_id='default'").first().catch(()=>null);
