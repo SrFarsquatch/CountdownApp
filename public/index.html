@@ -1527,7 +1527,7 @@ body.modal-open{overflow:hidden}
           <div class="calendar-side-list" id="questCalendarFilters"><div class="meta">Loading calendars…</div></div>
         </div>
         <div class="card calendar-side-section">
-          <div class="calendar-side-head"><strong>Google calendars</strong><span class="meta">Synced</span></div>
+          <div class="calendar-side-head"><strong>Other Calendars</strong><span class="meta">Synced</span></div>
           <div class="calendar-side-list" id="googleCalendarFilters"><div class="meta">Loading…</div></div>
         </div>
       </aside>
@@ -2936,7 +2936,7 @@ async function createQuestCalendarModal(){
 async function openMobileCalendarFilters(){
  await renderCalendarFilters();
  const q=$('questCalendarFilters')?.innerHTML||'',g=$('googleCalendarFilters')?.innerHTML||'';
- openActionSheet('Calendars','<div class="calendar-filter-sheet"><section><div class="calendar-side-head"><strong>Quest Log calendars</strong><button class="calendar-add" id="sheetNewCalendar" type="button">+</button></div><div class="calendar-side-list" id="sheetQuestCalendars">'+q+'</div></section><section><div class="calendar-side-head"><strong>Google calendars</strong></div><div class="calendar-side-list" id="sheetGoogleCalendars">'+g+'</div></section></div>');
+ openActionSheet('Calendars','<div class="calendar-filter-sheet"><section><div class="calendar-side-head"><strong>Quest Log calendars</strong><button class="calendar-add" id="sheetNewCalendar" type="button">+</button></div><div class="calendar-side-list" id="sheetQuestCalendars">'+q+'</div></section><section><div class="calendar-side-head"><strong>Other Calendars</strong></div><div class="calendar-side-list" id="sheetGoogleCalendars">'+g+'</div></section></div>');
  document.querySelectorAll('#sheetQuestCalendars [data-calendar-filter],#sheetGoogleCalendars [data-calendar-filter]').forEach(input=>input.onchange=()=>{setCalendarVisible(input.dataset.calendarFilter,input.checked);renderPlanner()});
  if($('sheetNewCalendar'))$('sheetNewCalendar').onclick=createQuestCalendarModal;
 }
