@@ -1600,7 +1600,6 @@ body.modal-open{overflow:hidden}
 </nav>
 
 <div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
-<div class="back-exit-toast" id="backExitToast" role="status" aria-live="polite">Swipe back again to close</div>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -1608,7 +1607,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',financeData=null,financeError='',plaidLinkLoading=false,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,backExitRestoreTimer=null,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',financeData=null,financeError='',plaidLinkLoading=false,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -1981,30 +1980,11 @@ function renderAppView(name){
 }
 function setView(name,{historyMode='push'}={}){
  if(!APP_VIEWS.has(name))name='today';
- const previous=currentAppView(),atExitGuard=history.state?.questlog&&history.state.type==='exit-guard';
+ const previous=currentAppView();
  renderAppView(name);
  if(!appHistoryReady||historyMode==='none')return;
- if(atExitGuard){
-   hideBackExitPrompt();
-   history.pushState({questlog:true,type:'view',view:'today',root:true},'',appViewUrl('today'));
-   if(name!=='today')history.pushState({questlog:true,type:'view',view:name},'',appViewUrl(name));
-   return;
- }
  if(historyMode==='replace')history.replaceState({questlog:true,type:'view',view:name},'',appViewUrl(name));
  else if(previous!==name)history.pushState({questlog:true,type:'view',view:name},'',appViewUrl(name));
-}
-function hideBackExitPrompt(){
- clearTimeout(backExitRestoreTimer);backExitRestoreTimer=null;$('backExitToast')?.classList.remove('show');
-}
-function armRootExitGuard(rootView='today'){
- $('backExitToast')?.classList.add('show');
- clearTimeout(backExitRestoreTimer);
- backExitRestoreTimer=setTimeout(()=>{
-   $('backExitToast')?.classList.remove('show');
-   if(history.state?.questlog&&history.state.type==='exit-guard'){
-     history.pushState({questlog:true,type:'view',view:rootView,root:true},'',appViewUrl(rootView));
-   }
- },2200);
 }
 function initAppHistory(initialView){
  const initial=APP_VIEWS.has(initialView)?initialView:'today';
@@ -2012,19 +1992,11 @@ function initAppHistory(initialView){
    appHistoryReady=true;
    return;
  }
- history.replaceState({questlog:true,type:'exit-guard',view:'today'},'',appViewUrl('today'));
- history.pushState({questlog:true,type:'view',view:'today',root:true},'',appViewUrl('today'));
- if(initial!=='today')history.pushState({questlog:true,type:'view',view:initial},'',appViewUrl(initial));
+ history.replaceState({questlog:true,type:'view',view:initial},'',appViewUrl(initial));
  appHistoryReady=true;
 }
 window.addEventListener('popstate',event=>{
  const nav=event.state;
- if(nav?.questlog&&nav.type==='exit-guard'){
-   renderAppView(nav.view||'today');
-   armRootExitGuard(nav.view||'today');
-   return;
- }
- hideBackExitPrompt();
  if(nav?.questlog&&nav.type==='view'){
    renderAppView(nav.view||'today');
    return;
