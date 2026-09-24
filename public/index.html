@@ -1683,7 +1683,8 @@ function renderRuntimeSession(){
  const foot=$('sideFoot');if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
    const email=runtimeInfo.user||'Authenticated user';
-   foot.innerHTML='<div class="side-session"><div class="side-session-email" title="'+esc(email)+'">'+esc(email)+'</div><div class="side-session-actions"><span>Cloud</span><span>•</span><a href="/cdn-cgi/access/logout">Log out</a></div></div>';
+   const logout=runtimeInfo.logoutPath||'/logout';
+   foot.innerHTML='<div class="side-session"><div class="side-session-email" title="'+esc(email)+'">'+esc(email)+'</div><div class="side-session-actions"><span>Cloud</span><span>•</span><a href="'+esc(logout)+'">Log out</a></div></div>';
  }else{
    foot.innerHTML='<div class="side-session"><div>Self-hosted • Google Calendar • E-ink</div></div>';
  }
