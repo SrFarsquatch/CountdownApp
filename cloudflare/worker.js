@@ -1,6 +1,6 @@
 import {
   loadState, saveState, publicState, id, cleanText, iso, num, clamp, en,
-  normalizeCountdown, normalizeTask, normalizeGoal, normalizeWeather,
+  normalizeCountdown, normalizeTask, normalizeGoal, normalizeQuestEvent, normalizeWeather,
   normalizeAppearance, normalizeMarkets, normalizeTimeZone, validTimeZone, normalizeSectionLayout,
   normalizeModeLayouts, normalizeModeSections, normalizeSectionOrder,
   LAYOUTS, PALETTES, DATE_WIDGETS, DISPLAY_MODES, WEATHER_STYLES,
@@ -19,6 +19,11 @@ import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
+import {
+  listQuestCalendars, createQuestCalendar, updateQuestCalendar, deleteQuestCalendar,
+  addCalendarMember, removeCalendarMember, sharedPlannerData, updateSharedItem, deleteSharedItem,
+  ensureOwnedCalendar, sanitizeParticipants
+} from './calendars.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -242,6 +247,29 @@ async function handleApi(request,env,identity){
     const incoming=await body(request);
     return json(await respondFriend(env,identity,incoming.friendshipId,incoming.action));
   }
+  if(p==='/api/calendars'&&method==='GET')return json(await listQuestCalendars(env,identity));
+  if(p==='/api/calendars'&&method==='POST')return json(await createQuestCalendar(env,identity,await body(request)),201);
+  const calendarMatch=p.match(/^\/api\/calendars\/([^/]+)$/);
+  if(calendarMatch){
+    const calendarId=decodeURIComponent(calendarMatch[1]);
+    if(method==='PUT')return json(await updateQuestCalendar(env,identity,calendarId,await body(request)));
+    if(method==='DELETE')return json(await deleteQuestCalendar(env,identity,calendarId));
+  }
+  const calendarMemberMatch=p.match(/^\/api\/calendars\/([^/]+)\/members(?:\/([^/]+))?$/);
+  if(calendarMemberMatch){
+    const calendarId=decodeURIComponent(calendarMemberMatch[1]),memberId=calendarMemberMatch[2]?decodeURIComponent(calendarMemberMatch[2]):'';
+    if(method==='POST'&&!memberId)return json(await addCalendarMember(env,identity,calendarId,await body(request)),201);
+    if(method==='DELETE'&&memberId)return json(await removeCalendarMember(env,identity,calendarId,memberId));
+  }
+  if(p==='/api/planner/shared'&&method==='GET'){
+    return json(await sharedPlannerData(env,identity,url.searchParams.get('from'),url.searchParams.get('to')));
+  }
+  const sharedItemMatch=p.match(/^\/api\/shared\/(event|task|goal|countdown)\/([^/]+)\/([^/]+)$/);
+  if(sharedItemMatch){
+    const type=sharedItemMatch[1],ownerUserId=decodeURIComponent(sharedItemMatch[2]),itemId=decodeURIComponent(sharedItemMatch[3]);
+    if(method==='PUT')return json(await updateSharedItem(env,identity,type,ownerUserId,itemId,await body(request)));
+    if(method==='DELETE')return json(await deleteSharedItem(env,identity,type,ownerUserId,itemId));
+  }
   if(p==='/api/friends/remove'&&method==='POST'){
     const incoming=await body(request);
     return json(await removeFriend(env,identity,incoming.friendshipId));
@@ -311,9 +339,31 @@ async function handleApi(request,env,identity){
     return json(await sendTestNotification(state,env,incoming.endpoint||''));
   }
 
+  if(p==='/api/events'&&method==='POST'){
+    const incoming=await body(request);ensureItemTitle(incoming.title,'Event title',200);
+    if(!iso(incoming.start)){const e=new Error('A valid event start is required.');e.status=400;throw e}
+    incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+    incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
+    const now=new Date().toISOString(),item=normalizeQuestEvent({...incoming,id:id(),created:now,updated:now});
+    state.events=Array.isArray(state.events)?state.events:[];state.events.push(item);await saveState(env,state);return json(item,201);
+  }
+  if(p.startsWith('/api/events/')){
+    const itemId=decodeURIComponent(p.split('/').pop()),index=(state.events||[]).findIndex(x=>x.id===itemId);
+    if(index<0)return json({error:'Not found'},404);
+    if(method==='PUT'){
+      const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Event title',200);
+      if(incoming.calendarId!==undefined)incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+      if(incoming.participantIds!==undefined)incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
+      state.events[index]=normalizeQuestEvent({...state.events[index],...incoming,id:itemId,created:state.events[index].created,updated:new Date().toISOString()});await saveState(env,state);return json(state.events[index]);
+    }
+    if(method==='DELETE'){state.events.splice(index,1);await saveState(env,state);return json({ok:true})}
+  }
+
   if(p==='/api/countdowns'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
     if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
+    incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+    incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
     const item=normalizeCountdown({...incoming,id:id(),created:new Date().toISOString()});state.countdowns.push(item);await saveState(env,state);return json(item,201);
   }
   if(p.startsWith('/api/countdowns/')){
@@ -322,6 +372,8 @@ async function handleApi(request,env,identity){
     if(method==='PUT'){
       const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
       if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
+      if(incoming.calendarId!==undefined)incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+      if(incoming.participantIds!==undefined)incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
       state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);return json(state.countdowns[index]);
     }
     if(method==='DELETE'){state.countdowns.splice(index,1);await saveState(env,state);return json({ok:true})}
@@ -329,6 +381,8 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/tasks'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Task title',160);
+    incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+    incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
     const now=new Date().toISOString();let item=normalizeTask({...incoming,id:id(),created:now,updated:now});
     if(incoming.googleAccountId&&incoming.googleTaskListId)item=await createGoogleTaskLink(item,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
     state.tasks.push(item);await saveState(env,state);return json(item,201);
@@ -338,6 +392,8 @@ async function handleApi(request,env,identity){
     if(index<0)return json({error:'Not found'},404);
     if(method==='PUT'){
       const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Task title',160);
+      if(incoming.calendarId!==undefined)incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+      if(incoming.participantIds!==undefined)incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
       const existing=state.tasks[index],merged={...existing,...incoming,id:itemId,created:existing.created,updated:new Date().toISOString()};
       if(incoming.status&&incoming.status!=='done')merged.completedAt=null;
       if(incoming.status==='done'&&!merged.completedAt)merged.completedAt=new Date().toISOString();
@@ -355,6 +411,8 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/goals'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Goal title',160);
+    incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+    incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
     const now=new Date().toISOString(),item=normalizeGoal({...incoming,id:id(),created:now,updated:now});
     state.goals.push(item);await saveState(env,state);return json({...item,progress:0},201);
   }
@@ -363,6 +421,8 @@ async function handleApi(request,env,identity){
     if(index<0)return json({error:'Not found'},404);
     if(method==='PUT'){
       const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Goal title',160);
+      if(incoming.calendarId!==undefined)incoming.calendarId=await ensureOwnedCalendar(env,identity,incoming.calendarId);
+      if(incoming.participantIds!==undefined)incoming.participantIds=await sanitizeParticipants(env,identity,incoming.participantIds);
       state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);return json(state.goals[index]);
     }
     if(method==='DELETE'){
