@@ -1336,6 +1336,36 @@ body.modal-open{overflow:hidden}
   .mobile-nav .mobile-account-nav svg{width:17px;height:17px}
 }
 
+/* Quest Log calendars */
+.calendar-shell{grid-template-columns:248px minmax(0,1fr)}
+.calendar-side{display:grid;gap:14px;align-content:start}
+.calendar-side-section{display:grid;gap:8px}
+.calendar-side-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calendar-side-head strong{font-size:12px}
+.calendar-side-list{display:grid;gap:3px}
+.calendar-filter-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 5px;border-radius:8px}
+.calendar-filter-row:hover{background:var(--panel2)}
+.calendar-filter-row input{width:16px;height:16px;min-height:0;padding:0}
+.calendar-filter-dot{width:10px;height:10px;border-radius:3px;background:var(--calendar-color,#6c5ce7)}
+.calendar-filter-label{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calendar-filter-meta{font-size:9px;color:var(--muted)}
+.calendar-add{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;padding:0 4px}
+.calendar-side-mobile-button{display:none}
+.questlog-kind-chip{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.05em}
+.month-chip.goal,.month-chip.countdown,.month-chip.quest-event,.month-chip.task{border-left:3px solid var(--event-color,var(--calendar-color,#6c5ce7));background:color-mix(in srgb,var(--event-color,var(--calendar-color,#6c5ce7)) 11%,var(--panel2))}
+.calendar-event-block.quest-item{border-left:3px solid var(--event-color,#6c5ce7)}
+.calendar-event-block.goal-time-block{background:color-mix(in srgb,var(--event-color,#6c5ce7) 12%,var(--panel));border-color:color-mix(in srgb,var(--event-color,#6c5ce7) 38%,var(--line))}
+.calendar-event-block.countdown-time-block{background:color-mix(in srgb,var(--event-color,#6c5ce7) 10%,var(--panel));border-color:color-mix(in srgb,var(--event-color,#6c5ce7) 36%,var(--line))}
+.friend-picker{display:grid;gap:6px;max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2)}
+.friend-picker label{display:flex;align-items:center;gap:8px;font-size:12px}
+.friend-picker input{width:16px;height:16px;min-height:0;padding:0}
+@media(max-width:760px){
+  .calendar-shell{grid-template-columns:1fr}
+  .calendar-side{display:none}
+  .calendar-side-mobile-button{display:inline-flex}
+  .calendar-filter-sheet{display:grid;gap:14px}
+}
+
 /* Friends */
 .account-menu-action{font:inherit;text-align:left;cursor:pointer}
 .account-menu-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-contrast);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:850}
@@ -1475,10 +1505,20 @@ body.modal-open{overflow:hidden}
   <div class="planner-pane on" data-planner-pane="calendar">
     <div class="calendar-toolbar">
       <div class="calendar-nav"><button class="btn tiny" id="plannerPrev">‹</button><button class="btn tiny" id="plannerToday">Today</button><button class="btn tiny" id="plannerNext">›</button><div class="calendar-title" id="plannerRange"></div></div>
-      <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="plannerViews"><button data-calview="day">Day</button><button class="on" data-calview="week">Week</button><button data-calview="month">Month</button></div><button class="btn" id="connectInline">Connect Google Calendar</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn tiny calendar-side-mobile-button" id="mobileCalendarFilters" type="button">Calendars</button><div class="seg" id="plannerViews"><button data-calview="day">Day</button><button class="on" data-calview="week">Week</button><button data-calview="month">Month</button></div><button class="btn" id="connectInline">Connect Google Calendar</button></div>
     </div>
     <div class="calendar-shell" style="margin-top:14px">
-      <div class="card mini"><div class="mini-head"><strong id="miniMonth"></strong><span class="meta">Navigate</span></div><div class="mini-grid" id="miniCalendar"></div></div>
+      <aside class="calendar-side" id="calendarSide">
+        <div class="card mini"><div class="mini-head"><strong id="miniMonth"></strong><span class="meta">Navigate</span></div><div class="mini-grid" id="miniCalendar"></div></div>
+        <div class="card calendar-side-section">
+          <div class="calendar-side-head"><strong>Quest Log calendars</strong><button class="calendar-add" id="newQuestCalendar" type="button" aria-label="Create Quest Log calendar">+</button></div>
+          <div class="calendar-side-list" id="questCalendarFilters"><div class="meta">Loading calendars…</div></div>
+        </div>
+        <div class="card calendar-side-section">
+          <div class="calendar-side-head"><strong>Google calendars</strong><span class="meta">Synced</span></div>
+          <div class="calendar-side-list" id="googleCalendarFilters"><div class="meta">Loading…</div></div>
+        </div>
+      </aside>
       <div class="card calendar-stage" id="calendarStage"></div>
     </div>
   </div>
@@ -1773,9 +1813,24 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',plaidLinkLoading=false,financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',plaidLinkLoading=false,financeTransactionLimit=20,questCalendars=[],questFriends=[],sharedPlanner={events:[],tasks:[],goals:[],countdowns:[]},calendarFilterState=null,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
+const calendarFilterKey=()=>{const id=runtimeInfo?.profile?.userId||runtimeInfo?.user||'device';return 'questlog.calendar.filters.'+encodeURIComponent(String(id))};
+function loadCalendarFilters(){try{calendarFilterState=JSON.parse(localStorage.getItem(calendarFilterKey())||'{}')}catch{calendarFilterState={}};if(!calendarFilterState||typeof calendarFilterState!=='object')calendarFilterState={};return calendarFilterState}
+function calendarVisible(key){return calendarFilterState?.[key]!==false}
+function setCalendarVisible(key,value){if(!calendarFilterState)loadCalendarFilters();calendarFilterState[key]=Boolean(value);localStorage.setItem(calendarFilterKey(),JSON.stringify(calendarFilterState));plannerEventCache.clear()}
+function questCalendarById(id){return questCalendars.find(c=>c.id===id)||null}
+function questCalendarColor(id,fallback='#6c5ce7'){return questCalendarById(id)?.color||fallback}
+function localQuestItems(){return{
+ events:(state?.events||[]).map(x=>({...x,ownerUserId:runtimeInfo?.profile?.userId||'',calendarName:questCalendarById(x.calendarId)?.name||'Quest Log',calendarColor:questCalendarColor(x.calendarId),calendarRole:'owner'})),
+ tasks:state?.tasks||[],goals:state?.goals||[],countdowns:state?.countdowns||[]
+}}
+function plannerQuestItems(kind){const own=localQuestItems()[kind]||[],shared=sharedPlanner?.[kind]||[];return [...own,...shared]}
+function friendPickerHtml(selected=[]){const chosen=new Set((selected||[]).map(String));return questFriends.length?'<div class="friend-picker" id="fQuestFriends">'+questFriends.map(f=>'<label><input type="checkbox" value="'+esc(f.userId)+'" '+(chosen.has(String(f.userId))?'checked':'')+'><span>'+esc(friendLabel(f))+'</span></label>').join('')+'</div>':'<div class="meta">Add Quest Log friends first to invite them.</div>'}
+function selectedFriendIds(){return $('fQuestFriends')?[...$('fQuestFriends').querySelectorAll('input:checked')].map(x=>x.value):[]}
+function calendarOptionsHtml(selected=''){const owned=questCalendars.filter(x=>x.role==='owner');return owned.map(cal=>'<option value="'+esc(cal.id)+'" '+(String(cal.id)===String(selected)?'selected':'')+'>'+esc(cal.name)+'</option>').join('')}
+
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
 function defaultPlannerView(){return window.matchMedia('(max-width:760px)').matches?'day':'week'}
 function plannerViewStorageKey(){
