@@ -31,6 +31,13 @@ function identityDescriptor(identity={}){
 }
 export async function resolveQuestLogUser(env,identity={}){
   await ensureUserSchema(env);
+  if(identity?.userId){
+    const userId=clean(identity.userId,120);
+    const email=clean(identity.email,320).toLowerCase();
+    if(!userId)throw new Error('Quest Log user ID is required.');
+    await env.DB.prepare("INSERT INTO questlog_users(user_id,primary_email,created_at,updated_at) VALUES(?,?,datetime('now'),datetime('now')) ON CONFLICT(user_id) DO UPDATE SET primary_email=COALESCE(excluded.primary_email,questlog_users.primary_email),updated_at=datetime('now')").bind(userId,email||null).run();
+    return{userId,email,provider:identity.provider||'questlog'};
+  }
   const descriptor=identityDescriptor(identity);
   let row=await env.DB.prepare(
     'SELECT user_id,email FROM questlog_user_identities WHERE provider=? AND subject=?'

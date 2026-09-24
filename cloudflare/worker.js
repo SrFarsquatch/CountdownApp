@@ -17,6 +17,7 @@ import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, 
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
+import { nativeSession, signup, login, logout, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -201,6 +202,25 @@ async function weatherData(state){
     official:null,alerts:[]
   };
 }
+function scopedUserEnv(env,identity){
+  if(!identity?.userId)return env;
+  const scoped=Object.create(env);
+  scoped.CLOUD_WORKSPACE_ID='user:'+identity.userId;
+  return scoped;
+}
+async function displayIdentityFromToken(env,token){
+  const cleanToken=cleanText(token,160);
+  if(!cleanToken||!env.DB)return null;
+  const row=await env.DB.prepare("SELECT workspace_id FROM questlog_state WHERE json_extract(state_json,'$.display.token')=? LIMIT 1").bind(cleanToken).first();
+  if(!row?.workspace_id)return null;
+  const workspace=String(row.workspace_id);
+  if(workspace.startsWith('user:')){
+    const userId=workspace.slice(5);
+    const user=await env.DB.prepare('SELECT primary_email,display_name FROM questlog_users WHERE user_id=?').bind(userId).first().catch(()=>null);
+    return{userId,email:user?.primary_email||'',sub:userId,provider:'questlog',displayAuthorized:true};
+  }
+  return{email:null,sub:'legacy-display',provider:'legacy',displayAuthorized:true,legacyWorkspace:workspace};
+}
 function cloudUpdateStatus(env){
   return{configured:true,cloudManaged:true,phase:'idle',step:'deployed',progress:100,message:'Cloudflare deploys Quest Log automatically from GitHub.',checking:false,available:false,lastCheckedAt:null,currentRevision:env.CF_VERSION_METADATA?.id||'',latestRevision:env.CF_VERSION_METADATA?.id||'',currentVersion:env.CF_VERSION_METADATA?.tag||'cloud',latestVersion:env.CF_VERSION_METADATA?.tag||'cloud',installMode:'cloudflare'};
 }
@@ -208,8 +228,9 @@ function ensureItemTitle(value,label,max){
   if(!cleanText(value,max)){const e=new Error(label+' is required.');e.status=400;throw e}
 }
 async function handleApi(request,env,identity){
+  env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
-  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/cdn-cgi/access/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
   if(p.startsWith('/api/update/')){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});
@@ -515,41 +536,87 @@ export default{
   async scheduled(controller,env,ctx){
     ctx.waitUntil((async()=>{
       try{
-        const state=await loadState(env);
-        await runNotificationSweep(state,env,controller?.scheduledTime||Date.now());
+        const rows=env.DB?await env.DB.prepare("SELECT workspace_id,state_json FROM questlog_state WHERE workspace_id LIKE 'user:%'").all():{results:[]};
+        for(const row of rows.results||[]){
+          try{
+            const userId=String(row.workspace_id||'').slice(5);
+            if(!userId)continue;
+            const scoped=scopedUserEnv(env,{userId});
+            const state=await loadState(scoped);
+            await runNotificationSweep(state,scoped,controller?.scheduledTime||Date.now());
+          }catch(error){console.error('Quest Log notification sweep failed for workspace:',row.workspace_id,error)}
+        }
       }catch(error){
-        console.error('Quest Log notification sweep failed:',error);
+        console.error('Quest Log scheduled sweep failed:',error);
       }
     })());
   },
   async fetch(request,env){
-    const url=new URL(request.url);
-    if(url.pathname==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
-    if(url.pathname==='/login')return env.ASSETS.fetch(new Request(new URL('/login.html',url),request));
-    if(url.pathname==='/login/start'){
-      try{return Response.redirect(accessLoginUrl(request,env,url.searchParams.get('next')||'/'),302)}
-      catch(error){return text(error.message||'Login is unavailable.',503)}
+    const url=new URL(request.url),path=url.pathname;
+    if(path==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
+
+    if(path==='/api/auth/config'&&request.method==='GET')return json(authPublicConfig(env));
+    if(path==='/api/auth/session'&&request.method==='GET'){
+      const identity=await nativeSession(request,env);
+      return json({authenticated:Boolean(identity),user:identity?.user||null});
     }
-    const machineDisplay=url.pathname==='/frame'||url.pathname==='/api/frameos/feed'||url.pathname==='/api/frameos/image'||url.pathname==='/api/frameos/svg';
+    if(path==='/api/auth/signup'&&request.method==='POST'){
+      try{
+        const incoming=await body(request),signupEmail=String(incoming.email||'').trim().toLowerCase(),legacyOwner=String(env.LEGACY_OWNER_EMAIL||'').trim().toLowerCase();
+        if(legacyOwner&&signupEmail===legacyOwner){
+          const legacyIdentity=await authenticate(request,env);
+          if(String(legacyIdentity.email||'').trim().toLowerCase()!==signupEmail){const e=new Error('Legacy owner identity could not be verified.');e.status=403;throw e}
+          incoming.legacyVerified=true;
+        }
+        const result=await signup(request,env,incoming);
+        return json({authenticated:true,user:result.user},201,{'set-cookie':authCookie(result.session,request)});
+      }catch(error){return json({error:error.message||'Could not create account.'},Number(error.status)||500)}
+    }
+    if(path==='/api/auth/login'&&request.method==='POST'){
+      try{
+        const result=await login(request,env,await body(request));
+        return json({authenticated:true,user:result.user},200,{'set-cookie':authCookie(result.session,request)});
+      }catch(error){return json({error:error.message||'Could not sign in.'},Number(error.status)||500)}
+    }
+    if(path==='/api/auth/logout'&&request.method==='POST'){
+      await logout(request,env).catch(()=>null);
+      return json({ok:true},200,{'set-cookie':expiredAuthCookie(request)});
+    }
+    if(path==='/logout'){
+      await logout(request,env).catch(()=>null);
+      return new Response(null,{status:302,headers:{location:'/login','set-cookie':expiredAuthCookie(request),'cache-control':'no-store'}});
+    }
+
+    if(path==='/login'){
+      const identity=await nativeSession(request,env).catch(()=>null);
+      if(identity)return Response.redirect(new URL('/',url),302);
+      return env.ASSETS.fetch(new Request(new URL('/login.html',url),request));
+    }
+    if(path.startsWith('/branding/')||path==='/favicon.ico')return env.ASSETS.fetch(request);
+
+    const machineDisplay=path==='/frame'||path==='/api/frameos/feed'||path==='/api/frameos/image'||path==='/api/frameos/svg';
     if(machineDisplay){
       try{
-        const state=await loadState(env),tokenValid=url.searchParams.get('token')===state.display.token;
-        let displayIdentity={email:null,sub:'display-token',bypass:true,displayAuthorized:true};
-        if(!tokenValid){
-          const identity=await authenticate(request,env);
-          displayIdentity={...identity,displayAuthorized:true};
-        }
-        if(url.pathname==='/frame')return env.ASSETS.fetch(new Request(new URL('/frame.html',url),request));
-        return await handleApi(request,env,displayIdentity);
+        let identity=await displayIdentityFromToken(env,url.searchParams.get('token'));
+        if(!identity)identity=await nativeSession(request,env);
+        if(!identity){const e=new Error('Display authentication is required.');e.status=401;throw e}
+        if(path==='/frame')return env.ASSETS.fetch(new Request(new URL('/frame.html',url),request));
+        return await handleApi(request,env,{...identity,displayAuthorized:true});
       }catch(error){
         const status=Number(error.status)||401;
-        return url.pathname==='/frame'?text(error.message||'Display unavailable.',status):json({error:error.message||'Display unavailable.'},status);
+        return path==='/frame'?text(error.message||'Display unavailable.',status):json({error:error.message||'Display unavailable.'},status);
       }
     }
-    let identity;
-    try{identity=await authenticate(request,env)}catch(error){return json({error:error.message||'Authentication failed.'},Number(error.status)||503)}
-    if(url.pathname.startsWith('/api/')){
-      try{return await handleApi(request,env,identity)}catch(error){return json({error:error.message||'Unexpected cloud runtime error.'},Number(error.status)||500)}
+
+    const identity=await nativeSession(request,env).catch(()=>null);
+    if(!identity){
+      if(path.startsWith('/api/'))return json({error:'Authentication required.'},401);
+      const next=url.pathname+url.search;
+      return Response.redirect(new URL('/login?next='+encodeURIComponent(next),url),302);
+    }
+    if(path.startsWith('/api/')){
+      try{return await handleApi(request,env,identity)}
+      catch(error){return json({error:error.message||'Unexpected cloud runtime error.'},Number(error.status)||500)}
     }
     return env.ASSETS.fetch(request);
   }
