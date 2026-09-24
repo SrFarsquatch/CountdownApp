@@ -7,7 +7,7 @@ It is built from **one repository and one `main` branch**, but supports two deli
 | Runtime | App server | Persistence | Authentication | Best for |
 | --- | --- | --- | --- | --- |
 | Self-hosted | Node.js / Docker | Local JSON at `/data/countdown-data.json` | Trusted LAN / your reverse proxy | CasaOS, home servers, local AI |
-| Cloud | Cloudflare Worker | Cloudflare D1 | Cloudflare Access | Always-on hosted access without a home-server dependency |
+| Cloud | Cloudflare Worker | Cloudflare D1 | Native Quest Log accounts | Always-on hosted access and multi-user accounts |
 
 The cloud and self-hosted editions share the same frontend and product version, but **do not connect to each other and do not synchronize Quest Log data**. Each runtime has its own tasks, goals, countdowns, settings, tokens, secrets, and display configuration.
 
@@ -48,7 +48,7 @@ If both runtimes are connected to the same external service, such as the same Go
 - Plaid Link can connect bank accounts without Quest Log ever receiving online-banking credentials.
 - Connected accounts, balances, and recent Transactions data are shown alongside the existing Yahoo Finance watchlist.
 - Plaid access tokens are encrypted with `APP_SECRET` and are never returned in browser API responses.
-- Cloud deployments map each authenticated identity to a stable internal **Quest Log user ID**. Plaid Items, accounts, and transactions are owned by that user ID, so one user can connect multiple institutions without exposing data to other users.
+- Cloud deployments use native **Quest Log user IDs**. Planner state, connected services, Plaid Items, accounts, and transactions are isolated per user, and one user can connect multiple institutions without exposing data to other users.
 - Self-hosted deployments keep Plaid data in a separate `/data/finance-data.json` store; the current self-hosted runtime remains a trusted single-user installation until Quest Log's native multi-user login is added. Only the Plaid access token is encrypted, so treat the persistent data directory as private.
 - This first finance slice syncs when Finance is opened (with a short cache) and when the user presses **Sync**. Budget rules, spending categories, cash-flow planning, goals, and webhook-driven background refresh are intended follow-on layers.
 
@@ -337,33 +337,22 @@ Initialize the database schema:
 npx wrangler d1 execute quest-log --remote --file=./cloudflare/migrations/0001_state_store.sql
 ~~~
 
-## 3. Configure Cloudflare Access
+## 3. Native Quest Log authentication
 
-Create a **Self-hosted** Cloudflare Access application for the hostname you will use, for example:
+The Cloudflare app uses Quest Log's own email/password account system. Cloudflare Access should **not** sit in front of the main Quest Log hostname once native auth is deployed, otherwise users will see Cloudflare's login before Quest Log's login page.
 
-~~~text
-questlog.example.com
-~~~
+Quest Log stores password derivations and opaque session hashes in D1. Browser sessions use an HTTP-only, SameSite cookie. Each authenticated user gets an isolated D1 workspace for planner state and connected integrations.
 
-Configure Google or another supported Cloudflare Access identity provider and restrict the Access policy to the users who should be allowed into Quest Log.
+Recommended Worker variables:
 
-From the Access application, collect:
-
-- the Access team domain, such as `your-team.cloudflareaccess.com`;
-- the application AUD/tag.
-
-Add these Worker variables:
-
-| Variable | Example / purpose |
+| Variable | Purpose |
 | --- | --- |
-| `CF_ACCESS_TEAM_DOMAIN` | `your-team.cloudflareaccess.com` |
-| `CF_ACCESS_AUD` | Access application AUD/tag |
-| `ALLOWED_EMAILS` | Comma-separated allowlist of user emails |
-| `CLOUD_WORKSPACE_ID` | Optional; defaults to `default` |
+| `ALLOW_SIGNUPS` | `true` while public account creation is enabled; set `false` to close registration |
+| `LEGACY_OWNER_EMAIL` | Optional. When this email creates its account, the old `default` workspace is copied into that user's private workspace |
+| `TURNSTILE_SITE_KEY` | Optional but recommended before public launch |
+| `TURNSTILE_SECRET_KEY` | Secret paired with the Turnstile site key |
 
-The Worker validates the Cloudflare Access JWT itself in addition to the Access policy.
-
-**Do not create a Bypass policy for the main Quest Log hostname or `/login*`.** Cloudflare Access is intentionally in front of the Worker for normal human access.
+Before removing Cloudflare Access from the hostname, deploy and validate the native login branch first.
 
 ## 4. Configure Worker secrets
 
@@ -373,8 +362,10 @@ Core/integration secrets:
 
 | Name | Type | Used for |
 | --- | --- | --- |
-| `APP_SECRET` | Secret | Google token encryption and OAuth state signing |
+| `APP_SECRET` | Secret | Credential encryption, OAuth state signing, and auth rate-limit hashing |
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
+| `TURNSTILE_SECRET_KEY` | Secret | Native signup/login bot protection |
+| `PLAID_SECRET` | Secret | Plaid bank connections |
 | `OPENAI_API_KEY` | Secret | Optional fallback for Cloud Navi OpenAI |
 | `ANTHROPIC_API_KEY` | Secret | Optional fallback for Cloud Navi Anthropic |
 | `GEMINI_API_KEY` | Secret | Optional fallback for Cloud Navi Gemini |
