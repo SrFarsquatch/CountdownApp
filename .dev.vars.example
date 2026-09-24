@@ -4,6 +4,8 @@
 # Native Quest Log authentication
 # Set a long, stable APP_SECRET below.
 # ALLOW_SIGNUPS=true
+# ENFORCE_ALLOWED_EMAILS=no
+# ALLOWED_EMAILS=you@example.com,friend@example.com
 # LEGACY_OWNER_EMAIL=you@example.com
 # TURNSTILE_SITE_KEY=
 # TURNSTILE_SECRET_KEY=
