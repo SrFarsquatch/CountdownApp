@@ -11,7 +11,7 @@ import {
   calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
-import { marketData, marketSearch, testMarketConnection } from './markets.js';
+import { marketData, marketHistory, marketSearch, testMarketConnection } from './markets.js';
 import { financeSummary, createFinanceLinkToken, exchangeFinancePublicToken, syncFinance, disconnectFinanceItem, saveFinancePreferences } from './plaid.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
@@ -435,6 +435,10 @@ async function handleApi(request,env,identity){
   if(p==='/api/markets'&&method==='GET'){
     try{return json({markets:await marketData(state,env),error:null})}
     catch(error){return json({markets:state.marketCache?.data||null,error:error.message||'Market data is unavailable.'})}
+  }
+  if(p==='/api/markets/history'&&method==='GET'){
+    try{return json({history:await marketHistory(state),error:null})}
+    catch(error){return json({history:null,error:error.message||'Market history is unavailable.'})}
   }
   if(p==='/api/markets/search'&&method==='GET'){
     const q=url.searchParams.get('q')||'';if(!cleanText(q,64).trim())return json({results:[]});
