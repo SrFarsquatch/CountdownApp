@@ -2973,6 +2973,13 @@ function taskCalendarSpan(t){
  if(Number.isNaN(end.getTime())||end<=start)end=new Date(start.getTime()+Math.max(15,Number(t.estimatedMinutes)||30)*60000);
  return{start,end};
 }
+function milestoneSpan(value){if(!value)return null;const start=new Date(value);if(Number.isNaN(start.getTime()))return null;return{start,end:new Date(start.getTime()+30*60000)}}
+function plannerItemColor(item,fallback='#6c5ce7'){return item?.calendarColor||questCalendarColor(item?.calendarId,fallback)}
+function sharedItemApiPath(type,item){
+ const current=runtimeInfo?.profile?.userId||'';
+ if(item?.ownerUserId&&item.ownerUserId!==current)return '/api/shared/'+type+'/'+encodeURIComponent(item.ownerUserId)+'/'+encodeURIComponent(item.id);
+ return '/api/'+(type==='countdown'?'countdowns':type+'s')+'/'+encodeURIComponent(item?.id||'');
+}
 function layoutTimedItems(items,day,next){
  const dayMs=day.getTime(),nextMs=next.getTime();
  const sorted=items.map(item=>{
@@ -3023,16 +3030,26 @@ function nowLineHtml(day){
 function timedBlockHtml(item){
  const top=item.top.toFixed(1),height=item.height.toFixed(1),left=item.left.toFixed(3),width=item.width.toFixed(3),sizeClass=item.height<14?' event-tiny':item.height<24?' event-compact':'';
  if(item.kind==='task'){
-   const t=item.data;
-   return'<button type="button" class="calendar-event-block task-time-block'+sizeClass+'" data-cal-task="'+esc(t.id)+'" style="top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(t.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">○ '+esc(t.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div></button>';
+   const t=item.data,color=plannerItemColor(t,'#4f7cac');
+   return'<button type="button" class="calendar-event-block quest-item task-time-block'+sizeClass+'" data-cal-task="'+esc(t.id)+'" data-owner-user="'+esc(t.ownerUserId||'')+'" style="--event-color:'+esc(color)+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(t.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">✓ '+esc(t.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div></button>';
+ }
+ if(item.kind==='goal'){
+   const g=item.data,color=plannerItemColor(g,'#8a63d2');
+   return'<button type="button" class="calendar-event-block quest-item goal-time-block'+sizeClass+'" data-cal-goal="'+esc(g.id)+'" data-owner-user="'+esc(g.ownerUserId||'')+'" style="--event-color:'+esc(color)+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)"><div class="cal-block-title">◎ '+esc(g.title)+'</div><div class="cal-block-time">Goal deadline · '+fmtTime(item.start)+'</div></button>';
+ }
+ if(item.kind==='countdown'){
+   const d=item.data,color=plannerItemColor(d,'#d97706');
+   return'<button type="button" class="calendar-event-block quest-item countdown-time-block'+sizeClass+'" data-cal-countdown="'+esc(d.id)+'" data-owner-user="'+esc(d.ownerUserId||'')+'" style="--event-color:'+esc(color)+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)"><div class="cal-block-title">⌛ '+esc(d.name)+'</div><div class="cal-block-time">Target · '+fmtTime(item.start)+'</div></button>';
  }
  const e=item.data,color=eventColorFor(e);
- return'<button type="button" class="calendar-event-block'+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||'Google Calendar')+'</div></button>';
+ return'<button type="button" class="calendar-event-block'+(e.source==='questlog'?' quest-item':'')+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||(e.source==='questlog'?'Quest Log':'Google Calendar'))+'</div></button>';
 }
 function calendarItemsForDay(day,next,eventSource=calEvents){
  const events=eventSource.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
- const tasks=plannerShowTasks?state.tasks.filter(t=>t.status!=='done').map(t=>({task:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.task,start:x.span.start,end:x.span.end})):[];
- return layoutTimedItems([...events,...tasks],day,next);
+ const tasks=plannerShowTasks?plannerQuestItems('tasks').filter(t=>t.status!=='done'&&calendarVisible('quest:'+t.calendarId)).map(t=>({item:t,span:taskCalendarSpan(t)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'task',data:x.item,start:x.span.start,end:x.span.end})):[];
+ const goals=plannerQuestItems('goals').filter(g=>g.status!=='complete'&&g.deadline&&calendarVisible('quest:'+g.calendarId)).map(g=>({item:g,span:milestoneSpan(g.deadline)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'goal',data:x.item,start:x.span.start,end:x.span.end}));
+ const countdowns=plannerQuestItems('countdowns').filter(d=>d.end&&calendarVisible('quest:'+d.calendarId)).map(d=>({item:d,span:milestoneSpan(d.end)})).filter(x=>x.span&&x.span.start<next&&x.span.end>day).map(x=>({kind:'countdown',data:x.item,start:x.span.start,end:x.span.end}));
+ return layoutTimedItems([...events,...tasks,...goals,...countdowns],day,next);
 }
 function allDayChip(e){
  return'<button type="button" class="all-day-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</button>';
@@ -3057,7 +3074,9 @@ function scrollTimeline(range,root=$('calendarStage'),eventSource=calEvents){
 function bindCalendarInteractions(root=$('calendarStage')){
  if(!root)return;
  root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=cachedPlannerEvents().find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
- root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
+ root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=plannerQuestItems('tasks').find(x=>x.id===el.dataset.calTask&&String(x.ownerUserId||'')===String(el.dataset.ownerUser||''))||plannerQuestItems('tasks').find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
+ root.querySelectorAll('[data-cal-goal]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=plannerQuestItems('goals').find(x=>x.id===el.dataset.calGoal&&String(x.ownerUserId||'')===String(el.dataset.ownerUser||''))||plannerQuestItems('goals').find(x=>x.id===el.dataset.calGoal);if(item)goalModal(item)});
+ root.querySelectorAll('[data-cal-countdown]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=plannerQuestItems('countdowns').find(x=>x.id===el.dataset.calCountdown&&String(x.ownerUserId||'')===String(el.dataset.ownerUser||''))||plannerQuestItems('countdowns').find(x=>x.id===el.dataset.calCountdown);if(item)countdownModal(item)});
  root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()});
  root.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
@@ -3149,7 +3168,9 @@ function buildMonthHtml(range,anchor=plannerAnchor,eventSource=calEvents){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
    const entries=[];
    eventSource.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
-   if(plannerShowTasks)state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
+   if(plannerShowTasks)plannerQuestItems('tasks').filter(t=>calendarVisible('quest:'+t.calendarId)&&t.status!=='done').filter(t=>{const span=taskCalendarSpan(t);return span&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t),color=plannerItemColor(t,'#4f7cac');entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'" data-owner-user="'+esc(t.ownerUserId||'')+'" style="--event-color:'+esc(color)+'">✓ '+esc(t.title)+'</button>'})});
+   plannerQuestItems('goals').filter(g=>calendarVisible('quest:'+g.calendarId)&&g.status!=='complete'&&g.deadline).forEach(g=>{const when=new Date(g.deadline);if(when>=day&&when<next){const color=plannerItemColor(g,'#8a63d2');entries.push({sort:when.getTime(),html:'<button type="button" class="month-chip goal" data-cal-goal="'+esc(g.id)+'" data-owner-user="'+esc(g.ownerUserId||'')+'" style="--event-color:'+esc(color)+'">◎ '+esc(g.title)+'</button>'})}});
+   plannerQuestItems('countdowns').filter(d=>calendarVisible('quest:'+d.calendarId)&&d.end).forEach(d=>{const when=new Date(d.end);if(when>=day&&when<next){const color=plannerItemColor(d,'#d97706');entries.push({sort:when.getTime(),html:'<button type="button" class="month-chip countdown" data-cal-countdown="'+esc(d.id)+'" data-owner-user="'+esc(d.ownerUserId||'')+'" style="--event-color:'+esc(color)+'">⌛ '+esc(d.name)+'</button>'})}});
    entries.sort((a,b)=>a.sort-b.sort);const visible=entries.slice(0,limit),remaining=Math.max(0,entries.length-visible.length);
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
    h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
