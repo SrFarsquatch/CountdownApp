@@ -1,12 +1,10 @@
-const CACHE_NAME='quest-log-pwa-v2';
+const CACHE_NAME='quest-log-pwa-v3';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
-  '/branding/icon-quest.svg',
-  '/branding/icon-quest-192.png',
-  '/branding/icon-quest-512.png',
-  '/branding/icon-quest-maskable-v2-512.png',
-  '/branding/icon-quest-maskable-v2-192.png',
+  '/branding/icon-classic.svg',
+  '/branding/icon-quest-classic-192.png',
+  '/branding/icon-quest-classic-512.png',
   '/branding/apple-touch-icon.png'
 ];
 
@@ -54,15 +52,14 @@ self.addEventListener('fetch',event=>{
   );
 });
 
-
 self.addEventListener('push',event=>{
   let data={};
   try{data=event.data?event.data.json():{}}catch{data={body:event.data?.text?.()||''}}
   const title=data.title||'Quest Log';
   const options={
     body:data.body||'You have a new Quest Log notification.',
-    icon:'/branding/icon-quest-192.png',
-    badge:'/branding/icon-quest-192.png',
+    icon:'/branding/icon-quest-classic-192.png',
+    badge:'/branding/icon-quest-classic-192.png',
     tag:data.tag||'questlog-notification',
     renotify:false,
     data:{url:data.url||'/?view=today',kind:data.kind||'general',timestamp:data.timestamp||new Date().toISOString()}
