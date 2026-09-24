@@ -1197,6 +1197,39 @@ body.modal-open{overflow:hidden}
     overflow-y:auto!important;
   }
 }
+
+/* Unified page chrome: Today, Planner, Finance and Settings share the same header language */
+.top{
+  height:58px;
+  padding:0 18px;
+  background:color-mix(in srgb,var(--panel) 96%,transparent);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(18px);
+}
+.top h1{font-size:20px;letter-spacing:-.03em}
+:root[data-density="compact"] .top{height:58px}
+@media(max-width:760px){
+  body:not(.planner-mode) .top{
+    min-height:66px;
+    height:66px;
+    padding:0 14px;
+    background:var(--panel);
+    border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent);
+    backdrop-filter:none;
+  }
+  body:not(.planner-mode) .top h1{
+    font-size:18px;
+    font-weight:850;
+    letter-spacing:-.025em;
+  }
+  body:not(.planner-mode) .top-actions{gap:6px;align-items:center}
+  body:not(.planner-mode) .top-actions .btn.primary{
+    min-height:38px;
+    padding:7px 11px;
+    border-radius:10px;
+  }
+}
+
 </style>
 </head>
 <body>
