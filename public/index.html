@@ -337,7 +337,7 @@
 body.planner-mode{overflow:hidden}
 body.planner-mode .top{height:58px;padding:0 18px;background:color-mix(in srgb,var(--panel) 96%,transparent)}
 body.planner-mode .top h1{font-size:20px}
-body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);height:calc(100dvh - 58px);padding:10px 14px 14px;overflow:hidden}
+body.planner-mode .content{width:100%;max-width:none;height:100vh;height:100dvh;padding:10px 14px 14px;overflow:hidden}
 #view-planner.on{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px;padding-right:54px}
 #view-planner>.hero{display:none}
 #view-planner .calendar-toolbar{min-height:38px;flex-wrap:nowrap;gap:8px}
@@ -452,8 +452,8 @@ body.planner-mode .content{width:100%;max-width:none;height:calc(100vh - 58px);h
 }
 
 @media(min-width:761px){
-  body.planner-mode .quick{width:44px;height:44px;right:10px;bottom:12px;border-radius:14px;font-size:22px}
-  body.planner-mode .agent-fab{width:44px;height:44px;right:10px;bottom:64px;border-radius:14px}
+  .quick{width:44px;height:44px;right:10px;bottom:12px;border-radius:14px;font-size:22px}
+  .agent-fab{width:44px;height:44px;right:10px;bottom:64px;border-radius:14px}
 }
 
 
@@ -1198,39 +1198,6 @@ body.modal-open{overflow:hidden}
   }
 }
 
-/* Unified page chrome: Today, Planner, Finance and Settings share the same header language */
-.top{
-  height:58px;
-  padding:0 18px;
-  background:color-mix(in srgb,var(--panel) 96%,transparent);
-  border-bottom:1px solid var(--line);
-  backdrop-filter:blur(18px);
-}
-.top h1{font-size:20px;letter-spacing:-.03em}
-:root[data-density="compact"] .top{height:58px}
-@media(max-width:760px){
-  body:not(.planner-mode) .top{
-    min-height:66px;
-    height:66px;
-    padding:0 14px;
-    background:var(--panel);
-    border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent);
-    backdrop-filter:none;
-  }
-  body:not(.planner-mode) .top h1{
-    font-size:18px;
-    font-weight:850;
-    letter-spacing:-.025em;
-  }
-  body:not(.planner-mode) .top-actions{gap:6px;align-items:center}
-  body:not(.planner-mode) .top-actions .btn.primary{
-    min-height:38px;
-    padding:7px 11px;
-    border-radius:10px;
-  }
-}
-
-
 /* Prevent iOS Safari from auto-zooming focused form controls */
 @media(max-width:760px){
   input,select,textarea{font-size:16px!important}
@@ -1252,7 +1219,6 @@ body.modal-open{overflow:hidden}
   <div class="side-foot" id="sideFoot"><div class="side-session"><div>Self-hosted • Google Calendar • E-ink</div></div></div>
 </aside>
 <main class="main">
-<header class="top"><h1 id="pageTitle">Today</h1><div class="top-actions"><button class="btn" id="syncBtn">Refresh</button><button class="btn primary" id="topAdd">+ Add</button></div></header>
 <div class="content">
 <section class="view on" id="view-today">
   <div class="hero today-hero">
@@ -1840,7 +1806,6 @@ function renderAppView(name){
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
  document.body.classList.toggle('planner-mode',visibleView==='planner');
- $('pageTitle').textContent=visibleView==='planner'?'Planner':({today:'Today',markets:'Finance',settings:'Settings'})[visibleView]||'Quest Log';
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
  if(visibleView==='settings')setSettingsSection(requestedSettingsSection||'general',{render:true});
@@ -1904,8 +1869,7 @@ document.querySelectorAll('[data-planner-section]').forEach(b=>b.onclick=()=>set
 document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>setView(b.dataset.settingsSection==='displays'?'displays':'settings'));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
-$('topAdd').onclick=$('quickAdd').onclick=()=>openChooser();
-$('syncBtn').onclick=()=>{plannerEventCache.clear();loadAll(true)};
+$('quickAdd').onclick=()=>openChooser();
 
 function isMobileUi(){return window.matchMedia('(max-width:760px)').matches}
 function openModal(title,html,options={}){
