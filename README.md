@@ -347,7 +347,9 @@ Recommended Worker variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `ALLOW_SIGNUPS` | `true` while public account creation is enabled; set `false` to close registration |
+| `ALLOW_SIGNUPS` | `true` while account creation is enabled; set `false` to close registration |
+| `ENFORCE_ALLOWED_EMAILS` | `yes`/`true` to restrict signup, login, and active sessions to `ALLOWED_EMAILS`; `no`/`false` disables the restriction |
+| `ALLOWED_EMAILS` | Comma-separated email addresses permitted when allowlist enforcement is enabled |
 | `LEGACY_OWNER_EMAIL` | Optional. When this email creates its account, the old `default` workspace is copied into that user's private workspace |
 | `TURNSTILE_SITE_KEY` | Optional but recommended before public launch |
 | `TURNSTILE_SECRET_KEY` | Secret paired with the Turnstile site key |
@@ -406,7 +408,8 @@ Useful non-secret variables:
 | `LOCAL_AGENT_MODEL` | Optional local-model override |
 | `CF_ACCESS_TEAM_DOMAIN` | Access validation |
 | `CF_ACCESS_AUD` | Access validation |
-| `ALLOWED_EMAILS` | Worker-side email allowlist |
+| `ENFORCE_ALLOWED_EMAILS` | Enables/disables the Worker-side email allowlist |
+| `ALLOWED_EMAILS` | Comma-separated Worker-side email allowlist |
 | `CLOUD_WORKSPACE_ID` | D1 workspace key |
 
 `AUTH_BYPASS=true` exists only for local Worker development. Never enable it in production.
