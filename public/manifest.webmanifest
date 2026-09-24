@@ -38,8 +38,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Today",
-      "short_name": "Today",
+      "name": "Home",
+      "short_name": "Home",
       "url": "/?view=today",
       "icons": [
         {
