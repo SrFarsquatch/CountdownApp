@@ -31,6 +31,29 @@ function sessionCookie(token,request,maxAge=SESSION_DAYS*86400){
 }
 function clearSessionCookie(request){return sessionCookie('',request,0)}
 function validEmail(email){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&email.length<=320}
+function envFlag(value,defaultValue=false){
+ const normalized=String(value??'').trim().toLowerCase();
+ if(['1','true','yes','y','on'].includes(normalized))return true;
+ if(['0','false','no','n','off'].includes(normalized))return false;
+ return defaultValue;
+}
+function enforceAllowedEmails(env){return envFlag(env.ENFORCE_ALLOWED_EMAILS,false)}
+function allowedEmails(env){
+ return [...new Set(String(env.ALLOWED_EMAILS||'').split(/[;,\n]/).map(emailValue).filter(Boolean))];
+}
+function assertAllowedEmail(env,email){
+ if(!enforceAllowedEmails(env))return;
+ const list=allowedEmails(env);
+ if(!list.length){
+  const e=new Error('Email allowlist enforcement is enabled but ALLOWED_EMAILS is empty.');
+  e.status=503;
+  throw e;
+ }
+ if(list.includes(emailValue(email)))return;
+ const e=new Error('This account is not permitted to access Quest Log.');
+ e.status=403;
+ throw e;
+}
 function validatePassword(password){
  const value=String(password||'');
  if(value.length<10)return'Use at least 10 characters.';
@@ -139,6 +162,11 @@ export async function nativeSession(request,env){
   if(row)await env.DB.prepare('DELETE FROM questlog_sessions WHERE session_hash=?').bind(hash).run().catch(()=>{});
   return null;
  }
+ try{assertAllowedEmail(env,row.primary_email)}
+ catch{
+  await env.DB.prepare('DELETE FROM questlog_sessions WHERE session_hash=?').bind(hash).run().catch(()=>{});
+  return null;
+ }
  env.DB.prepare("UPDATE questlog_sessions SET last_seen_at=datetime('now') WHERE session_hash=?").bind(hash).run().catch(()=>{});
  return{userId:row.user_id,email:row.primary_email||'',sub:row.user_id,provider:'questlog',user:publicUser(row)};
 }
@@ -147,6 +175,7 @@ export async function signup(request,env,payload={}){
  if(String(env.ALLOW_SIGNUPS||'true').toLowerCase()==='false'){const e=new Error('Account creation is currently closed.');e.status=403;throw e}
  const email=emailValue(payload.email),password=String(payload.password||''),displayName=clean(payload.displayName,120);
  if(!validEmail(email)){const e=new Error('Enter a valid email address.');e.status=400;throw e}
+ assertAllowedEmail(env,email);
  const passwordError=validatePassword(password);if(passwordError){const e=new Error(passwordError);e.status=400;throw e}
  await checkRateLimit(request,env,email,'signup');
  await verifyTurnstile(request,env,payload.turnstileToken);
@@ -183,6 +212,7 @@ export async function login(request,env,payload={}){
  await ensureAuthSchema(env);
  const email=emailValue(payload.email),password=String(payload.password||'');
  if(!validEmail(email)||!password){const e=new Error('Email and password are required.');e.status=400;throw e}
+ assertAllowedEmail(env,email);
  await checkRateLimit(request,env,email,'login');
  await verifyTurnstile(request,env,payload.turnstileToken);
  const user=await env.DB.prepare('SELECT * FROM questlog_users WHERE lower(primary_email)=?').bind(email).first();
