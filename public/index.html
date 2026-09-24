@@ -1826,7 +1826,7 @@ function localQuestItems(){return{
  events:(state?.events||[]).map(x=>({...x,ownerUserId:runtimeInfo?.profile?.userId||'',calendarName:questCalendarById(x.calendarId)?.name||'Quest Log',calendarColor:questCalendarColor(x.calendarId),calendarRole:'owner'})),
  tasks:state?.tasks||[],goals:state?.goals||[],countdowns:state?.countdowns||[]
 }}
-function plannerQuestItems(kind){const own=localQuestItems()[kind]||[],shared=sharedPlanner?.[kind]||[];return [...own,...shared]}
+function plannerQuestItems(kind){const shared=sharedPlanner?.[kind];if(runtimeInfo?.runtime==='cloudflare'&&Array.isArray(shared))return shared;return localQuestItems()[kind]||[]}
 function friendPickerHtml(selected=[]){const chosen=new Set((selected||[]).map(String));return questFriends.length?'<div class="friend-picker" id="fQuestFriends">'+questFriends.map(f=>'<label><input type="checkbox" value="'+esc(f.userId)+'" '+(chosen.has(String(f.userId))?'checked':'')+'><span>'+esc(friendLabel(f))+'</span></label>').join('')+'</div>':'<div class="meta">Add Quest Log friends first to invite them.</div>'}
 function selectedFriendIds(){return $('fQuestFriends')?[...$('fQuestFriends').querySelectorAll('input:checked')].map(x=>x.value):[]}
 function calendarOptionsHtml(selected=''){const owned=questCalendars.filter(x=>x.role==='owner');return owned.map(cal=>'<option value="'+esc(cal.id)+'" '+(String(cal.id)===String(selected)?'selected':'')+'>'+esc(cal.name)+'</option>').join('')}
@@ -2849,6 +2849,43 @@ function renderMini(){
  $('miniCalendar').innerHTML=h;
  $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=parseDateKey(x.dataset.miniDate);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()})
 }
+async function renderCalendarFilters(){
+ if(!calendarFilterState)loadCalendarFilters();
+ const qRoot=$('questCalendarFilters'),gRoot=$('googleCalendarFilters');
+ if(qRoot){
+   qRoot.innerHTML=questCalendars.length?questCalendars.map(cal=>{
+     const key='quest:'+cal.id,owner=cal.role==='owner'?'My calendar':(cal.owner?.displayName||cal.owner?.email||'Shared');
+     return '<label class="calendar-filter-row"><input type="checkbox" data-calendar-filter="'+esc(key)+'" '+(calendarVisible(key)?'checked':'')+'><span class="calendar-filter-dot" style="--calendar-color:'+esc(cal.color)+'"></span><span><span class="calendar-filter-label">'+esc(cal.name)+'</span><span class="calendar-filter-meta">'+esc(owner)+(cal.shared?' · shared':'')+'</span></span></label>';
+   }).join(''):'<div class="meta">No Quest Log calendars.</div>';
+ }
+ if(gRoot){
+   const rows=[];
+   for(const account of state?.google?.accounts||[]){
+     try{
+       const calendars=await googleCalendarsFor(account.id);
+       const selected=new Set(account.selectedCalendarIds||[]);
+       calendars.filter(cal=>selected.has(cal.id)).forEach(cal=>{
+         const key='google:'+account.id+':'+cal.id;
+         rows.push('<label class="calendar-filter-row"><input type="checkbox" data-calendar-filter="'+esc(key)+'" '+(calendarVisible(key)?'checked':'')+'><span class="calendar-filter-dot" style="--calendar-color:'+esc(cal.backgroundColor||'#6c5ce7')+'"></span><span><span class="calendar-filter-label">'+esc(cal.summary||'Google calendar')+'</span><span class="calendar-filter-meta">'+esc(account.label||account.googleId||'Google')+'</span></span></label>');
+       });
+     }catch{}
+   }
+   gRoot.innerHTML=rows.length?rows.join(''):'<div class="meta">'+(state?.google?.connected?'No selected Google calendars.':'Connect Google Calendar to add external calendars.')+'</div>';
+ }
+ document.querySelectorAll('[data-calendar-filter]').forEach(input=>input.onchange=()=>{setCalendarVisible(input.dataset.calendarFilter,input.checked);renderPlanner()});
+}
+async function createQuestCalendarModal(){
+ if(runtimeInfo?.runtime!=='cloudflare')return;
+ openModal('New calendar','<form id="questCalendarForm"><div class="form-grid"><div class="field full"><label>Name</label><input id="questCalendarName" required placeholder="Family, Work, Trip…"></div><div class="field"><label>Color</label><input id="questCalendarColor" type="color" value="#6c5ce7"></div></div><div class="modal-actions"><button class="btn primary">Create calendar</button></div></form>');
+ $('questCalendarForm').onsubmit=async e=>{e.preventDefault();await api('/api/calendars',{method:'POST',body:JSON.stringify({name:$('questCalendarName').value.trim(),color:$('questCalendarColor').value})});closeModal();await loadQuestCollaboration();await renderCalendarFilters();renderPlanner()};
+}
+async function openMobileCalendarFilters(){
+ await renderCalendarFilters();
+ const q=$('questCalendarFilters')?.innerHTML||'',g=$('googleCalendarFilters')?.innerHTML||'';
+ openActionSheet('Calendars','<div class="calendar-filter-sheet"><section><div class="calendar-side-head"><strong>Quest Log calendars</strong><button class="calendar-add" id="sheetNewCalendar" type="button">+</button></div><div class="calendar-side-list" id="sheetQuestCalendars">'+q+'</div></section><section><div class="calendar-side-head"><strong>Google calendars</strong></div><div class="calendar-side-list" id="sheetGoogleCalendars">'+g+'</div></section></div>');
+ document.querySelectorAll('#sheetQuestCalendars [data-calendar-filter],#sheetGoogleCalendars [data-calendar-filter]').forEach(input=>input.onchange=()=>{setCalendarVisible(input.dataset.calendarFilter,input.checked);renderPlanner()});
+ if($('sheetNewCalendar'))$('sheetNewCalendar').onclick=createQuestCalendarModal;
+}
 function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.classList.toggle('on',b.dataset.calview===plannerView))}
 function syncMobilePlannerChrome(){
  if(!$('mobilePlannerTitle'))return;
@@ -3126,13 +3163,25 @@ function renderMonth(range){
 }
 function plannerRangeKey(range){return range.start.toISOString()+'|'+range.end.toISOString()}
 async function fetchPlannerEvents(range){
- if(!state.google.connected)return[];
  const key=plannerRangeKey(range),cached=plannerEventCache.get(key);
  if(cached?.events)return cached.events;
  if(cached?.promise)return cached.promise;
- const promise=api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()))
-   .then(data=>{const events=data.events||[];plannerEventCache.set(key,{events,at:Date.now()});while(plannerEventCache.size>28)plannerEventCache.delete(plannerEventCache.keys().next().value);return events})
-   .catch(error=>{plannerEventCache.delete(key);throw error});
+ const promise=(async()=>{
+   const [google] = await Promise.all([
+     state.google.connected?api('/api/google/events?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString())).catch(()=>({events:[]})):Promise.resolve({events:[]}),
+     loadSharedPlanner(range)
+   ]);
+   const googleEvents=(google.events||[]).filter(e=>calendarVisible('google:'+e.accountId+':'+e.calendarId));
+   const questEvents=(sharedPlanner.events||[]).filter(e=>calendarVisible('quest:'+e.calendarId)).map(e=>({
+     ...e,source:'questlog',questType:'event',accountId:'questlog:'+e.ownerUserId,
+     accountLabel:e.ownerName||'Quest Log',calendarName:e.calendarName||'Quest Log',
+     calendarColor:e.calendarColor||questCalendarColor(e.calendarId),eventColor:e.calendarColor||questCalendarColor(e.calendarId),
+     accessRole:e.calendarRole==='editor'||e.calendarRole==='owner'?'writer':'reader'
+   }));
+   const events=[...googleEvents,...questEvents].sort((a,b)=>new Date(a.start)-new Date(b.start));
+   plannerEventCache.set(key,{events,at:Date.now()});while(plannerEventCache.size>28)plannerEventCache.delete(plannerEventCache.keys().next().value);
+   return events;
+ })().catch(error=>{plannerEventCache.delete(key);throw error});
  plannerEventCache.set(key,{promise,at:Date.now()});
  return promise;
 }
@@ -3249,7 +3298,7 @@ async function completePlannerPagerSwipe(direction,animate=true){
 }
 async function renderPlanner(){
  const seq=++plannerRenderSeq;
- renderMini();syncPlannerViewButtons();syncMobilePlannerChrome();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
+ renderMini();syncPlannerViewButtons();syncMobilePlannerChrome();renderCalendarFilters();const range=plannerRange();$('plannerRange').textContent=plannerLabel(range);
  try{
    const events=await fetchPlannerEvents(range);
    if(seq!==plannerRenderSeq)return;
@@ -3330,6 +3379,8 @@ document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=(
 $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
+if($('newQuestCalendar'))$('newQuestCalendar').onclick=createQuestCalendarModal;
+if($('mobileCalendarFilters'))$('mobileCalendarFilters').onclick=openMobileCalendarFilters;
 const plannerMedia=window.matchMedia('(max-width:760px)');plannerMedia.addEventListener?.('change',()=>{if($('view-planner').classList.contains('on')){if(plannerSection==='calendar')renderPlanner();else syncMobilePlannerChrome()}});
 $('mobilePlannerPeriod').onclick=e=>{e.stopPropagation();if(plannerSection==='calendar')togglePlannerDrawer()};
 $('mobilePlannerSearch').onclick=()=>{closePlannerDrawer();openPlannerSearch()};
@@ -4299,6 +4350,21 @@ async function loadFinance(){
  try{financeData=await api('/api/finance');financeError=''}
  catch(error){financeData={configured:false,connections:[],accounts:[],transactions:[],errors:[]};financeError=error.message||'Finance data is unavailable.'}
 }
+async function loadQuestCollaboration(){
+ if(runtimeInfo?.runtime!=='cloudflare'){questCalendars=[];questFriends=[];return}
+ try{
+   const [calendarData,friendData]=await Promise.all([api('/api/calendars'),api('/api/friends')]);
+   questCalendars=calendarData.calendars||[];questFriends=friendData.friends||[];
+   if(!calendarFilterState)loadCalendarFilters();
+ }catch(error){console.warn('Quest Log collaboration unavailable',error);questCalendars=[];questFriends=[]}
+}
+async function loadSharedPlanner(range){
+ if(runtimeInfo?.runtime!=='cloudflare'){sharedPlanner={events:[],tasks:state?.tasks||[],goals:state?.goals||[],countdowns:state?.countdowns||[]};return sharedPlanner}
+ try{
+   sharedPlanner=await api('/api/planner/shared?from='+encodeURIComponent(range.start.toISOString())+'&to='+encodeURIComponent(range.end.toISOString()));
+ }catch(error){console.warn('Shared planner unavailable',error);sharedPlanner={events:[],tasks:state?.tasks||[],goals:state?.goals||[],countdowns:state?.countdowns||[]}}
+ return sharedPlanner;
+}
 async function loadAll(force=false){
  if(!runtimeInfo){try{runtimeInfo=await api('/api/runtime')}catch{runtimeInfo={runtime:'self-hosted'}}restorePlannerViewPreference();renderRuntimeSession()}
  state=await api('/api/state');
@@ -4310,7 +4376,7 @@ async function loadAll(force=false){
    state=await api('/api/state');
    appearanceDraft=normalizedAppearance(state.appearance||{});applyAppearance(appearanceDraft);
  }
- await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets(),loadFinance()]);
+ await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets(),loadFinance(),loadQuestCollaboration()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderFinance();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
  if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets'){renderFinance();renderMarkets();}if(current==='settings')setSettingsSection(settingsSection,{render:true})
