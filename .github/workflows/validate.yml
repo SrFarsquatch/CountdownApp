@@ -1,0 +1,55 @@
+name: Validate Quest Log
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check self-hosted JavaScript
+        run: |
+          node --check server.js
+          node --check plaid-finance.cjs
+
+      - name: Check browser JavaScript
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+          const html = fs.readFileSync('public/index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+            .map(match => match[1])
+            .filter(code => code.trim());
+          scripts.forEach((code, index) => new vm.Script(code, { filename: 'public/index.html#script-' + (index + 1) }));
+          console.log('Checked ' + scripts.length + ' inline browser scripts.');
+          NODE
+
+      - name: Check Cloudflare modules
+        run: |
+          node --input-type=module --check < cloudflare/plaid.js
+          node --input-type=module --check < cloudflare/worker.js
+
+      - name: Validate Cloudflare bundle
+        run: npx wrangler deploy --dry-run
+
+      - name: Validate CasaOS Compose
+        run: docker compose -f docker-compose.casaos.yml config --quiet
