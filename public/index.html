@@ -3642,5 +3642,10 @@ loadAll().then(()=>{
 });
 setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
 </script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));
+}
+</script>
 </body>
 </html>
