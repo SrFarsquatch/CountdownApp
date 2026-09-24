@@ -42,6 +42,16 @@ If both runtimes are connected to the same external service, such as the same Go
 - Cloud runtime currently uses **Open-Meteo** directly.
 - No weather API key is required.
 
+### Finance and Plaid
+
+- The former Markets page is evolving into a lightweight **Finance** workspace.
+- Plaid Link can connect bank accounts without Quest Log ever receiving online-banking credentials.
+- Connected accounts, balances, and recent Transactions data are shown alongside the existing Yahoo Finance watchlist.
+- Plaid access tokens are encrypted with `APP_SECRET` and are never returned in browser API responses.
+- Cloud deployments isolate Plaid records by the authenticated Cloudflare Access identity in dedicated D1 tables.
+- Self-hosted deployments keep Plaid data in a separate `/data/finance-data.json` store; only the Plaid access token is encrypted, so treat the persistent data directory as private.
+- This first finance slice syncs when Finance is opened (with a short cache) and when the user presses **Sync**. Budget rules, spending categories, cash-flow planning, goals, and webhook-driven background refresh are intended follow-on layers.
+
 ### Markets
 
 - Yahoo Finance-backed market watchlist covering U.S., Canadian, and other Yahoo-supported instruments.
@@ -246,6 +256,10 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
 | `APP_BASE_URL` | For Google | Public HTTPS origin used to build the OAuth callback |
 | `APP_SECRET` | Strongly recommended | Encrypts Google tokens and saved Navi API credentials |
+| `PLAID_CLIENT_ID` | For Finance | Plaid application client ID |
+| `PLAID_SECRET` | For Finance | Plaid Sandbox or Production secret; keep secret |
+| `PLAID_ENV` | Optional | `sandbox` while developing, `production` for live bank connections |
+| `PLAID_COUNTRY_CODES` | Optional | Comma-separated Plaid countries; defaults to `CA` |
 | `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
 | `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
 | `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
@@ -254,7 +268,7 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `TARGET_CONTAINER` | Updater only | Defaults to `countdownapp` |
 | `TARGET_IMAGE` | Updater only | Defaults to the GHCR edge image |
 
-Keep `APP_SECRET` stable. Changing it makes credentials encrypted with the old value unreadable and will require reconnecting those integrations.
+Keep `APP_SECRET` stable. Changing it makes credentials encrypted with the old value unreadable and will require reconnecting those integrations, including Plaid bank connections.
 
 ## Self-hosted updates
 
