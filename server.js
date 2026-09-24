@@ -3407,7 +3407,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/state' && req.method === 'GET') return json(res, 200, state());
 
     if (p === '/api/finance' && req.method === 'GET') return json(res, 200, await plaidFinance.summary(true));
-    if (p === '/api/finance/link-token' && req.method === 'POST') return json(res, 200, await plaidFinance.linkToken());
+    if (p === '/api/finance/link-token' && req.method === 'POST') {
+      const incoming = await body(req);
+      return json(res, 200, await plaidFinance.linkToken(incoming.redirectUri || ''));
+    }
     if (p === '/api/finance/preferences' && req.method === 'PUT') return json(res, 200, await plaidFinance.savePreferences(await body(req)));
     if (p === '/api/finance/exchange' && req.method === 'POST') {
       const incoming = await body(req);
@@ -3888,6 +3891,7 @@ const server = http.createServer(async (req, res) => {
       const data = await feed();
       return text(res, 200, renderSvg(data, w, h), 'image/svg+xml; charset=utf-8', { 'X-FrameOS-Refresh-Minutes': String(data.display.refreshMinutes) });
     }
+    if (p === '/plaid-oauth') return serve(res, '/plaid-oauth.html');
     if (p === '/frame') {
       if (!authorized(url)) return text(res, 401, 'Invalid display token');
       return serve(res, '/frame.html');

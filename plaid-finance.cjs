@@ -18,6 +18,37 @@ function countryCodes(env) {
 function configured(env) {
   return Boolean(env.PLAID_CLIENT_ID && env.PLAID_SECRET && env.APP_SECRET);
 }
+function plaidRedirectUri(value, env) {
+  const raw = cleanText(value || env.PLAID_REDIRECT_URI || '', 500);
+  if (!raw) {
+    const error = new Error('Plaid OAuth redirect URI is missing.');
+    error.status = 400;
+    throw error;
+  }
+  let url;
+  try { url = new URL(raw); } catch {
+    const error = new Error('Plaid OAuth redirect URI is invalid.');
+    error.status = 400;
+    throw error;
+  }
+  if (url.search || url.hash || url.pathname !== '/plaid-oauth') {
+    const error = new Error('Plaid OAuth redirect URI must end exactly with /plaid-oauth and cannot contain query parameters.');
+    error.status = 400;
+    throw error;
+  }
+  const production = plaidEnvironment(env) === 'production';
+  if (production && url.protocol !== 'https:') {
+    const error = new Error('Plaid Production OAuth requires an HTTPS redirect URI.');
+    error.status = 400;
+    throw error;
+  }
+  if (!production && !['https:','http:'].includes(url.protocol)) {
+    const error = new Error('Plaid OAuth redirect URI must use HTTP or HTTPS.');
+    error.status = 400;
+    throw error;
+  }
+  return url.toString().replace(/\/$/, '');
+}
 function key(env) {
   return env.APP_SECRET ? crypto.createHash('sha256').update(String(env.APP_SECRET)).digest() : null;
 }
@@ -209,7 +240,7 @@ module.exports = function createPlaidFinance(options = {}) {
 
   return {
     configured: () => configured(env),
-    async linkToken() {
+    async linkToken(redirectUri = '') {
       if (!configured(env)) {
         const error = new Error('Plaid is not configured for Quest Log.');
         error.status = 503;
@@ -220,9 +251,10 @@ module.exports = function createPlaidFinance(options = {}) {
         client_name: 'Quest Log',
         products: ['transactions'],
         country_codes: countryCodes(env),
-        language: 'en'
+        language: 'en',
+        redirect_uri: plaidRedirectUri(redirectUri, env)
       });
-      return { linkToken: result.link_token, expiration: result.expiration, environment: plaidEnvironment(env) };
+      return { linkToken: result.link_token, expiration: result.expiration, environment: plaidEnvironment(env), redirectUri: plaidRedirectUri(redirectUri, env) };
     },
     async exchange(publicToken, metadata = {}) {
       if (!configured(env)) {

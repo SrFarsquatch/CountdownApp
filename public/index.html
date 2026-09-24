@@ -3374,30 +3374,66 @@ function renderFinance(){
  $('financeTransactionCount').textContent=filtered.length+' transaction'+(filtered.length===1?'':'s');
  $('financeTransactions').innerHTML=shown.length?shown.map(t=>financeTransactionHtml(t,currency)).join(''):'<div class="empty">'+(q?'No matching transactions.':'Connected-bank transactions will appear here.')+'</div>';
 }
+const PLAID_OAUTH_STORAGE_KEY='questlog.plaid.oauth';
+function clearPlaidOauthState(){try{localStorage.removeItem(PLAID_OAUTH_STORAGE_KEY)}catch{}}
+function savePlaidOauthState(linkToken,redirectUri){
+ try{localStorage.setItem(PLAID_OAUTH_STORAGE_KEY,JSON.stringify({linkToken,redirectUri,createdAt:Date.now(),returnUrl:'/?view=markets'}))}catch{}
+}
+function plaidErrorText(error,metadata={}){
+ const parts=[
+   error?.display_message,
+   error?.error_message,
+   error?.error_code,
+   metadata?.error_code
+ ].filter(Boolean);
+ return parts.length?[...new Set(parts)].join(' · '):'Plaid Link was closed before the bank was connected.';
+}
+async function finishPlaidConnection(publicToken,metadata={}){
+ const institution=metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null;
+ financeData=await api('/api/finance/exchange',{method:'POST',body:JSON.stringify({publicToken,metadata:{institution}})});
+ financeError='';
+ clearPlaidOauthState();
+ renderFinance();
+}
 async function connectFinanceBank(){
  if(plaidLinkLoading)return;plaidLinkLoading=true;renderFinance();
  try{
    if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
-   const token=await api('/api/finance/link-token',{method:'POST'});
+   const redirectUri=location.origin+'/plaid-oauth';
+   const token=await api('/api/finance/link-token',{method:'POST',body:JSON.stringify({redirectUri})});
+   savePlaidOauthState(token.linkToken,token.redirectUri||redirectUri);
    const handler=window.Plaid.create({
      token:token.linkToken,
      onSuccess:async(publicToken,metadata)=>{
-       try{
-         const institution=metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null;
-         financeData=await api('/api/finance/exchange',{method:'POST',body:JSON.stringify({publicToken,metadata:{institution}})});
-         financeError='';renderFinance();
-       }catch(error){financeError=error.message;renderFinance()}
+       try{await finishPlaidConnection(publicToken,metadata)}
+       catch(error){financeError=error.message;renderFinance()}
        finally{plaidLinkLoading=false;renderFinance();handler.destroy?.()}
      },
-     onExit:(error)=>{
+     onExit:(error,metadata)=>{
        plaidLinkLoading=false;
-       if(error)financeError=error.display_message||error.error_message||'Plaid Link was closed before the bank was connected.';
+       if(error){
+         financeError=plaidErrorText(error,metadata);
+         clearPlaidOauthState();
+       }
        renderFinance();handler.destroy?.();
+     },
+     onEvent:(eventName,metadata)=>{
+       if(eventName==='ERROR')console.warn('Plaid Link error event',metadata);
      }
    });
    handler.open();
- }catch(error){financeError=error.message;plaidLinkLoading=false;renderFinance()}
+ }catch(error){financeError=error.message;plaidLinkLoading=false;clearPlaidOauthState();renderFinance()}
 }
+window.addEventListener('message',async event=>{
+ if(event.origin!==location.origin||event.data?.type!=='questlog-plaid-oauth-complete')return;
+ if(event.data.ok){
+   try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
+   catch(error){financeError=error.message;renderFinance()}
+ }else{
+   financeError=event.data.error||'Bank connection could not be completed.';
+   renderFinance();
+ }
+});
 $('connectBankButton').onclick=connectFinanceBank;
 $('financeSyncButton').onclick=async()=>{
  const button=$('financeSyncButton');button.disabled=true;button.textContent='Syncing…';

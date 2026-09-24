@@ -56,6 +56,37 @@ function countryCodes(env) {
 export function plaidConfigured(env) {
   return Boolean(env.DB && env.PLAID_CLIENT_ID && env.PLAID_SECRET && env.APP_SECRET);
 }
+function plaidRedirectUri(value, env) {
+  const raw = cleanText(value || env.PLAID_REDIRECT_URI || '', 500);
+  if (!raw) {
+    const error = new Error('Plaid OAuth redirect URI is missing.');
+    error.status = 400;
+    throw error;
+  }
+  let url;
+  try { url = new URL(raw); } catch {
+    const error = new Error('Plaid OAuth redirect URI is invalid.');
+    error.status = 400;
+    throw error;
+  }
+  if (url.search || url.hash || url.pathname !== '/plaid-oauth') {
+    const error = new Error('Plaid OAuth redirect URI must end exactly with /plaid-oauth and cannot contain query parameters.');
+    error.status = 400;
+    throw error;
+  }
+  const production = plaidEnvironment(env) === 'production';
+  if (production && url.protocol !== 'https:') {
+    const error = new Error('Plaid Production OAuth requires an HTTPS redirect URI.');
+    error.status = 400;
+    throw error;
+  }
+  if (!production && !['https:','http:'].includes(url.protocol)) {
+    const error = new Error('Plaid OAuth redirect URI must use HTTP or HTTPS.');
+    error.status = 400;
+    throw error;
+  }
+  return url.toString().replace(/\/$/, '');
+}
 async function plaidRequest(env, endpoint, payload = {}) {
   if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) {
     const error = new Error('Plaid is not configured.');
@@ -306,7 +337,7 @@ async function institutionName(env, institutionId, fallback = '') {
     return cleanText(fallback, 160);
   }
 }
-export async function createFinanceLinkToken(env, identity) {
+export async function createFinanceLinkToken(env, identity, redirectUri = '') {
   if (!plaidConfigured(env)) {
     const error = new Error('Plaid is not configured for Quest Log.');
     error.status = 503;
@@ -317,12 +348,14 @@ export async function createFinanceLinkToken(env, identity) {
     client_name: 'Quest Log',
     products: ['transactions'],
     country_codes: countryCodes(env),
-    language: 'en'
+    language: 'en',
+    redirect_uri: plaidRedirectUri(redirectUri, env)
   });
   return {
     linkToken: result.link_token,
     expiration: result.expiration,
-    environment: plaidEnvironment(env)
+    environment: plaidEnvironment(env),
+    redirectUri: plaidRedirectUri(redirectUri, env)
   };
 }
 export async function exchangeFinancePublicToken(env, identity, publicToken, metadata = {}) {

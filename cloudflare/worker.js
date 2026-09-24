@@ -253,7 +253,10 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/finance'&&method==='GET')return json(await financeSummary(env,identity,{sync:true}));
-  if(p==='/api/finance/link-token'&&method==='POST')return json(await createFinanceLinkToken(env,identity));
+  if(p==='/api/finance/link-token'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await createFinanceLinkToken(env,identity,incoming.redirectUri||''));
+  }
   if(p==='/api/finance/preferences'&&method==='PUT')return json(await saveFinancePreferences(env,identity,await body(request)));
   if(p==='/api/finance/exchange'&&method==='POST'){
     const incoming=await body(request);
@@ -601,6 +604,12 @@ export default{
     if(path==='/logout'){
       await logout(request,env).catch(()=>null);
       return new Response(null,{status:302,headers:{location:'/login','set-cookie':expiredAuthCookie(request),'cache-control':'no-store'}});
+    }
+
+    if(path==='/plaid-oauth'){
+      const assetUrl=new URL('/plaid-oauth.html',url);
+      assetUrl.search=url.search;
+      return env.ASSETS.fetch(new Request(assetUrl,request));
     }
 
     if(path==='/login'){
