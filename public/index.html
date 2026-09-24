@@ -82,7 +82,10 @@
 .market-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .market-card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 13px;min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.025)}
 .market-card-top{display:flex;align-items:center;gap:9px;min-width:0}
-.market-badge{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:900;letter-spacing:-.02em}
+.market-logo{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;position:relative;overflow:hidden;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:900;letter-spacing:-.02em}
+.market-logo-fallback{display:grid;place-items:center;width:100%;height:100%;transition:opacity .14s ease}
+.market-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:3px;background:var(--panel);opacity:0;transition:opacity .14s ease}
+.market-logo.has-image img{opacity:1}.market-logo.has-image .market-logo-fallback{opacity:0}
 .market-card-copy{min-width:0}
 .market-company{font-size:11px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
 .market-symbol{font-size:9px;color:var(--muted);font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
@@ -92,14 +95,14 @@
 .market-change.up{color:var(--green);background:color-mix(in srgb,var(--green) 10%,var(--panel))}
 .market-change.down{color:var(--danger);background:color-mix(in srgb,var(--danger) 9%,var(--panel))}
 .market-home-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.market-home-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;align-items:center;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);min-width:0}
-.market-home-symbol{font-size:12px;font-weight:900}
+.market-home-card{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:5px 10px;align-items:center;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);min-width:0}
+.market-home-copy{min-width:0}.market-home-symbol{font-size:12px;font-weight:900}
 .market-home-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .market-home-quote{text-align:right;white-space:nowrap}
 .market-home-price{font-size:12px;font-weight:850}
 .market-home-change{font-size:10px;font-weight:850;margin-top:2px}.market-home-change.up{color:var(--green)}.market-home-change.down{color:var(--danger)}
 .market-search-results{display:grid;gap:6px;max-height:240px;overflow:auto}.market-search-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.market-search-result:hover{border-color:var(--text)}
-.market-watchlist{display:grid;gap:7px}.market-watch-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--panel2)}
+.market-watchlist{display:grid;gap:7px}.market-watch-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--panel2)}.market-watch-row-main{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center;min-width:0}
 .finance-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .finance-hero{margin-bottom:14px}
 .finance-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
@@ -175,7 +178,7 @@
 .market-watch-quote{text-align:right;white-space:nowrap}.market-watch-quote strong{display:block;font-size:10px}.market-watch-quote span{display:block;font-size:8px;font-weight:850;margin-top:2px}.market-watch-quote span.up{color:var(--green)}.market-watch-quote span.down{color:var(--danger)}
 .market-trending-card{margin-top:12px;padding:14px}
 .market-trending-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:9px}
-.market-trend-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-width:0}
+.market-trend-item{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-width:0}
 .market-trend-item strong{font-size:10px}.market-trend-item small{display:block;color:var(--muted);font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .market-trend-value{text-align:right;font-size:9px;font-weight:850;white-space:nowrap}.market-trend-value.up{color:var(--green)}.market-trend-value.down{color:var(--danger)}
 .finance-watchlist-details{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
@@ -2551,12 +2554,34 @@ function marketQuoteState(q){
  return {pct,up,down,cls:up?'up':down?'down':'',arrow:up?'▲':down?'▼':'•'};
 }
 function marketBadgeText(q){return String(q?.symbol||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase()||'?'}
+function marketLogoMarkup(q){
+ return '<span class="market-logo" data-market-logo data-market-symbol="'+esc(q?.symbol||'')+'" data-market-provider-symbol="'+esc(q?.providerSymbol||'')+'"><span class="market-logo-fallback">'+esc(marketBadgeText(q))+'</span><img alt="" loading="lazy" decoding="async"></span>';
+}
+function hydrateMarketLogos(root=document){
+ if(!root?.querySelectorAll)return;
+ root.querySelectorAll('[data-market-logo]').forEach(wrap=>{
+   if(wrap.dataset.logoReady==='1')return;
+   wrap.dataset.logoReady='1';
+   const image=wrap.querySelector('img');if(!image)return;
+   const ids=[wrap.dataset.marketProviderSymbol,wrap.dataset.marketSymbol].map(value=>String(value||'').trim().toUpperCase()).filter(Boolean);
+   const unique=[...new Set(ids)],urls=unique.map(id=>'https://financialmodelingprep.com/image-stock/'+encodeURIComponent(id)+'.png');
+   let index=0;
+   const next=()=>{
+     wrap.classList.remove('has-image');
+     if(index>=urls.length){image.removeAttribute('src');image.hidden=true;return}
+     image.hidden=false;image.src=urls[index++];
+   };
+   image.onload=()=>wrap.classList.add('has-image');
+   image.onerror=next;
+   next();
+ });
+}
 function marketCard(q){
  const changeState=marketQuoteState(q),venue=[q?.exchange,q?.currency].filter(Boolean).join(' · ');
  const unavailable=q?.available===false||q?.close==null;
  const price=unavailable?'Unavailable':marketMoney(q.close,q.currency);
  const change=unavailable?'No quote':(Number.isFinite(changeState.pct)?changeState.arrow+' '+Math.abs(changeState.pct).toFixed(2)+'%':'—');
- return '<div class="market-card"><div class="market-card-top"><div class="market-badge">'+esc(marketBadgeText(q))+'</div><div class="market-card-copy"><div class="market-company">'+esc(q?.name||q?.symbol||'Market quote')+'</div><div class="market-symbol">'+esc(q?.symbol||venue||'')+'</div></div></div><div class="market-price-row"><div class="market-price">'+esc(price)+'</div><div class="market-change '+changeState.cls+'">'+esc(change)+'</div></div></div>';
+ return '<div class="market-card"><div class="market-card-top">'+marketLogoMarkup(q)+'<div class="market-card-copy"><div class="market-company">'+esc(q?.name||q?.symbol||'Market quote')+'</div><div class="market-symbol">'+esc(q?.symbol||venue||'')+'</div></div></div><div class="market-price-row"><div class="market-price">'+esc(price)+'</div><div class="market-change '+changeState.cls+'">'+esc(change)+'</div></div></div>';
 }
 function marketValidQuotes(){
  return (marketData?.quotes||[]).filter(q=>q&&q.available!==false&&q.close!=null);
@@ -2566,6 +2591,7 @@ function renderMarketSummary(rootId,limit=4){
  if(!marketData){root.innerHTML='<div class="empty" style="grid-column:1/-1">'+esc(marketError||'Markets are not configured yet.')+'</div>';return}
  const quotes=(marketData.quotes||[]).slice(0,limit);
  root.innerHTML=quotes.length?quotes.map(marketCard).join(''):'<div class="empty" style="grid-column:1/-1">Add a few symbols to start your watchlist.</div>';
+ hydrateMarketLogos(root);
 }
 function renderHomeMarketMovers(){
  const root=$('todayMarkets');if(!root)return;
@@ -2573,8 +2599,9 @@ function renderHomeMarketMovers(){
  const quotes=marketValidQuotes().sort((a,b)=>Math.abs(Number(b.percentChange)||0)-Math.abs(Number(a.percentChange)||0)).slice(0,4);
  root.innerHTML=quotes.length?quotes.map(q=>{
    const s=marketQuoteState(q);
-   return '<div class="market-home-card"><div><div class="market-home-symbol">'+esc(q.symbol||'')+'</div><div class="market-home-name">'+esc(q.name||[q.exchange,q.currency].filter(Boolean).join(' · '))+'</div></div><div class="market-home-quote"><div class="market-home-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-home-change '+s.cls+'">'+esc((Number.isFinite(s.pct)?(s.pct>=0?'+':'')+s.pct.toFixed(2)+'%':'—'))+'</div></div></div>';
+   return '<div class="market-home-card">'+marketLogoMarkup(q)+'<div class="market-home-copy"><div class="market-home-symbol">'+esc(q.symbol||'')+'</div><div class="market-home-name">'+esc(q.name||[q.exchange,q.currency].filter(Boolean).join(' · '))+'</div></div><div class="market-home-quote"><div class="market-home-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-home-change '+s.cls+'">'+esc((Number.isFinite(s.pct)?(s.pct>=0?'+':'')+s.pct.toFixed(2)+'%':'—'))+'</div></div></div>';
  }).join(''):'<div class="empty" style="grid-column:1/-1">No market movers yet.</div>';
+ hydrateMarketLogos(root);
 }
 function marketHistoryRangeDays(){
  return marketHistoryRange==='annually'?366:(marketHistoryRange==='quarterly'?93:31);
@@ -3643,7 +3670,7 @@ function renderMarkets(){
    summary.innerHTML=watchlist.length?watchlist.slice(0,5).map(item=>{
      const q=quotes.find(q=>q.providerSymbol===item.providerSymbol)||quotes.find(q=>q.symbol===item.symbol),s=marketQuoteState(q),available=q&&q.available!==false&&q.close!=null;
      const price=available?marketMoney(q.close,q.currency):'—',pct=available&&Number.isFinite(s.pct)?(s.pct>=0?'+':'')+s.pct.toFixed(2)+'%':'—';
-     return '<div class="market-watch-item"><div class="market-badge">'+esc(marketBadgeText(item))+'</div><div class="market-watch-copy"><strong>'+esc(item.symbol||'')+'</strong><div>'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div></div><div class="market-watch-quote"><strong>'+esc(price)+'</strong><span class="'+s.cls+'">'+esc(pct)+'</span></div></div>';
+     return '<div class="market-watch-item">'+marketLogoMarkup(q||item)+'<div class="market-watch-copy"><strong>'+esc(item.symbol||'')+'</strong><div>'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div></div><div class="market-watch-quote"><strong>'+esc(price)+'</strong><span class="'+s.cls+'">'+esc(pct)+'</span></div></div>';
    }).join(''):'<div class="empty">No symbols selected.</div>';
  }
  const count=$('marketWatchCount');if(count)count.textContent=watchlist.length+' symbol'+(watchlist.length===1?'':'s');
@@ -3651,17 +3678,18 @@ function renderMarkets(){
  if(trending){
    trending.innerHTML=movers.length?movers.slice(0,4).map(q=>{
      const s=marketQuoteState(q),pct=Number.isFinite(s.pct)?s.pct:0;
-     return '<div class="market-trend-item"><div><strong>'+esc(q.symbol||'')+'</strong><small>'+esc(q.name||[q.exchange,q.currency].filter(Boolean).join(' · '))+'</small></div><div class="market-trend-value '+s.cls+'">'+esc((pct>=0?'+':'')+pct.toFixed(2)+'%')+'</div></div>';
+     return '<div class="market-trend-item">'+marketLogoMarkup(q)+'<div><strong>'+esc(q.symbol||'')+'</strong><small>'+esc(q.name||[q.exchange,q.currency].filter(Boolean).join(' · '))+'</small></div><div class="market-trend-value '+s.cls+'">'+esc((pct>=0?'+':'')+pct.toFixed(2)+'%')+'</div></div>';
    }).join(''):'<div class="empty" style="grid-column:1/-1">No watchlist trends yet.</div>';
  }
  $('marketWatchlist').innerHTML=watchlist.length?watchlist.map((item,index)=>{
    const q=quotes.find(q=>q.providerSymbol===item.providerSymbol)||quotes.find(q=>q.symbol===item.symbol),s=marketQuoteState(q),available=q&&q.available!==false&&q.close!=null;
    const stat=available?marketMoney(q.close,q.currency)+' · '+(Number.isFinite(s.pct)?(s.pct>=0?'+':'')+s.pct.toFixed(2)+'%':'—'):(q?.error||'Quote unavailable');
-   return '<div class="market-watch-row"><div><strong>'+esc(item.symbol)+'</strong><div class="meta">'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div><div class="meta">'+esc(stat)+'</div></div><button class="btn tiny ghost" data-remove-market="'+index+'">Remove</button></div>';
+   return '<div class="market-watch-row"><div class="market-watch-row-main">'+marketLogoMarkup(q||item)+'<div><strong>'+esc(item.symbol)+'</strong><div class="meta">'+esc(item.name||[item.exchange,item.currency].filter(Boolean).join(' · '))+'</div><div class="meta">'+esc(stat)+'</div></div></div><button class="btn tiny ghost" data-remove-market="'+index+'">Remove</button></div>';
  }).join(''):'<div class="empty">No symbols selected.</div>';
  $('marketWatchlist').querySelectorAll('[data-remove-market]').forEach(btn=>btn.onclick=()=>saveMarketWatchlist(watchlist.filter((_,i)=>i!==Number(btn.dataset.removeMarket))));
  $('marketSearchInput').disabled=!configured;$('marketSearchButton').disabled=!configured;
  if(!configured)$('marketSearchResults').innerHTML='<div class="meta">Yahoo Finance market data is temporarily unavailable.</div>';
+ hydrateMarketLogos($('view-markets'));
 }
 $('marketSearchButton').onclick=searchMarkets;
 $('marketSearchInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchMarkets()}};
