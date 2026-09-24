@@ -2,7 +2,7 @@ const enc=new TextEncoder();
 const dec=new TextDecoder();
 const SESSION_COOKIE='questlog_session';
 const SESSION_DAYS=30;
-const PBKDF2_ITERATIONS=600000;
+const PBKDF2_ITERATIONS=100000;
 const AUTH_WINDOW_SECONDS=15*60;
 const AUTH_MAX_ATTEMPTS=12;
 
