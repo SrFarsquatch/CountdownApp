@@ -2765,6 +2765,16 @@ function countdownLabel(c){
 }
 function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==false&&c.timeDisplayStyle!=='date'?'<small>'+fmtDate(c.end,{year:'numeric'})+'</small>':'';return `<div class="count-card" data-count="${esc(c.id)}">${date}<strong class="${display.dense?'dense':''}">${esc(display.label)}</strong><div class="title">${esc(c.name)}</div></div>`}
 function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" onclick="countdownModal(state.countdowns.find(x=>x.id==='${esc(c.id)}'))">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>'}
+function updateCountdownTimers(){
+ if(!state)return;
+ const byId=new Map((state.countdowns||[]).map(c=>[String(c.id),c]));
+ document.querySelectorAll('.count-card[data-count]').forEach(card=>{
+   const c=byId.get(String(card.dataset.count||''));if(!c)return;
+   const display=countdownLabel(c),strong=card.querySelector('strong');if(!strong)return;
+   if(strong.textContent!==display.label)strong.textContent=display.label;
+   strong.classList.toggle('dense',!!display.dense);
+ });
+}
 
 function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
 function weekStart(d=new Date()){const x=startOfDay(d),day=x.getDay(),sundayFirst=isMobileUi()&&plannerWeekStartsSunday;x.setDate(x.getDate()-(sundayFirst?day:(day===0?6:day-1)));return x}
@@ -4257,7 +4267,7 @@ loadAll().then(()=>{
  if(initialRaw==='agent')openAgentDrawer();
  refreshUpdateStatus();
 });
-setInterval(()=>{if(!state)return;renderToday();renderCountdowns()},1000);
+setInterval(()=>{if(!state)return;updateCountdownTimers()},1000);
 </script>
 <script>
 if('serviceWorker' in navigator){
