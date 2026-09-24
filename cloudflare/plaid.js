@@ -1,4 +1,5 @@
 import { cleanText } from './state.js';
+import { resolveQuestLogUser } from './users.js';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -78,12 +79,12 @@ async function plaidRequest(env, endpoint, payload = {}) {
   return data;
 }
 async function financeUserKey(identity, env) {
-  const source = identity?.sub || identity?.email || env.CLOUD_WORKSPACE_ID || 'default';
-  return hex(await sha256('questlog-finance:' + source));
+  const user = await resolveQuestLogUser(env, identity);
+  return user.userId;
 }
 async function clientUserId(identity, env) {
-  const source = identity?.sub || identity?.email || env.CLOUD_WORKSPACE_ID || 'default';
-  return 'questlog-' + hex(await sha256('plaid-client-user:' + source)).slice(0, 40);
+  const user = await resolveQuestLogUser(env, identity);
+  return 'questlog-' + user.userId;
 }
 async function ensureFinanceSchema(env) {
   if (!env.DB) throw new Error('Cloudflare D1 binding DB is not configured.');
