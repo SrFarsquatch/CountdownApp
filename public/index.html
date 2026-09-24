@@ -2370,10 +2370,45 @@ $('mobileUndoButton').onclick=async()=>{
 };
 function openActionSheet(title,html){openModal(title,html,{sheet:true})}
 function openCreate(type,item=null){
- if(type==='event')return eventModal(item);
+ if(type==='event')return questEventModal(item);
  if(type==='task')return taskModal(item);
  if(type==='goal')return goalModal(item);
  if(type==='countdown')return countdownModal(item);
+}
+async function questEventModal(item=null,preset={}){
+ const editing=Boolean(item),shared=Boolean(item?.ownerUserId&&item.ownerUserId!==(runtimeInfo?.profile?.userId||'')),canEdit=!shared||item?.calendarRole==='editor'||item?.calendarRole==='owner';
+ let start=preset.start?new Date(preset.start):(item?.start?new Date(item.start):new Date());
+ if(!preset.start&&!item){start.setSeconds(0,0);start.setMinutes(Math.ceil(start.getMinutes()/30)*30)}
+ let end=preset.end?new Date(preset.end):(item?.end?new Date(item.end):new Date(start.getTime()+3600000));
+ if(end<=start)end=new Date(start.getTime()+3600000);
+ const calendarId=item?.calendarId||questCalendars.find(x=>x.role==='owner')?.id||'';
+ let form='<form id="questEventForm"><div class="form-grid">';
+ form+='<div class="field full"><label>Title</label><input id="fQEventTitle" required value="'+esc(item?.title||'')+'" placeholder="Event title" '+(canEdit?'':'disabled')+'></div>';
+ form+='<div class="field"><label>Start</label><input id="fQEventStart" type="datetime-local" required value="'+localInput(start)+'" '+(canEdit?'':'disabled')+'></div>';
+ form+='<div class="field"><label>End</label><input id="fQEventEnd" type="datetime-local" required value="'+localInput(end)+'" '+(canEdit?'':'disabled')+'></div>';
+ form+='<div class="field"><label>Quest Log calendar</label><select id="fQEventCalendar" '+(canEdit&&!shared?'':'disabled')+'>'+calendarOptionsHtml(calendarId)+'</select></div>';
+ form+='<div class="field full"><label>Location</label><input id="fQEventLocation" value="'+esc(item?.location||'')+'" '+(canEdit?'':'disabled')+'></div>';
+ form+='<div class="field full"><label>Notes</label><textarea id="fQEventDescription" '+(canEdit?'':'disabled')+'>'+esc(item?.description||'')+'</textarea></div>';
+ form+='<div class="field full"><label>Invite Quest Log friends</label>'+friendPickerHtml(item?.participantIds||item?.participants||[])+'<div class="meta">Only accepted Quest Log friends are listed here.</div></div>';
+ form+='</div><div id="questEventStatus" class="meta" style="margin-top:8px">'+(canEdit?'': 'This shared calendar is view-only.')+'</div><div class="modal-actions">';
+ if(editing&&canEdit)form+='<button type="button" class="btn" id="deleteQuestEvent">Delete</button>';
+ if(!editing&&state?.google?.connected)form+='<button type="button" class="btn ghost" id="createGoogleEventInstead">Google event instead</button>';
+ if(canEdit)form+='<button class="btn primary">'+(editing?'Save event':'Create event')+'</button>';
+ form+='</div></form>';
+ openModal(editing?'Edit Quest Log event':'New Quest Log event',form);
+ if($('fQuestFriends')&&!canEdit)$('fQuestFriends').querySelectorAll('input').forEach(x=>x.disabled=true);
+ if($('createGoogleEventInstead'))$('createGoogleEventInstead').onclick=()=>eventModal(null,preset);
+ if(canEdit)$('questEventForm').onsubmit=async e=>{
+   e.preventDefault();
+   const payload={title:$('fQEventTitle').value.trim(),start:zonedInputToIso($('fQEventStart').value),end:zonedInputToIso($('fQEventEnd').value),location:$('fQEventLocation').value.trim(),description:$('fQEventDescription').value,calendarId:$('fQEventCalendar').value,participantIds:selectedFriendIds()};
+   const path=editing?sharedItemApiPath('event',item):'/api/events';
+   await api(path,{method:editing?'PUT':'POST',body:JSON.stringify(payload)});
+   closeModal();plannerEventCache.clear();await loadAll(true);
+ };
+ if(editing&&canEdit&&$('deleteQuestEvent'))$('deleteQuestEvent').onclick=async()=>{
+   if(!confirm('Delete this Quest Log event?'))return;
+   await api(sharedItemApiPath('event',item),{method:'DELETE'});closeModal();plannerEventCache.clear();await loadAll(true);
+ };
 }
 async function eventModal(item=null,preset={}){
  const allAccounts=state?.google?.accounts||[];
@@ -2486,6 +2521,8 @@ async function taskModal(item){
  form+='<div class="field"><label>Status</label><select id="fStatus"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Complete</option></select></div>';
  form+='<div class="field"><label>Project / list</label><input id="fProject" value="'+esc(item?.project||'')+'" placeholder="Personal"></div>';
  form+='<div class="field full"><label>Linked goal</label><select id="fGoal"><option value="">None</option>'+goals+'</select></div>';
+ form+='<div class="field"><label>Quest Log calendar</label><select id="fQuestCalendar">'+calendarOptionsHtml(item?.calendarId||'')+'</select></div>';
+ form+='<div class="field full"><label>Invite Quest Log friends</label>'+friendPickerHtml(item?.participantIds||item?.participants||[])+'<div class="meta">Only accepted Quest Log friends are listed.</div></div>';
  form+='<div class="field full"><label>Google Tasks sync</label><select id="fGoogleTaskList" '+(linked?'disabled':'')+'><option value="">Quest Log only</option></select><div class="meta task-sync-note">'+(linked?'Linked to '+esc(item.googleTaskListTitle||'Google Tasks')+'. Changes and completion status sync both ways.':'Choose a Google Task list to sync this task both ways. Google Tasks stores due dates but not due times; Quest Log keeps the local time.')+'</div></div>';
  form+='</div><div id="taskFormStatus" class="meta" style="margin-top:8px"></div><div class="modal-actions">'+(item?'<button type="button" class="btn" id="deleteEntity">Delete</button>':'')+'<button class="btn primary">Save task</button></div></form>';
  openModal(item?'Edit task':'New task',form);
@@ -2516,20 +2553,21 @@ async function taskModal(item){
    const b={
      title:$('fTitle').value.trim(),description:$('fDesc').value,status:$('fStatus').value,
      priority:$('fPriority').value,due:$('fDue').value?zonedInputToIso($('fDue').value):null,
-     project:$('fProject').value.trim(),goalId:$('fGoal').value
+     project:$('fProject').value.trim(),goalId:$('fGoal').value,
+     calendarId:$('fQuestCalendar').value,participantIds:selectedFriendIds()
    };
    if(!linked&&select.value){
      const parts=select.value.split('|||');b.googleAccountId=parts[0]||'';b.googleTaskListId=parts[1]||'';
    }
    $('taskFormStatus').textContent=linked?'Saving to Quest Log and Google Tasks…':'Saving task…';
    try{
-     await api(item?'/api/tasks/'+encodeURIComponent(item.id):'/api/tasks',{method:item?'PUT':'POST',body:JSON.stringify(b)});
+     await api(item?sharedItemApiPath('task',item):'/api/tasks',{method:item?'PUT':'POST',body:JSON.stringify(b)});
      closeModal();await loadAll();
    }catch(error){$('taskFormStatus').textContent=error.message}
  };
  if(item)$('deleteEntity').onclick=async()=>{
    if(!confirm(linked?'Delete this task from Quest Log and Google Tasks?':'Delete this task?'))return;
-   try{await api('/api/tasks/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}
+   try{await api(sharedItemApiPath('task',item),{method:'DELETE'});closeModal();await loadAll()}
    catch(error){$('taskFormStatus').textContent=error.message}
  };
 }
@@ -2543,10 +2581,12 @@ function goalModal(item){
  <div class="field"><label>Target</label><input id="fTarget" type="number" step="any" min="0" value="${item?.target??100}"></div>
  <div class="field"><label>Unit</label><input id="fUnit" value="${esc(item?.unit||'')}" placeholder="$, books, km…"></div>
  <div class="field"><label>Project / list</label><input id="fProject" value="${esc(item?.project||'')}"></div>
+ <div class="field"><label>Quest Log calendar</label><select id="fQuestCalendar">${calendarOptionsHtml(item?.calendarId||'')}</select></div>
+ <div class="field full"><label>Invite Quest Log friends</label>${friendPickerHtml(item?.participantIds||item?.participants||[])}<div class="meta">Only accepted Quest Log friends are listed.</div></div>
  </div><div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save goal</button></div></form>`);
  $('fType').value=item?.type||'number';
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?zonedInputToIso($('fDeadline').value):null,project:$('fProject').value.trim()};await api(item?'/api/goals/'+encodeURIComponent(item.id):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
- if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this goal?')){await api('/api/goals/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?zonedInputToIso($('fDeadline').value):null,project:$('fProject').value.trim(),calendarId:$('fQuestCalendar').value,participantIds:selectedFriendIds()};await api(item?sharedItemApiPath('goal',item):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this goal?')){await api(sharedItemApiPath('goal',item),{method:'DELETE'});closeModal();await loadAll()}};
 }
 function countdownModal(item){
  openModal(item?'Edit countdown':'New countdown',`<form id="entityForm"><div class="form-grid">
@@ -2555,6 +2595,8 @@ function countdownModal(item){
  <div class="field"><label>Accent</label><select id="fAccent"><option value="black">Black</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="green">Green</option><option value="red">Red</option><option value="yellow">Yellow</option></select></div>
  <div class="field"><label>Countdown display</label><select id="fTime"><option value="days">Days only — 27 days</option><option value="compact">Days + hours — 27d 06h</option><option value="full">Days + hours + minutes — 27d 06h 14m</option><option value="precise">Days + hours + minutes + seconds</option><option value="weeks">Weeks + days — 3w 6d</option><option value="date">Target date</option></select></div>
  <div class="field"><label>Progress</label><select id="fProgress"><option value="time">Time elapsed</option><option value="manual">Manual</option><option value="none">None</option></select></div>
+ <div class="field"><label>Quest Log calendar</label><select id="fQuestCalendar">${calendarOptionsHtml(item?.calendarId||'')}</select></div>
+ <div class="field full"><label>Invite Quest Log friends</label>${friendPickerHtml(item?.participantIds||item?.participants||[])}<div class="meta">Only accepted Quest Log friends are listed.</div></div>
  </div>
  <div class="count-options">
    <label><input id="fShowDate" type="checkbox"> Show target date</label>
@@ -2563,8 +2605,8 @@ function countdownModal(item){
  </div>
  <div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save countdown</button></div></form>`);
  $('fAccent').value=item?.accentColor||'purple';$('fTime').value=item?.timeDisplayStyle||'days';$('fProgress').value=item?.progressMode||'time';$('fShowDate').checked=item?.showExactDate!==false;$('fShowEink').checked=item?.displayEnabled!==false;$('fPinned').checked=!!item?.pinned;
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:zonedInputToIso($('fEnd').value),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked};await api(item?'/api/countdowns/'+encodeURIComponent(item.id):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
- if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this countdown?')){await api('/api/countdowns/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:zonedInputToIso($('fEnd').value),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked,calendarId:$('fQuestCalendar').value,participantIds:selectedFriendIds()};await api(item?sharedItemApiPath('countdown',item):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this countdown?')){await api(sharedItemApiPath('countdown',item),{method:'DELETE'});closeModal();await loadAll()}};
 }
 
 function weatherIcon(condition){
@@ -3085,14 +3127,15 @@ function bindCalendarInteractions(root=$('calendarStage')){
    const minutes=Math.max(0,Math.min(23*60+30,Math.round(raw/30)*30));
    const start=parseDateKey(lane.dataset.day);start.setHours(0,minutes,0,0);
    const end=new Date(start.getTime()+60*60000);
-   eventModal(null,{start,end});
+   questEventModal(null,{start,end});
  });
  root.querySelectorAll('.all-day-cell[data-day]').forEach(cell=>cell.onclick=e=>{
    if(e.target.closest('[data-event-key],button'))return;
-   eventModal(null,{allDay:true,startDate:cell.dataset.day,endDate:cell.dataset.day});
+   questEventModal(null,{start:parseDateKey(cell.dataset.day),end:new Date(parseDateKey(cell.dataset.day).getTime()+3600000)});
  });
 }
 function calendarEventModal(e){
+ if(e?.source==='questlog')return questEventModal(e);
  const link=safeHttpUrl(e.htmlLink),account=(state.google.accounts||[]).find(a=>a.id===e.accountId);
  const calendarWritable=['writer','owner'].includes(e.accessRole||''),canEdit=Boolean(account?.canWrite)&&calendarWritable;
  let body='<div class="event-detail-grid">';
