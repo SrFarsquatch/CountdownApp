@@ -1611,6 +1611,23 @@ body.modal-open{overflow:hidden}
 let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',financeData=null,financeError='',plaidLinkLoading=false,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,backExitRestoreTimer=null,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
+const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
+function defaultPlannerView(){return window.matchMedia('(max-width:760px)').matches?'day':'week'}
+function plannerViewStorageKey(){
+ const account=String(runtimeInfo?.profile?.userId||runtimeInfo?.user||'device').trim().toLowerCase();
+ return 'questlog.planner.view.'+encodeURIComponent(account||'device');
+}
+function restorePlannerViewPreference(){
+ const saved=localStorage.getItem(plannerViewStorageKey());
+ plannerView=PLANNER_VIEW_VALUES.has(saved)?saved:defaultPlannerView();
+ return plannerView;
+}
+function savePlannerViewPreference(next=plannerView){
+ if(!PLANNER_VIEW_VALUES.has(next))return plannerView;
+ plannerView=next;
+ localStorage.setItem(plannerViewStorageKey(),next);
+ return plannerView;
+}
 function pwaStandalone(){
  return window.matchMedia?.('(display-mode: standalone)').matches===true||window.navigator.standalone===true;
 }
@@ -2511,7 +2528,7 @@ function renderMini(){
  for(let i=0;i<offset;i++)h+='<span></span>';
  for(let d=1;d<=days;d++){const date=new Date(n.getFullYear(),n.getMonth(),d),key=dateKeyLocal(date),cls=(key===today?' today':'')+(key===selected?' selected':'');h+='<span class="'+cls.trim()+'" data-mini-date="'+key+'">'+d+'</span>'}
  $('miniCalendar').innerHTML=h;
- $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=parseDateKey(x.dataset.miniDate);plannerView='day';syncPlannerViewButtons();renderPlanner()})
+ $('miniCalendar').querySelectorAll('[data-mini-date]').forEach(x=>x.onclick=()=>{plannerAnchor=parseDateKey(x.dataset.miniDate);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()})
 }
 function syncPlannerViewButtons(){document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.classList.toggle('on',b.dataset.calview===plannerView))}
 function syncMobilePlannerChrome(){
@@ -2685,7 +2702,7 @@ function bindCalendarInteractions(root=$('calendarStage')){
  if(!root)return;
  root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=cachedPlannerEvents().find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
  root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
- root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);plannerView='day';syncPlannerViewButtons();renderPlanner()});
+ root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()});
  root.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
    if(e.target.closest('[data-event-key],[data-cal-task],button'))return;
@@ -2785,7 +2802,7 @@ function buildMonthHtml(range,anchor=plannerAnchor,eventSource=calEvents){
 }
 function renderMonth(range){
  const stage=$('calendarStage');stage.dataset.calendarMode='month';stage.innerHTML=buildMonthHtml(range,plannerAnchor,calEvents);
- stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);plannerView='day';syncPlannerViewButtons();renderPlanner()});
+ stage.querySelectorAll('[data-month-date]').forEach(x=>x.ondblclick=e=>{if(e.target.closest('button'))return;plannerAnchor=parseDateKey(x.dataset.monthDate);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()});
  bindCalendarInteractions(stage);
 }
 function plannerRangeKey(range){return range.start.toISOString()+'|'+range.end.toISOString()}
@@ -2990,7 +3007,7 @@ function bindPlannerSwipe(){
  stage.addEventListener('pointerup',finish);stage.addEventListener('pointercancel',finish);
  stage.addEventListener('click',e=>{if(Date.now()<plannerSwipeSuppressUntil){e.preventDefault();e.stopPropagation()}},true);
 }
-document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=()=>{plannerView=b.dataset.calview;syncPlannerViewButtons();renderPlanner()});
+document.querySelectorAll('#plannerViews [data-calview]').forEach(b=>b.onclick=()=>{savePlannerViewPreference(b.dataset.calview);syncPlannerViewButtons();renderPlanner()});
 $('plannerToday').onclick=()=>{plannerAnchor=new Date();renderPlanner()};
 $('plannerPrev').onclick=()=>navigatePlanner(-1,false);
 $('plannerNext').onclick=()=>navigatePlanner(1,false);
@@ -3000,7 +3017,7 @@ $('mobilePlannerSearch').onclick=()=>{closePlannerDrawer();openPlannerSearch()};
 $('mobilePlannerToday').onclick=()=>{closePlannerDrawer();plannerAnchor=new Date();renderPlanner()};
 $('mobilePlannerDrawer').querySelectorAll('[data-planner-drawer-view]').forEach(button=>button.onclick=async e=>{
  e.stopPropagation();const next=button.dataset.plannerDrawerView;if(!next||next===plannerView){closePlannerDrawer();return}
- plannerView=next;syncPlannerViewButtons();closePlannerDrawer();await renderPlanner();
+ savePlannerViewPreference(next);syncPlannerViewButtons();closePlannerDrawer();await renderPlanner();
 });
 $('plannerDrawerShowTasks').onchange=async e=>{
  plannerShowTasks=e.target.checked;localStorage.setItem('questlog.planner.showTasks',plannerShowTasks?'1':'0');syncPlannerDrawer();await renderPlanner();
@@ -3838,7 +3855,7 @@ async function loadFinance(){
  catch(error){financeData={configured:false,connections:[],accounts:[],transactions:[],errors:[]};financeError=error.message||'Finance data is unavailable.'}
 }
 async function loadAll(force=false){
- if(!runtimeInfo){try{runtimeInfo=await api('/api/runtime')}catch{runtimeInfo={runtime:'self-hosted'}}renderRuntimeSession()}
+ if(!runtimeInfo){try{runtimeInfo=await api('/api/runtime')}catch{runtimeInfo={runtime:'self-hosted'}}restorePlannerViewPreference();renderRuntimeSession()}
  state=await api('/api/state');
  appearanceDraft=normalizedAppearance(state.appearance||{});applyAppearance(appearanceDraft);
  if(force){calendarCache={};taskListCache={}}
