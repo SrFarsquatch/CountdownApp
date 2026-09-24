@@ -95,6 +95,12 @@ input:focus{background:var(--panel);border-color:var(--accent);box-shadow:0 0 0 
   .auth-card{padding:25px;margin:auto}.mobile-brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:850;margin-bottom:28px}.mobile-brand img{width:38px;height:38px;border-radius:10px}
 }
 @media(max-width:480px){.page{padding:14px}.auth-card{border-radius:18px;padding:20px}.auth-title{font-size:31px}.tabs{margin-bottom:23px}}
+
+/* Prevent iOS Safari from auto-zooming focused form controls */
+@media(max-width:760px){
+  input,select,textarea{font-size:16px!important}
+}
+
 </style>
 </head>
 <body data-auth-build="classic-auth-v2">
