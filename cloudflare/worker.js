@@ -562,7 +562,13 @@ export default{
     }
     if(path==='/api/auth/signup'&&request.method==='POST'){
       try{
-        const result=await signup(request,env,await body(request));
+        const incoming=await body(request),signupEmail=String(incoming.email||'').trim().toLowerCase(),legacyOwner=String(env.LEGACY_OWNER_EMAIL||'').trim().toLowerCase();
+        if(legacyOwner&&signupEmail===legacyOwner){
+          const legacyIdentity=await authenticate(request,env);
+          if(String(legacyIdentity.email||'').trim().toLowerCase()!==signupEmail){const e=new Error('Legacy owner identity could not be verified.');e.status=403;throw e}
+          incoming.legacyVerified=true;
+        }
+        const result=await signup(request,env,incoming);
         return json({authenticated:true,user:result.user},201,{'set-cookie':authCookie(result.session,request)});
       }catch(error){return json({error:error.message||'Could not create account.'},Number(error.status)||500)}
     }
