@@ -12,6 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketSearch, testMarketConnection } from './markets.js';
+import { financeSummary, createFinanceLinkToken, exchangeFinancePublicToken, syncFinance, disconnectFinanceItem } from './plaid.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
@@ -213,6 +214,22 @@ async function handleApi(request,env,identity){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});
     if(p==='/api/update/start'&&method==='POST')return json({error:'Cloud deployments are managed by Cloudflare Workers Builds from GitHub.'},409);
+  }
+
+  if(p==='/api/finance'&&method==='GET')return json(await financeSummary(env,identity,{sync:true}));
+  if(p==='/api/finance/link-token'&&method==='POST')return json(await createFinanceLinkToken(env,identity));
+  if(p==='/api/finance/exchange'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await exchangeFinancePublicToken(env,identity,incoming.publicToken,incoming.metadata||{}));
+  }
+  if(p==='/api/finance/sync'&&method==='POST'){
+    await syncFinance(env,identity,{force:true});
+    return json(await financeSummary(env,identity,{sync:false}));
+  }
+  if(p==='/api/finance/disconnect'&&method==='POST'){
+    const incoming=await body(request);
+    await disconnectFinanceItem(env,identity,incoming.itemId);
+    return json(await financeSummary(env,identity,{sync:false}));
   }
 
   let state=await loadState(env);
