@@ -3408,6 +3408,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/finance' && req.method === 'GET') return json(res, 200, await plaidFinance.summary(true));
     if (p === '/api/finance/link-token' && req.method === 'POST') return json(res, 200, await plaidFinance.linkToken());
+    if (p === '/api/finance/preferences' && req.method === 'PUT') return json(res, 200, await plaidFinance.savePreferences(await body(req)));
     if (p === '/api/finance/exchange' && req.method === 'POST') {
       const incoming = await body(req);
       return json(res, 200, await plaidFinance.exchange(incoming.publicToken, incoming.metadata || {}));

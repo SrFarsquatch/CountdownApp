@@ -71,7 +71,12 @@ function normalizeDb(value) {
   return {
     connections: Array.isArray(source.connections) ? source.connections : [],
     accounts: Array.isArray(source.accounts) ? source.accounts : [],
-    transactions: Array.isArray(source.transactions) ? source.transactions : []
+    transactions: Array.isArray(source.transactions) ? source.transactions : [],
+    preferences: {
+      monthlySpendingTarget: Number.isFinite(Number(source.preferences?.monthlySpendingTarget)) && Number(source.preferences.monthlySpendingTarget) > 0
+        ? Number(source.preferences.monthlySpendingTarget)
+        : null
+    }
   };
 }
 function mapAccount(account, itemId) {
@@ -278,6 +283,19 @@ module.exports = function createPlaidFinance(options = {}) {
       save(db);
       return { ok: true };
     },
+    async savePreferences(payload = {}) {
+      const db = load();
+      const raw = payload.monthlySpendingTarget;
+      const parsed = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+      if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0 || parsed > 100000000)) {
+        const error = new Error('Monthly spending target must be a positive number.');
+        error.status = 400;
+        throw error;
+      }
+      db.preferences = { monthlySpendingTarget: parsed && parsed > 0 ? parsed : null };
+      save(db);
+      return this.summary(false);
+    },
     async summary(sync = true) {
       const db = load();
       const errors = configured(env) && sync ? await this.sync(false) : [];
@@ -297,7 +315,11 @@ module.exports = function createPlaidFinance(options = {}) {
         environment: plaidEnvironment(env),
         connections,
         accounts: [...fresh.accounts].sort((a, b) => (a.type || '').localeCompare(b.type || '') || (a.name || '').localeCompare(b.name || '')),
-        transactions: [...fresh.transactions].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 100),
+        transactions: [...fresh.transactions]
+          .filter(x => !x.date || new Date(x.date + 'T12:00:00').getTime() >= Date.now() - 400 * 86400000)
+          .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+          .slice(0, 1500),
+        preferences: { monthlySpendingTarget: fresh.preferences?.monthlySpendingTarget ?? null },
         errors,
         lastSyncedAt: connections.map(x => x.lastSyncedAt).filter(Boolean).sort().at(-1) || null
       };

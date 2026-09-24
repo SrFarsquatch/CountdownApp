@@ -85,7 +85,58 @@
 .market-price{font-size:23px;font-weight:880;letter-spacing:-.04em;margin-top:9px}.market-change{font-size:11px;font-weight:850;margin-top:3px}.market-change.up{color:#238636}.market-change.down{color:#c62828}
 .market-meta{font-size:10px;color:var(--muted);margin-top:7px}.market-watchlist{display:grid;gap:7px}.market-watch-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--panel2)}
 .market-search-results{display:grid;gap:6px;max-height:240px;overflow:auto}.market-search-result{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 10px}.market-search-result:hover{border-color:var(--text)}
-.finance-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.finance-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.finance-stat{padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.finance-stat b{display:block;font-size:25px;letter-spacing:-.045em;margin-top:3px}.finance-stat span{color:var(--muted);font-size:11px}.finance-section{margin-top:18px}.finance-section-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin-bottom:10px}.finance-section-head h3{margin:0}.finance-connection-list{display:grid;gap:8px}.finance-connection{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}.finance-account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.finance-account{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.finance-account-name{font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.finance-account-balance{font-size:24px;font-weight:880;letter-spacing:-.04em;margin-top:9px}.finance-transactions{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}.finance-transaction{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 13px;border-top:1px solid var(--line)}.finance-transaction:first-child{border-top:0}.finance-transaction-name{font-weight:780;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.finance-transaction-amount{font-weight:850;text-align:right;white-space:nowrap}.finance-transaction-amount.inflow{color:var(--green)}.finance-transaction-amount.outflow{color:var(--text)}.finance-markets{margin-top:28px;padding-top:22px;border-top:1px solid var(--line)}.finance-markets-head{margin-bottom:14px}.finance-markets-head h3{font-size:22px;margin:0}.finance-markets-head p{margin:4px 0 0;color:var(--muted)}@media(max-width:900px){.finance-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.finance-stat-grid,.finance-account-grid{grid-template-columns:1fr}.finance-section-head{align-items:flex-start;flex-direction:column}.finance-actions{width:100%}.finance-actions .btn{flex:1}}
+.finance-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.finance-hero{margin-bottom:14px}
+.finance-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.finance-stat-grid-four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.finance-stat{padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.finance-stat b{display:block;font-size:25px;letter-spacing:-.045em;margin-top:3px}
+.finance-stat span{color:var(--muted);font-size:11px}
+.finance-stat small{display:block;color:var(--muted);font-size:10px;margin-top:5px}
+.finance-stat.positive b{color:var(--green)}.finance-stat.negative b{color:var(--danger)}
+.finance-dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:4px}
+.finance-clean-card{min-width:0;padding:16px}
+.finance-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
+.finance-card-head h3{margin:3px 0 0;font-size:17px}
+.finance-budget-number{font-size:31px;font-weight:880;letter-spacing:-.05em;line-height:1}
+.finance-budget-copy{margin-top:6px;color:var(--muted);font-size:11px}
+.finance-budget-progress{height:9px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:13px}
+.finance-budget-progress i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.finance-budget-progress.over i{background:var(--danger)}
+.finance-category-list{display:grid;gap:10px}
+.finance-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.finance-category-name{font-size:12px;font-weight:790;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finance-category-amount{font-size:12px;font-weight:850;white-space:nowrap}
+.finance-category-track{grid-column:1/-1;height:5px;border-radius:999px;background:var(--panel2);overflow:hidden}
+.finance-category-track i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.finance-section{margin-top:22px}
+.finance-section-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin-bottom:10px}
+.finance-section-head h3{margin:0}
+.finance-section-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.finance-connection-list{display:grid;gap:8px}
+.finance-connection{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.finance-account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.finance-account{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.finance-account-name{font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finance-account-balance{font-size:24px;font-weight:880;letter-spacing:-.04em;margin-top:9px}
+.finance-search-row{margin-bottom:8px}.finance-search-row input{max-width:360px;background:var(--panel)}
+.finance-transactions{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.finance-transaction{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 13px;border-top:1px solid var(--line)}
+.finance-transaction:first-child{border-top:0}
+.finance-transaction-name{font-weight:780;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finance-transaction-amount{font-weight:850;text-align:right;white-space:nowrap}
+.finance-transaction-amount.inflow{color:var(--green)}.finance-transaction-amount.outflow{color:var(--text)}
+.finance-transaction-detail{color:var(--muted);font-size:10px;margin-top:2px}
+.finance-markets{margin-top:28px;padding-top:22px;border-top:1px solid var(--line)}
+.finance-markets-head{margin-bottom:14px}.finance-markets-head h3{font-size:22px;margin:0}.finance-markets-head p{margin:4px 0 0;color:var(--muted)}
+.finance-watchlist-details{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.finance-watchlist-details summary{cursor:pointer;list-style:none;padding:11px 13px;font-size:12px;font-weight:820}
+.finance-watchlist-details summary::-webkit-details-marker{display:none}
+.finance-watchlist-details summary:after{content:'+';float:right;color:var(--muted)}
+.finance-watchlist-details[open] summary:after{content:'−'}
+.finance-watchlist-tools{padding:0 12px 12px}
+@media(max-width:1000px){.finance-stat-grid-four{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-dashboard-grid{grid-template-columns:1fr}.finance-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.finance-stat-grid,.finance-stat-grid-four,.finance-account-grid{grid-template-columns:1fr}.finance-section-head{align-items:flex-start;flex-direction:column}.finance-section-meta{justify-content:flex-start}.finance-actions{width:100%}.finance-actions .btn{flex:1}.finance-search-row input{max-width:none}}
 
 @media(max-width:900px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.market-grid{grid-template-columns:1fr}}
 .list{display:grid;gap:8px}.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}.item:first-child{border-top:0}.check{width:20px;height:20px;border-radius:7px;border:1.5px solid var(--line);background:transparent;display:grid;place-items:center}.check.done{background:var(--text);border-color:var(--text);color:var(--panel)}.title{font-weight:760}.meta{color:var(--muted);font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:var(--panel2);border:1px solid var(--line)}.pill.high,.pill.urgent{color:var(--danger)}.pill.medium{color:var(--orange)}.pill.low{color:var(--green)}.progress{height:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:var(--accent)}.count-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.count-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel2)}.count-card strong{display:block;font-size:28px;letter-spacing:-.05em;margin:6px 0}.count-card strong.dense{font-size:20px;letter-spacing:-.025em;line-height:1.25}.count-options{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px}.count-options label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:750;color:var(--muted)}.count-options input{width:16px;height:16px;min-height:0;padding:0}.count-card small{color:var(--muted)}.calendar-shell{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px}.mini{padding:15px}.mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;text-align:center}.mini-grid span{padding:6px 2px;border-radius:7px}.mini-grid .today{background:var(--text);color:var(--panel)}.week{overflow:auto;padding:0}.week-head{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));border-bottom:1px solid var(--line)}.week-head div{padding:12px;border-left:1px solid var(--line);font-weight:760}.week-body{display:grid;grid-template-columns:70px repeat(7,minmax(120px,1fr));min-height:620px;background:linear-gradient(to bottom,transparent 49px,var(--line) 50px,transparent 51px);background-size:100% 50px}.time-col{border-right:1px solid var(--line)}.time-col div{height:50px;padding:2px 8px;color:var(--muted);font-size:11px}.day-col{position:relative;border-right:1px solid var(--line);min-height:620px;padding:6px}.event-block{position:relative;margin:4px 0;padding:8px 9px;border-radius:10px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));font-size:12px}.event-block b{display:block}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}.seg button{border:0;background:transparent;border-radius:7px;padding:7px 10px;font-weight:750;color:var(--muted)}.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:12px;font-weight:800;color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 11px;outline:none}textarea{min-height:90px;resize:vertical}.field.full{grid-column:1/-1}.modal-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(5px);z-index:100;padding:22px;align-items:center;justify-content:center}.modal-wrap.open{display:flex}.modal{width:min(640px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.25)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 18px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0}.modal-body{padding:18px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.empty{padding:28px;text-align:center;color:var(--muted)}.goal-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.goal-card h3{margin:4px 0 10px}.goal-number{font-size:28px;font-weight:850;letter-spacing:-.04em}.goal-actions,.row-actions{display:flex;gap:8px;margin-top:12px}.tiny{padding:6px 9px;font-size:12px}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.setting-card h3{margin:4px 0 12px}.account-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px;background:var(--panel2)}.account-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.account-title{font-weight:820;overflow-wrap:anywhere}.calendar-list{display:grid;gap:8px;margin-top:10px}.calendar-list label{display:flex;align-items:center;gap:8px}.calendar-list input{width:16px;height:16px;min-height:0;padding:0}.setting-row{display:grid;grid-template-columns:1fr minmax(150px,240px);gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.setting-row:first-of-type{border-top:0}.preview{padding:12px;background:#d7d6d1;border-radius:14px}.preview img{width:100%;display:block;background:white;border:1px solid #aaa;border-radius:8px}.quick{position:fixed;right:24px;bottom:24px;width:54px;height:54px;border:0;border-radius:18px;background:var(--accent);color:var(--accent-contrast);font-size:26px;box-shadow:0 12px 30px rgba(0,0,0,.2);z-index:40}.mobile-nav{display:none}
@@ -1397,32 +1448,60 @@ body.modal-open{overflow:hidden}
 </section>
 
 <section class="view" id="view-markets">
-  <div class="hero">
-    <div><h2>Finance</h2><p>Connected accounts, everyday spending, and the markets you follow.</p></div>
+  <div class="hero finance-hero">
+    <div><h2>Finance</h2><p>A simple view of your money, updated from your connected accounts.</p></div>
     <div class="finance-actions"><button class="btn" id="financeSyncButton" type="button">Sync</button><button class="btn primary" id="connectBankButton" type="button">+ Connect bank</button></div>
   </div>
   <div id="financeStatus" class="notice" style="display:none"></div>
-  <div id="financeStats" class="finance-stat-grid"></div>
+
+  <div id="financeStats" class="finance-stat-grid finance-stat-grid-four"></div>
+
+  <div class="finance-dashboard-grid">
+    <div class="card finance-clean-card">
+      <div class="finance-card-head">
+        <div><div class="eyebrow">This month</div><h3>Monthly budget</h3></div>
+        <button class="btn tiny ghost" id="financeBudgetButton" type="button">Set target</button>
+      </div>
+      <div id="financeBudgetOverview"></div>
+    </div>
+    <div class="card finance-clean-card">
+      <div class="finance-card-head"><div><div class="eyebrow">Automatic</div><h3>Spending by category</h3></div></div>
+      <div id="financeCategories"></div>
+    </div>
+  </div>
 
   <div class="finance-section">
-    <div class="finance-section-head"><div><div class="eyebrow">Banking</div><h3>Accounts</h3></div><span class="pill" id="financeProviderStatus">Plaid</span></div>
+    <div class="finance-section-head">
+      <div><div class="eyebrow">Banking</div><h3>Accounts</h3></div>
+      <div class="finance-section-meta"><span class="meta" id="financeLastSynced"></span><span class="pill" id="financeProviderStatus">Plaid</span></div>
+    </div>
     <div id="financeConnections" class="finance-connection-list"></div>
     <div id="financeAccounts" class="finance-account-grid" style="margin-top:10px"></div>
   </div>
 
   <div class="finance-section">
-    <div class="finance-section-head"><div><div class="eyebrow">Cash flow</div><h3>Recent transactions</h3></div><span class="meta" id="financeLastSynced"></span></div>
+    <div class="finance-section-head">
+      <div><div class="eyebrow">Activity</div><h3>Recent transactions</h3></div>
+      <span class="meta" id="financeTransactionCount"></span>
+    </div>
+    <div class="finance-search-row"><input id="financeTransactionSearch" type="search" placeholder="Search transactions"></div>
     <div id="financeTransactions" class="finance-transactions"></div>
   </div>
 
   <div class="finance-markets">
-    <div class="finance-section-head finance-markets-head"><div><div class="eyebrow">Investing</div><h3>Markets</h3><p>Market data from Yahoo Finance, cached by Quest Log.</p></div><span class="pill" id="marketProviderStatus">Yahoo Finance</span></div>
+    <div class="finance-section-head finance-markets-head">
+      <div><div class="eyebrow">Investing</div><h3>Market watch</h3><p>Your watchlist updates automatically.</p></div>
+      <span class="pill" id="marketProviderStatus">Yahoo Finance</span>
+    </div>
     <div id="marketStatus" class="notice" style="display:none"></div>
     <div id="marketGrid" class="market-grid"></div>
-    <div class="settings-grid" style="margin-top:14px">
-      <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><p class="meta">Pick the securities you want Quest Log to follow. Prices update automatically.</p><div id="marketWatchlist" class="market-watchlist"></div></div>
-      <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Yahoo Finance</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
-    </div>
+    <details class="finance-watchlist-details">
+      <summary>Manage watchlist</summary>
+      <div class="settings-grid finance-watchlist-tools">
+        <div class="card setting-card"><div class="eyebrow">Watchlist</div><h3>Symbols</h3><div id="marketWatchlist" class="market-watchlist"></div></div>
+        <div class="card setting-card"><div class="eyebrow">Add symbol</div><h3>Search Yahoo Finance</h3><div class="weather-search"><div class="weather-search-row"><input id="marketSearchInput" placeholder="Ticker or company name"><button class="btn tiny" id="marketSearchButton" type="button">Search</button></div><div id="marketSearchResults" class="market-search-results"></div></div></div>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -1607,7 +1686,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',financeData=null,financeError='',plaidLinkLoading=false,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',financeData=null,financeError='',plaidLinkLoading=false,financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -3180,40 +3259,104 @@ $('saveDisplay').onclick=async()=>{
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const el=$(b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent);const old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,1200)}catch{prompt('Copy this URL:',el.textContent)}});
 $('rotateDisplayToken').onclick=async()=>{if(!confirm('Rotate the private display token? Existing FrameOS URLs will stop working.'))return;await api('/api/display/rotate-token',{method:'POST'});state=await api('/api/state');renderDisplay()};
 
+const FINANCE_CATEGORY_LABELS={
+ INCOME:'Income',TRANSFER_IN:'Transfers in',TRANSFER_OUT:'Transfers',LOAN_PAYMENTS:'Debt payments',
+ BANK_FEES:'Bank fees',ENTERTAINMENT:'Entertainment',FOOD_AND_DRINK:'Food & dining',
+ GENERAL_MERCHANDISE:'Shopping',HOME_IMPROVEMENT:'Home',MEDICAL:'Health',
+ PERSONAL_CARE:'Personal care',GENERAL_SERVICES:'Services',GOVERNMENT_AND_NON_PROFIT:'Government & giving',
+ TRANSPORTATION:'Transportation',TRAVEL:'Travel',RENT_AND_UTILITIES:'Housing & utilities'
+};
 function financeMoney(value,currency='CAD'){
  const number=Number(value);if(!Number.isFinite(number))return '—';
  try{return new Intl.NumberFormat(undefined,{style:'currency',currency:currency||'CAD',maximumFractionDigits:2}).format(number)}
  catch{return (currency||'')+' '+number.toFixed(2)}
 }
 function financeDate(value){
- if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleDateString([],{month:'short',day:'numeric'});
+ if(!value)return'';const d=new Date(value+'T12:00:00');return Number.isNaN(d.getTime())?String(value):d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
+function financeMonthKey(value){const m=/^(\d{4})-(\d{2})/.exec(String(value||''));return m?m[1]+'-'+m[2]:''}
+function financeCurrentMonthKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function financeCategoryKey(t){return String(t?.categoryPrimary||'OTHER').toUpperCase()||'OTHER'}
+function financeCategoryLabel(key){const k=String(key||'OTHER').toUpperCase();return FINANCE_CATEGORY_LABELS[k]||k.toLowerCase().replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}
+function financeExcludedSpend(t){return['INCOME','TRANSFER_IN','TRANSFER_OUT','LOAN_PAYMENTS'].includes(financeCategoryKey(t))}
+function financePrimaryCurrency(accounts){
+ const cash=(accounts||[]).filter(a=>['depository','cash'].includes(String(a.type||'').toLowerCase()));
+ return cash.find(a=>a.currency)?.currency||(accounts||[]).find(a=>a.currency)?.currency||'CAD';
+}
+function financeInCurrency(transactions,currency){return(transactions||[]).filter(t=>!t.currency||String(t.currency).toUpperCase()===String(currency).toUpperCase())}
+function financeSpend(transactions,currency){return financeInCurrency(transactions,currency).filter(t=>!t.pending&&Number(t.amount)>0&&!financeExcludedSpend(t))}
+function financeIncome(transactions,currency){return financeInCurrency(transactions,currency).filter(t=>!t.pending&&Number(t.amount)<0&&!['TRANSFER_IN','TRANSFER_OUT'].includes(financeCategoryKey(t)))}
+function financeMonthStats(transactions,currency,key=financeCurrentMonthKey()){
+ const spent=financeSpend(transactions,currency).filter(t=>financeMonthKey(t.date)===key).reduce((s,t)=>s+Number(t.amount||0),0);
+ const income=financeIncome(transactions,currency).filter(t=>financeMonthKey(t.date)===key).reduce((s,t)=>s+Math.abs(Number(t.amount||0)),0);
+ return{spent,income,net:income-spent};
+}
+function financeSuggestedBudget(transactions,currency){
+ const now=new Date(),values=[];
+ for(let i=1;i<=3;i++){
+   const d=new Date(now.getFullYear(),now.getMonth()-i,1),key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),value=financeMonthStats(transactions,currency,key).spent;
+   if(value>0)values.push(value);
+ }
+ if(!values.length)return 0;
+ return Math.ceil((values.reduce((a,b)=>a+b,0)/values.length)/50)*50;
+}
+function financeCategories(transactions,currency){
+ const map=new Map(),key=financeCurrentMonthKey();
+ financeSpend(transactions,currency).filter(t=>financeMonthKey(t.date)===key).forEach(t=>{
+   const category=financeCategoryKey(t);map.set(category,(map.get(category)||0)+Number(t.amount||0));
+ });
+ return[...map.entries()].map(([key,amount])=>({key,label:financeCategoryLabel(key),amount})).sort((a,b)=>b.amount-a.amount);
+}
+function financeTransactionHtml(t,currency){
+ const amount=Number(t.amount)||0,outflow=amount>0,label=t.merchantName||t.name||'Transaction',display=(outflow?'-':'+')+financeMoney(Math.abs(amount),t.currency||currency);
+ const detail=[financeDate(t.date),financeCategoryLabel(financeCategoryKey(t)),t.pending?'Pending':''].filter(Boolean).join(' · ');
+ return '<div class="finance-transaction"><div><div class="finance-transaction-name">'+esc(label)+'</div><div class="finance-transaction-detail">'+esc(detail)+'</div></div><div class="finance-transaction-amount '+(outflow?'outflow':'inflow')+'">'+esc(display)+'</div></div>';
+}
+function renderFinanceCategories(items,currency){
+ const root=$('financeCategories'),rows=(items||[]).slice(0,7),max=Math.max(1,...rows.map(x=>x.amount));
+ root.innerHTML=rows.length?'<div class="finance-category-list">'+rows.map(item=>'<div class="finance-category-row"><div class="finance-category-name">'+esc(item.label)+'</div><div class="finance-category-amount">'+esc(financeMoney(item.amount,currency))+'</div><div class="finance-category-track"><i style="width:'+Math.max(4,Math.round(item.amount/max*100))+'%"></i></div></div>').join('')+'</div>':'<div class="empty">Spending categories will appear automatically after your transactions sync.</div>';
+}
+function openFinanceBudgetModal(){
+ const data=financeData||{},accounts=data.accounts||[],transactions=data.transactions||[],currency=financePrimaryCurrency(accounts),saved=Number(data.preferences?.monthlySpendingTarget)||0,suggested=financeSuggestedBudget(transactions,currency);
+ openModal('Monthly budget','<div class="field"><label>Monthly spending target</label><input id="financeBudgetInput" type="number" min="0" step="50" inputmode="decimal" value="'+(saved?esc(String(saved)):'')+'" placeholder="'+(suggested?esc(String(suggested)):'e.g. 3000')+'"></div><div class="meta" style="margin-top:8px">'+(suggested?'Based on your last few months, about '+esc(financeMoney(suggested,currency))+' is a reasonable starting point.':'Set one simple monthly spending number. Categories are tracked automatically.')+'</div><div class="modal-actions"><button class="btn" id="financeBudgetClear" type="button">Clear target</button>'+(suggested?'<button class="btn" id="financeBudgetSuggested" type="button">Use suggestion</button>':'')+'<button class="btn primary" id="financeBudgetSave" type="button">Save</button></div>');
+ const input=$('financeBudgetInput');
+ if($('financeBudgetSuggested'))$('financeBudgetSuggested').onclick=()=>{input.value=String(suggested)};
+ $('financeBudgetClear').onclick=async()=>{try{financeData=await api('/api/finance/preferences',{method:'PUT',body:JSON.stringify({monthlySpendingTarget:null})});closeModal();renderFinance()}catch(error){alert(error.message)}};
+ $('financeBudgetSave').onclick=async()=>{
+   const value=input.value.trim(),button=$('financeBudgetSave');button.disabled=true;button.textContent='Saving…';
+   try{financeData=await api('/api/finance/preferences',{method:'PUT',body:JSON.stringify({monthlySpendingTarget:value===''?null:Number(value)})});closeModal();renderFinance()}
+   catch(error){alert(error.message);button.disabled=false;button.textContent='Save'}
+ };
 }
 function renderFinance(){
- const data=financeData||{connections:[],accounts:[],transactions:[]},accounts=data.accounts||[],transactions=data.transactions||[],connections=data.connections||[];
- const configured=Boolean(data.configured);
+ const data=financeData||{connections:[],accounts:[],transactions:[],preferences:{}},accounts=data.accounts||[],transactions=data.transactions||[],connections=data.connections||[],configured=Boolean(data.configured);
+ const currency=financePrimaryCurrency(accounts),sameCurrencyAccounts=accounts.filter(a=>!a.currency||String(a.currency).toUpperCase()===String(currency).toUpperCase()),deposits=sameCurrencyAccounts.filter(a=>['depository','cash'].includes(String(a.type||'').toLowerCase()));
+ const available=deposits.reduce((sum,a)=>sum+(Number(a.availableBalance??a.currentBalance)||0),0),month=financeMonthStats(transactions,currency),target=Number(data.preferences?.monthlySpendingTarget)||0,budgetLeft=target?target-month.spent:month.net,suggested=financeSuggestedBudget(transactions,currency),categories=financeCategories(transactions,currency);
  $('financeProviderStatus').textContent=configured?'Plaid '+(data.environment==='sandbox'?'Sandbox':'connected'):'Plaid not configured';
  $('connectBankButton').disabled=!configured||plaidLinkLoading;
  $('financeSyncButton').disabled=!configured||!connections.length;
- const status=$('financeStatus');
- const messages=[];
- if(financeError)messages.push(financeError);
- if(!configured)messages.push('Bank syncing is ready in Quest Log, but Plaid credentials still need to be added to this deployment.');
- for(const error of data.errors||[])if(error?.error)messages.push(error.error);
+ const status=$('financeStatus'),messages=[];if(financeError)messages.push(financeError);if(!configured)messages.push('Plaid credentials are required before bank accounts can sync.');for(const error of data.errors||[])if(error?.error)messages.push(error.error);
  status.style.display=messages.length?'block':'none';status.textContent=messages.join(' ');
- const deposits=accounts.filter(a=>['depository','cash'].includes(String(a.type||'').toLowerCase()));
- const liquid=deposits.reduce((sum,a)=>sum+(Number(a.currentBalance)||0),0);
- const credit=accounts.filter(a=>String(a.type||'').toLowerCase()==='credit').reduce((sum,a)=>sum+Math.max(0,Number(a.currentBalance)||0),0);
- const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
- const spend30=transactions.filter(t=>!t.pending&&Number(t.amount)>0&&t.date&&new Date(t.date+'T12:00:00')>=cutoff).reduce((sum,t)=>sum+Number(t.amount||0),0);
- const primaryCurrency=deposits.find(a=>a.currency)?.currency||accounts.find(a=>a.currency)?.currency||'CAD';
  $('financeStats').innerHTML=[
-   ['Cash & deposits',financeMoney(liquid,primaryCurrency)],
-   ['Credit balance',financeMoney(credit,primaryCurrency)],
-   ['30-day outflow',financeMoney(spend30,primaryCurrency)]
- ].map(([label,value])=>'<div class="finance-stat"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>').join('');
+   ['Available cash',financeMoney(available,currency),'Connected cash accounts',''],
+   ['Money in',financeMoney(month.income,currency),'This month','positive'],
+   ['Spent',financeMoney(month.spent,currency),'This month',''],
+   [target?'Budget left':'Net this month',financeMoney(budgetLeft,currency),target?'Against '+financeMoney(target,currency)+' target':'Money in minus spending',budgetLeft<0?'negative':'']
+ ].map(([label,value,note,cls])=>'<div class="finance-stat '+cls+'"><span>'+esc(label)+'</span><b>'+esc(value)+'</b><small>'+esc(note)+'</small></div>').join('');
+ const budget=$('financeBudgetOverview');
+ if(!connections.length){
+   budget.innerHTML='<div class="finance-budget-number">—</div><div class="finance-budget-copy">Connect a bank and Quest Log will build this automatically from your transactions.</div>';
+ }else if(target){
+   const left=target-month.spent,pct=Math.round(month.spent/target*100);
+   budget.innerHTML='<div class="finance-budget-number">'+esc(financeMoney(Math.abs(left),currency))+'</div><div class="finance-budget-copy">'+(left>=0?'left this month':'over your target')+' · '+esc(financeMoney(month.spent,currency))+' of '+esc(financeMoney(target,currency))+'</div><div class="finance-budget-progress '+(left<0?'over':'')+'"><i style="width:'+Math.min(100,Math.max(0,pct))+'%"></i></div>';
+   $('financeBudgetButton').textContent='Edit target';
+ }else{
+   budget.innerHTML='<div class="finance-budget-number">'+esc(financeMoney(month.spent,currency))+'</div><div class="finance-budget-copy">spent this month'+(suggested?' · suggested target '+esc(financeMoney(suggested,currency)):'')+'</div><div class="finance-budget-progress"><i style="width:'+(suggested?Math.min(100,month.spent/suggested*100):0)+'%"></i></div>';
+   $('financeBudgetButton').textContent='Set target';
+ }
+ renderFinanceCategories(categories,currency);
  $('financeConnections').innerHTML=connections.length?connections.map(connection=>{
-   const synced=connection.lastSyncedAt?'Synced '+new Date(connection.lastSyncedAt).toLocaleString():'Waiting for first sync';
-   const meta=[synced,connection.status==='error'?connection.error:''].filter(Boolean).join(' · ');
+   const synced=connection.lastSyncedAt?'Synced '+new Date(connection.lastSyncedAt).toLocaleString():'Waiting for first sync',meta=[synced,connection.status==='error'?connection.error:''].filter(Boolean).join(' · ');
    return '<div class="finance-connection"><div><strong>'+esc(connection.institutionName||'Connected bank')+'</strong><div class="meta">'+esc(meta)+'</div></div><button class="btn tiny ghost" type="button" data-finance-disconnect="'+esc(connection.itemId)+'">Disconnect</button></div>';
  }).join(''):'<div class="empty">No bank accounts connected yet.</div>';
  $('financeConnections').querySelectorAll('[data-finance-disconnect]').forEach(button=>button.onclick=async()=>{
@@ -3222,18 +3365,14 @@ function renderFinance(){
    catch(error){financeError=error.message;renderFinance()}
  });
  $('financeAccounts').innerHTML=accounts.length?accounts.map(account=>{
-   const name=account.name||account.officialName||'Account',mask=account.mask?' •••• '+account.mask:'';
-   const balance=financeMoney(account.currentBalance,account.currency||primaryCurrency);
-   const available=account.availableBalance!=null?'Available '+financeMoney(account.availableBalance,account.currency||primaryCurrency):'';
-   return '<div class="finance-account"><div class="finance-account-name">'+esc(name+mask)+'</div><div class="meta">'+esc([account.subtype||account.type,account.currency].filter(Boolean).join(' · '))+'</div><div class="finance-account-balance">'+esc(balance)+'</div><div class="meta">'+esc(available)+'</div></div>';
+   const name=account.name||account.officialName||'Account',mask=account.mask?' •••• '+account.mask:'',balance=financeMoney(account.currentBalance,account.currency||currency),availableText=account.availableBalance!=null?'Available '+financeMoney(account.availableBalance,account.currency||currency):'';
+   return '<div class="finance-account"><div class="finance-account-name">'+esc(name+mask)+'</div><div class="meta">'+esc([account.subtype||account.type,account.currency].filter(Boolean).join(' · '))+'</div><div class="finance-account-balance">'+esc(balance)+'</div><div class="meta">'+esc(availableText)+'</div></div>';
  }).join(''):'';
- $('financeTransactions').innerHTML=transactions.length?transactions.slice(0,60).map(transaction=>{
-   const amount=Number(transaction.amount)||0,outflow=amount>0,label=transaction.merchantName||transaction.name||'Transaction';
-   const display=(outflow?'-':'+')+financeMoney(Math.abs(amount),transaction.currency||primaryCurrency);
-   const detail=[financeDate(transaction.date),String(transaction.categoryPrimary||'').replaceAll('_',' ').toLowerCase(),transaction.pending?'Pending':''].filter(Boolean).join(' · ');
-   return '<div class="finance-transaction"><div><div class="finance-transaction-name">'+esc(label)+'</div><div class="meta">'+esc(detail)+'</div></div><div class="finance-transaction-amount '+(outflow?'outflow':'inflow')+'">'+esc(display)+'</div></div>';
- }).join(''):'<div class="empty">Connected-bank transactions will appear here.</div>';
  $('financeLastSynced').textContent=data.lastSyncedAt?'Last synced '+new Date(data.lastSyncedAt).toLocaleString():'';
+ const q=String($('financeTransactionSearch')?.value||'').trim().toLowerCase(),filtered=transactions.filter(t=>!q||[(t.merchantName||t.name||''),financeCategoryLabel(financeCategoryKey(t))].some(v=>String(v).toLowerCase().includes(q)));
+ const shown=filtered.slice(0,q?80:financeTransactionLimit);
+ $('financeTransactionCount').textContent=filtered.length+' transaction'+(filtered.length===1?'':'s');
+ $('financeTransactions').innerHTML=shown.length?shown.map(t=>financeTransactionHtml(t,currency)).join(''):'<div class="empty">'+(q?'No matching transactions.':'Connected-bank transactions will appear here.')+'</div>';
 }
 async function connectFinanceBank(){
  if(plaidLinkLoading)return;plaidLinkLoading=true;renderFinance();
@@ -3266,6 +3405,8 @@ $('financeSyncButton').onclick=async()=>{
  catch(error){financeError=error.message;renderFinance()}
  finally{button.textContent='Sync';button.disabled=!(financeData?.configured&&(financeData?.connections||[]).length)}
 };
+$('financeBudgetButton').onclick=openFinanceBudgetModal;
+$('financeTransactionSearch').oninput=()=>renderFinance();
 
 async function saveMarketWatchlist(watchlist){
  await api('/api/settings',{method:'PUT',body:JSON.stringify({marketWatchlist:watchlist})});

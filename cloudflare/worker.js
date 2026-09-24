@@ -12,7 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketSearch, testMarketConnection } from './markets.js';
-import { financeSummary, createFinanceLinkToken, exchangeFinancePublicToken, syncFinance, disconnectFinanceItem } from './plaid.js';
+import { financeSummary, createFinanceLinkToken, exchangeFinancePublicToken, syncFinance, disconnectFinanceItem, saveFinancePreferences } from './plaid.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
@@ -254,6 +254,7 @@ async function handleApi(request,env,identity){
 
   if(p==='/api/finance'&&method==='GET')return json(await financeSummary(env,identity,{sync:true}));
   if(p==='/api/finance/link-token'&&method==='POST')return json(await createFinanceLinkToken(env,identity));
+  if(p==='/api/finance/preferences'&&method==='PUT')return json(await saveFinancePreferences(env,identity,await body(request)));
   if(p==='/api/finance/exchange'&&method==='POST'){
     const incoming=await body(request);
     return json(await exchangeFinancePublicToken(env,identity,incoming.publicToken,incoming.metadata||{}));

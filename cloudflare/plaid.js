@@ -144,6 +144,13 @@ async function ensureFinanceSchema(env) {
       PRIMARY KEY (user_key, transaction_id)
     )
   `).run();
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS finance_preferences (
+      user_key TEXT PRIMARY KEY,
+      monthly_spending_target REAL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_finance_accounts_user ON finance_accounts(user_key)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_finance_transactions_user_date ON finance_transactions(user_key, date DESC)').run();
 }
@@ -381,12 +388,33 @@ export async function disconnectFinanceItem(env, identity, itemId) {
   ]);
   return { ok: true };
 }
+export async function saveFinancePreferences(env, identity, payload = {}) {
+  await ensureFinanceSchema(env);
+  const userKey = await financeUserKey(identity, env);
+  const raw = payload.monthlySpendingTarget;
+  const parsed = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+  if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0 || parsed > 100000000)) {
+    const error = new Error('Monthly spending target must be a positive number.');
+    error.status = 400;
+    throw error;
+  }
+  const target = parsed && parsed > 0 ? parsed : null;
+  await env.DB.prepare(`
+    INSERT INTO finance_preferences(user_key,monthly_spending_target,updated_at)
+    VALUES(?,?,datetime('now'))
+    ON CONFLICT(user_key) DO UPDATE SET
+      monthly_spending_target=excluded.monthly_spending_target,
+      updated_at=datetime('now')
+  `).bind(userKey, target).run();
+  return financeSummary(env, identity, { sync: false });
+}
+
 export async function financeSummary(env, identity, { sync = true } = {}) {
   if (!env.DB) return { configured: false, provider: 'Plaid', environment: plaidEnvironment(env), connections: [], accounts: [], transactions: [], errors: ['D1 is not configured.'] };
   await ensureFinanceSchema(env);
   const userKey = await financeUserKey(identity, env);
   const errors = plaidConfigured(env) && sync ? await syncFinance(env, identity, { force: false }) : [];
-  const [connectionsResult, accountsResult, transactionsResult] = await Promise.all([
+  const [connectionsResult, accountsResult, transactionsResult, preferencesRow] = await Promise.all([
     env.DB.prepare(`
       SELECT item_id,institution_id,institution_name,status,last_error,last_synced_at,created_at
       FROM finance_connections WHERE user_key=? ORDER BY created_at
@@ -398,8 +426,11 @@ export async function financeSummary(env, identity, { sync = true } = {}) {
     env.DB.prepare(`
       SELECT transaction_id,item_id,account_id,name,merchant_name,amount,currency,date,authorized_date,pending,
              category_primary,category_detailed,payment_channel,website,logo_url
-      FROM finance_transactions WHERE user_key=? ORDER BY date DESC, authorized_date DESC LIMIT 100
-    `).bind(userKey).all()
+      FROM finance_transactions
+      WHERE user_key=? AND (date IS NULL OR date='' OR date>=date('now','-13 months'))
+      ORDER BY date DESC, authorized_date DESC LIMIT 1500
+    `).bind(userKey).all(),
+    env.DB.prepare('SELECT monthly_spending_target,updated_at FROM finance_preferences WHERE user_key=?').bind(userKey).first()
   ]);
   const connections = (connectionsResult.results || []).map(row => ({
     itemId: row.item_id,
@@ -448,6 +479,10 @@ export async function financeSummary(env, identity, { sync = true } = {}) {
     connections,
     accounts,
     transactions,
+    preferences: {
+      monthlySpendingTarget: preferencesRow?.monthly_spending_target == null ? null : Number(preferencesRow.monthly_spending_target),
+      updatedAt: preferencesRow?.updated_at || null
+    },
     errors,
     lastSyncedAt: connections.map(x => x.lastSyncedAt).filter(Boolean).sort().at(-1) || null
   };
