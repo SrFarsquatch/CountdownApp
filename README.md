@@ -48,8 +48,8 @@ If both runtimes are connected to the same external service, such as the same Go
 - Plaid Link can connect bank accounts without Quest Log ever receiving online-banking credentials.
 - Connected accounts, balances, and recent Transactions data are shown alongside the existing Yahoo Finance watchlist.
 - Plaid access tokens are encrypted with `APP_SECRET` and are never returned in browser API responses.
-- Cloud deployments isolate Plaid records by the authenticated Cloudflare Access identity in dedicated D1 tables.
-- Self-hosted deployments keep Plaid data in a separate `/data/finance-data.json` store; only the Plaid access token is encrypted, so treat the persistent data directory as private.
+- Cloud deployments map each authenticated identity to a stable internal **Quest Log user ID**. Plaid Items, accounts, and transactions are owned by that user ID, so one user can connect multiple institutions without exposing data to other users.
+- Self-hosted deployments keep Plaid data in a separate `/data/finance-data.json` store; the current self-hosted runtime remains a trusted single-user installation until Quest Log's native multi-user login is added. Only the Plaid access token is encrypted, so treat the persistent data directory as private.
 - This first finance slice syncs when Finance is opened (with a short cache) and when the user presses **Sync**. Budget rules, spending categories, cash-flow planning, goals, and webhook-driven background refresh are intended follow-on layers.
 
 ### Markets
