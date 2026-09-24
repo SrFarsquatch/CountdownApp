@@ -1200,40 +1200,38 @@ body.modal-open{overflow:hidden}
 
 
 /* Account controls */
+.account-avatar{overflow:hidden}
+.account-avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.account-menu-head{display:flex;align-items:center;gap:10px;padding:7px 8px 11px;border-bottom:1px solid var(--line)}
+.account-menu-avatar{width:42px;height:42px}
+.account-menu-identity{min-width:0}
+.account-menu-name{font-size:13px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-menu-email{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-editor{display:grid;gap:16px}
+.profile-photo-row{display:flex;align-items:center;gap:14px}
+.profile-photo-preview{width:76px;height:76px;flex:0 0 auto}
+.profile-photo-preview.account-avatar svg{width:34px;height:34px}
+.profile-photo-actions{display:flex;gap:7px;flex-wrap:wrap}
+.profile-photo-actions input{display:none}
+.profile-status{font-size:11px;color:var(--muted)}
+.profile-status.error{color:var(--danger)}
+.mobile-account-nav{position:relative}
+.mobile-account-nav .account-avatar{width:29px;height:29px;border:1.5px solid var(--muted);background:var(--panel2)}
+.mobile-account-nav .account-avatar svg{width:17px;height:17px}
+.mobile-account-nav[aria-expanded="true"] .account-avatar,
+.mobile-account-nav.on .account-avatar{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 @media(max-width:760px){
-  #view-today .today-hero{
-    grid-template-columns:minmax(0,1fr) auto;
-    align-items:start;
-  }
-  #view-today .today-greeting{grid-column:1;grid-row:1}
-  #view-today .mobile-account-trigger{
-    display:grid;
-    grid-column:2;
-    grid-row:1;
-    justify-self:end;
-    align-self:start;
-    width:42px;
-    min-width:42px;
-    height:42px;
-    min-height:42px;
-    padding:3px;
-    border-radius:14px;
-  }
-  #view-today .mobile-account-trigger .account-avatar{
-    width:34px;
-    height:34px;
-  }
-  #view-today .today-agent-bar{grid-column:1/-1;grid-row:2}
-  #view-today .today-hero-side{grid-column:1/-1;grid-row:3;width:100%}
   .account-menu{
-    left:auto;
-    right:14px;
-    top:calc(max(env(safe-area-inset-top),8px) + 62px);
-    bottom:auto;
-    width:min(280px,calc(100vw - 28px));
+    left:10px;
+    right:10px;
+    top:auto;
+    bottom:calc(72px + env(safe-area-inset-bottom));
+    width:auto;
+    border-radius:18px;
   }
+  .mobile-nav .mobile-account-nav{display:grid;place-items:center}
+  .mobile-nav .mobile-account-nav svg{width:17px;height:17px}
 }
-
 
 /* Friends */
 .account-menu-action{font:inherit;text-align:left;cursor:pointer}
@@ -1249,7 +1247,7 @@ body.modal-open{overflow:hidden}
 .friend-count{font-size:10px;color:var(--muted);font-weight:800}
 .friend-list{display:grid;gap:7px}
 .friend-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
-.friend-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:900;text-transform:uppercase}
+.friend-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:900;text-transform:uppercase;overflow:hidden}.friend-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .friend-copy{min-width:0}
 .friend-name{font-size:12px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .friend-email{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1276,20 +1274,30 @@ body.modal-open{overflow:hidden}
     <button class="on" data-view="today">Home</button>
     <button data-view="planner">Planner</button>
     <button data-view="markets">Finance</button>
-    <div class="sep"></div>
-    <button class="nav-with-badge" data-view="settings">Settings <span class="nav-update-badge" id="settingsUpdateBadge" hidden>Update</span></button>
   </nav>
   <div class="side-foot" id="sideFoot"><div class="side-session"><div>Self-hosted • Google Calendar • E-ink</div></div></div>
 </aside>
 <div class="account-menu" id="accountMenu" hidden>
   <div class="account-menu-head">
-    <div class="account-menu-label">Signed in as</div>
-    <div class="account-menu-email" id="accountMenuEmail"></div>
+    <span class="account-avatar account-menu-avatar" id="accountMenuAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
+    <div class="account-menu-identity">
+      <div class="account-menu-name" id="accountMenuName">Account</div>
+      <div class="account-menu-email" id="accountMenuEmail"></div>
+    </div>
   </div>
+  <button class="account-menu-action" id="accountManage" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg>
+    <span>Manage account</span>
+  </button>
   <button class="account-menu-action" id="accountFriends" type="button">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.7-3.6 2.8-5.4 5.5-5.4s4.8 1.8 5.5 5.4"></path><path d="M14.5 14.5c2.9-.5 5.1 1 5.9 4.5"></path></svg>
     <span>Friends</span>
     <span class="account-menu-badge" id="friendRequestBadge" hidden></span>
+  </button>
+  <button class="account-menu-action" id="accountSettings" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.37.36.7.6 1 .3.3.7.4 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6z"></path></svg>
+    <span>Settings</span>
+    <span class="nav-update-badge" id="settingsUpdateBadge" hidden>Update</span>
   </button>
   <a class="account-menu-action" id="accountLogout" href="/logout">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5"></path><path d="m14 8 4 4-4 4"></path><path d="M18 12H9"></path></svg>
@@ -1301,9 +1309,6 @@ body.modal-open{overflow:hidden}
 <section class="view on" id="view-today">
   <div class="hero today-hero">
     <div class="today-greeting"><h2 id="greeting">Your day</h2><p id="todayDate"></p></div>
-    <button class="mobile-account-trigger account-trigger" id="mobileAccountButton" type="button" aria-label="Open account menu" aria-expanded="false" hidden>
-      <span class="account-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
-    </button>
     <form class="today-agent-bar" id="todayAgentForm">
       <span class="today-agent-icon" aria-hidden="true">✦</span>
       <input id="todayAgentInput" autocomplete="off" placeholder="Ask Navi about your day…">
@@ -1591,7 +1596,7 @@ body.modal-open{overflow:hidden}
   <button class="on" data-view="today" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg><span class="sr-only">Home</span></button>
   <button data-view="planner" aria-label="Planner" title="Planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span class="sr-only">Planner</span></button>
   <button data-view="markets" aria-label="Finance" title="Finance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path><path d="M2 19h22"></path></svg><span class="sr-only">Finance</span></button>
-  <button data-view="settings" aria-label="More" title="More" class="mobile-more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg><span class="sr-only">More</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
+  <button id="mobileAccountNav" class="mobile-account-nav" type="button" aria-label="Account" title="Account" aria-expanded="false"><span class="account-avatar" id="mobileNavAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span><span class="sr-only">Account</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
 <div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
@@ -1765,14 +1770,23 @@ $('enableNotifications').onclick=enablePushNotifications;
 $('disableNotifications').onclick=disablePushNotifications;
 $('testNotification').onclick=testPushNotification;
 
-function accountIconMarkup(){
- return '<span class="account-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>';
+function profileAvatarData(profile=runtimeInfo?.profile){
+ const value=String(profile?.avatarData||'');
+ return /^data:image\/(?:png|jpeg|webp);base64,/i.test(value)?value:'';
+}
+function accountAvatarInner(profile=runtimeInfo?.profile){
+ const avatar=profileAvatarData(profile);
+ if(avatar)return '<img src="'+esc(avatar)+'" alt="">';
+ return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg>';
+}
+function accountIconMarkup(profile=runtimeInfo?.profile){
+ return '<span class="account-avatar">'+accountAvatarInner(profile)+'</span>';
 }
 function setAccountMenuOpen(open,source=''){
  const menu=$('accountMenu');if(!menu)return;
  menu.hidden=!open;
  menu.dataset.source=open?source:'';
- const desktop=$('desktopAccountButton'),mobile=$('mobileAccountButton');
+ const desktop=$('desktopAccountButton'),mobile=$('mobileAccountNav');
  if(desktop)desktop.setAttribute('aria-expanded',open&&source==='desktop'?'true':'false');
  if(mobile)mobile.setAttribute('aria-expanded',open&&source==='mobile'?'true':'false');
 }
@@ -1784,34 +1798,41 @@ function toggleAccountMenu(source,event){
  if(isOpen===false&&runtimeInfo?.runtime==='cloudflare')refreshFriendBadge().catch(()=>{});
 }
 function renderRuntimeSession(){
- const foot=$('sideFoot'),mobile=$('mobileAccountButton'),menuEmail=$('accountMenuEmail'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends');
+ const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
  if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
-   const email=runtimeInfo.user||'Authenticated user';
+   const profile=runtimeInfo.profile||{email:runtimeInfo.user||'',displayName:'',avatarData:''};
+   const email=profile.email||runtimeInfo.user||'Authenticated user';
+   const name=profile.displayName||email.split('@')[0]||'Account';
    const logout=runtimeInfo.logoutPath||'/logout';
-   foot.innerHTML='<button class="account-trigger" id="desktopAccountButton" type="button" aria-label="Open account menu" aria-expanded="false">'+accountIconMarkup()+'<span class="account-trigger-copy"><span class="account-trigger-label">Account</span><span class="account-trigger-email" title="'+esc(email)+'">'+esc(email)+'</span></span><span class="account-trigger-chevron">⌃</span></button>';
+   foot.innerHTML='<button class="account-trigger account-menu-toggle" id="desktopAccountButton" type="button" aria-label="Open account menu" aria-expanded="false">'+accountIconMarkup(profile)+'<span class="account-trigger-copy"><span class="account-trigger-label">'+esc(name)+'</span><span class="account-trigger-email" title="'+esc(email)+'">'+esc(email)+'</span></span><span class="account-trigger-chevron">⌃</span></button>';
    if(menuEmail)menuEmail.textContent=email;
+   if(menuName)menuName.textContent=name;
+   if(menuAvatar)menuAvatar.innerHTML=accountAvatarInner(profile);
+   if(navAvatar)navAvatar.innerHTML=accountAvatarInner(profile);
    if(logoutLink)logoutLink.href=logout;
+   if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
    if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
+   if(settingsButton)settingsButton.onclick=()=>{setAccountMenuOpen(false);setView('settings')};
    refreshFriendBadge().catch(()=>{});
-   if(mobile){
-     mobile.hidden=false;
-     mobile.title=email;
-     mobile.setAttribute('aria-label','Open account menu for '+email);
-   }
    const desktop=$('desktopAccountButton');
    if(desktop)desktop.onclick=event=>toggleAccountMenu('desktop',event);
-   if(mobile)mobile.onclick=event=>toggleAccountMenu('mobile',event);
+   if(mobile){
+     mobile.title=name;
+     mobile.setAttribute('aria-label','Open account menu for '+email);
+     mobile.onclick=event=>toggleAccountMenu('mobile',event);
+   }
  }else{
-   foot.innerHTML='<div class="side-session"><div>Self-hosted • Google Calendar • E-ink</div></div>';
-   if(mobile)mobile.hidden=true;
+   foot.innerHTML='<button class="account-trigger" id="selfHostedSettings" type="button">'+accountIconMarkup({})+'<span class="account-trigger-copy"><span class="account-trigger-label">Settings</span><span class="account-trigger-email">Self-hosted Quest Log</span></span></button>';
+   const settings=$('selfHostedSettings');if(settings)settings.onclick=()=>setView('settings');
+   if(mobile){mobile.onclick=()=>setView('settings');mobile.title='Settings';mobile.setAttribute('aria-label','Settings')}
    setAccountMenuOpen(false);
  }
 }
 
 document.addEventListener('click',event=>{
  const menu=$('accountMenu');
- if(menu&&!menu.hidden&&!event.target.closest('#accountMenu')&&!event.target.closest('.account-trigger'))setAccountMenuOpen(false);
+ if(menu&&!menu.hidden&&!event.target.closest('#accountMenu')&&!event.target.closest('.account-menu-toggle')&&!event.target.closest('#mobileAccountNav'))setAccountMenuOpen(false);
 });
 document.addEventListener('keydown',event=>{if(event.key==='Escape')setAccountMenuOpen(false)});
 
@@ -1926,6 +1947,7 @@ function renderAppView(name){
  if(visibleView!=='planner')closePlannerDrawer();
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
+ const mobileAccountNav=$('mobileAccountNav');if(mobileAccountNav)mobileAccountNav.classList.toggle('on',visibleView==='settings');
  document.body.classList.toggle('planner-mode',visibleView==='planner');
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
@@ -2005,6 +2027,47 @@ $('modalClose').onclick=closeModal;$('modalWrap').onclick=e=>{if(e.target===$('m
 function openChooser(){
  openModal('Add something','<div class="mobile-create-grid"><button class="btn" onclick="openCreate(\'event\')">Calendar event</button><button class="btn" onclick="openCreate(\'task\')">Task</button><button class="btn" onclick="openCreate(\'goal\')">Goal</button><button class="btn" onclick="openCreate(\'countdown\')">Countdown</button></div>',{sheet:true});
 }
+function readProfileFile(file){
+ return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Could not read that image.'));reader.readAsDataURL(file)});
+}
+function loadProfileImage(src){
+ return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Could not open that image.'));img.src=src});
+}
+async function prepareProfileAvatar(file){
+ if(!file||!/^image\/(png|jpeg|webp)$/i.test(file.type||''))throw new Error('Choose a PNG, JPG, or WebP image.');
+ if(file.size>10*1024*1024)throw new Error('Choose an image smaller than 10 MB.');
+ const src=await readProfileFile(file),img=await loadProfileImage(src),size=256;
+ const canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
+ const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Image editing is not supported on this device.');
+ const scale=Math.max(size/img.naturalWidth,size/img.naturalHeight),w=img.naturalWidth*scale,h=img.naturalHeight*scale;
+ ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+ return canvas.toDataURL('image/jpeg',0.84);
+}
+async function openManageAccountModal(){
+ const profile=runtimeInfo?.profile||{email:runtimeInfo?.user||'',displayName:'',avatarData:''};
+ let avatarDraft=profileAvatarData(profile);
+ openModal('Manage account','<div class="profile-editor"><div class="profile-photo-row"><span class="account-avatar profile-photo-preview" id="profileAvatarPreview">'+accountAvatarInner(profile)+'</span><div><div class="profile-photo-actions"><label class="btn tiny" for="profileAvatarFile">Choose photo</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn tiny ghost" id="profileAvatarRemove" type="button">Remove</button></div><div class="profile-status" id="profileStatus">Photos are resized to a small square profile image.</div></div></div><div class="field"><label>Display name</label><input id="profileDisplayName" maxlength="120" value="'+esc(profile.displayName||'')+'" placeholder="Your name"></div><div class="field"><label>Email</label><input value="'+esc(profile.email||'')+'" disabled></div><div class="modal-actions"><button class="btn primary" id="profileSave" type="button">Save profile</button></div></div>');
+ const preview=$('profileAvatarPreview'),fileInput=$('profileAvatarFile'),remove=$('profileAvatarRemove'),status=$('profileStatus'),save=$('profileSave');
+ fileInput.onchange=async()=>{
+   const file=fileInput.files?.[0];if(!file)return;
+   status.textContent='Preparing photo…';status.className='profile-status';
+   try{
+     avatarDraft=await prepareProfileAvatar(file);
+     preview.innerHTML=accountAvatarInner({avatarData:avatarDraft});
+     status.textContent='Photo ready to save.';
+   }catch(error){status.textContent=error.message||'Could not prepare that photo.';status.className='profile-status error'}
+ };
+ remove.onclick=()=>{avatarDraft='';preview.innerHTML=accountAvatarInner({avatarData:''});status.textContent='Profile photo will be removed.';status.className='profile-status'};
+ save.onclick=async()=>{
+   save.disabled=true;status.textContent='Saving profile…';status.className='profile-status';
+   try{
+     const updated=await api('/api/profile',{method:'PUT',body:JSON.stringify({displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft})});
+     runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;
+     renderRuntimeSession();
+     closeModal();
+   }catch(error){status.textContent=error.message||'Could not save profile.';status.className='profile-status error';save.disabled=false}
+ };
+}
 function friendInitial(person){
  const source=String(person?.displayName||person?.email||'?').trim();
  return (source[0]||'?').toUpperCase();
@@ -2022,12 +2085,12 @@ async function refreshFriendBadge(){
  return data;
 }
 function friendRowHtml(person,kind){
- const label=friendLabel(person),email=String(person?.email||'');
+ const label=friendLabel(person),email=String(person?.email||''),avatar=profileAvatarData(person);
  let actions='';
  if(kind==='incoming')actions='<div class="friend-actions"><button class="btn tiny primary" data-friend-action="accept" data-friendship-id="'+esc(person.friendshipId)+'">Accept</button><button class="btn tiny ghost" data-friend-action="decline" data-friendship-id="'+esc(person.friendshipId)+'">Decline</button></div>';
  else if(kind==='outgoing')actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Cancel</button></div>';
  else actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Remove</button></div>';
- return '<div class="friend-row"><div class="friend-avatar">'+esc(friendInitial(person))+'</div><div class="friend-copy"><div class="friend-name">'+esc(label)+'</div><div class="friend-email">'+esc(email)+'</div></div>'+actions+'</div>';
+ return '<div class="friend-row"><div class="friend-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(person)))+'</div><div class="friend-copy"><div class="friend-name">'+esc(label)+'</div><div class="friend-email">'+esc(email)+'</div></div>'+actions+'</div>';
 }
 function renderFriendCollection(id,items,kind,emptyText){
  const el=$(id);if(!el)return;

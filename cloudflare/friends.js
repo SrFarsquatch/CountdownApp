@@ -30,6 +30,7 @@ function publicPerson(row){
   userId:String(row.other_user_id||''),
   email:String(row.primary_email||''),
   displayName:String(row.display_name||''),
+  avatarData:String(row.avatar_data||''),
   createdAt:row.created_at||null,
   updatedAt:row.updated_at||null,
   acceptedAt:row.accepted_at||null
@@ -40,7 +41,7 @@ export async function listFriends(env,identity){
  const current=userId(identity);
  const result=await env.DB.prepare(`
   SELECT f.friendship_id,f.user_low,f.user_high,f.requested_by,f.status,f.created_at,f.updated_at,f.accepted_at,
-         u.user_id AS other_user_id,u.primary_email,u.display_name
+         u.user_id AS other_user_id,u.primary_email,u.display_name,u.avatar_data
   FROM questlog_friendships f
   JOIN questlog_users u
     ON u.user_id=CASE WHEN f.user_low=? THEN f.user_high ELSE f.user_low END

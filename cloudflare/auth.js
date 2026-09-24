@@ -84,6 +84,7 @@ export async function ensureAuthSchema(env){
   )
  `).run();
  await ensureColumn(env.DB,'questlog_users','display_name','TEXT');
+ await ensureColumn(env.DB,'questlog_users','avatar_data','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_hash','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_salt','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_iterations','INTEGER');
@@ -148,13 +149,13 @@ async function createSession(request,env,user){
  `).bind(hash,user.user_id,expires,clean(request.headers.get('user-agent'),500),ipHash).run();
  return{token,expires};
 }
-function publicUser(row){return{userId:row.user_id,email:row.primary_email||'',displayName:row.display_name||'',createdAt:row.created_at||null}}
+function publicUser(row){return{userId:row.user_id,email:row.primary_email||'',displayName:row.display_name||'',avatarData:row.avatar_data||'',createdAt:row.created_at||null}}
 export async function nativeSession(request,env){
  await ensureAuthSchema(env);
  const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;
  const hash=await sha256Hex(token);
  const row=await env.DB.prepare(`
-  SELECT u.user_id,u.primary_email,u.display_name,u.created_at,u.status,s.expires_at
+  SELECT u.user_id,u.primary_email,u.display_name,u.avatar_data,u.created_at,u.status,s.expires_at
   FROM questlog_sessions s JOIN questlog_users u ON u.user_id=s.user_id
   WHERE s.session_hash=?
  `).bind(hash).first();
@@ -229,6 +230,26 @@ export async function login(request,env,payload={}){
  const session=await createSession(request,env,user);
  return{user:publicUser(user),session};
 }
+function normalizeAvatarData(value){
+ const raw=String(value||'').trim();
+ if(!raw)return'';
+ if(raw.length>400000){const e=new Error('Profile image is too large.');e.status=413;throw e}
+ if(!/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(raw)){const e=new Error('Profile image format is not supported.');e.status=400;throw e}
+ return raw;
+}
+export async function updateProfile(env,identity,payload={}){
+ await ensureAuthSchema(env);
+ const userId=clean(identity?.userId,120);
+ if(!userId){const e=new Error('Quest Log account is required.');e.status=401;throw e}
+ const displayName=clean(payload.displayName,120);
+ const avatarData=normalizeAvatarData(payload.avatarData);
+ await env.DB.prepare("UPDATE questlog_users SET display_name=?,avatar_data=?,updated_at=datetime('now') WHERE user_id=?")
+  .bind(displayName,avatarData||null,userId).run();
+ const user=await env.DB.prepare('SELECT * FROM questlog_users WHERE user_id=?').bind(userId).first();
+ if(!user){const e=new Error('Account was not found.');e.status=404;throw e}
+ return publicUser(user);
+}
+
 export async function logout(request,env){
  await ensureAuthSchema(env);
  const token=cookieValue(request,SESSION_COOKIE);

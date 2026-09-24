@@ -17,7 +17,7 @@ import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, 
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
-import { nativeSession, signup, login, logout, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
+import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 
 let jwksCache={expiresAt:0,keys:[]};
@@ -231,7 +231,8 @@ function ensureItemTitle(value,label,max){
 async function handleApi(request,env,identity){
   env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
-  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,profile:identity.user||{userId:identity.userId||'',email:identity.email||'',displayName:'',avatarData:''},database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/profile'&&method==='PUT')return json(await updateProfile(env,identity,await body(request)));
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
     const incoming=await body(request);
