@@ -1,19 +1,25 @@
 # Copy this file to .dev.vars for local Cloudflare Worker development.
 # Never commit .dev.vars.
 
-AUTH_BYPASS=true
-DEV_USER_EMAIL=local-dev@questlog.local
-CLOUD_WORKSPACE_ID=default
-
-# Production Access values:
-# CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
-# CF_ACCESS_AUD=your-access-application-aud
-# ALLOWED_EMAILS=you@example.com
+# Native Quest Log authentication
+# Set a long, stable APP_SECRET below.
+# ALLOW_SIGNUPS=true
+# LEGACY_OWNER_EMAIL=you@example.com
+# TURNSTILE_SITE_KEY=
+# TURNSTILE_SECRET_KEY=
 
 # Cloud-only integration secrets/variables are configured directly on the Worker:
 # GOOGLE_CLIENT_ID
 # GOOGLE_CLIENT_SECRET
 # APP_SECRET=replace-with-a-long-random-secret
+# ALLOW_SIGNUPS=true
+# LEGACY_OWNER_EMAIL=you@example.com
+# TURNSTILE_SITE_KEY
+# TURNSTILE_SECRET_KEY
+# PLAID_CLIENT_ID
+# PLAID_SECRET
+# PLAID_ENV=sandbox
+# PLAID_COUNTRY_CODES=CA
 #
 # Cloud AI provider keys can normally be entered in Quest Log itself and encrypted into D1.
 # The provider variables below are optional deployment-level fallbacks:
