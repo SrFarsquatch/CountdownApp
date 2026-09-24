@@ -1,11 +1,12 @@
-const CACHE_NAME='quest-log-pwa-v1';
+const CACHE_NAME='quest-log-pwa-v2';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
   '/branding/icon-quest.svg',
   '/branding/icon-quest-192.png',
   '/branding/icon-quest-512.png',
-  '/branding/icon-quest-maskable-512.png',
+  '/branding/icon-quest-maskable-v2-512.png',
+  '/branding/icon-quest-maskable-v2-192.png',
   '/branding/apple-touch-icon.png'
 ];
 
