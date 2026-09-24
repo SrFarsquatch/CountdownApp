@@ -592,7 +592,7 @@ export default{
       if(identity)return Response.redirect(new URL('/',url),302);
       return env.ASSETS.fetch(new Request(new URL('/login.html',url),request));
     }
-    if(path.startsWith('/branding/')||path==='/favicon.ico')return env.ASSETS.fetch(request);
+    if(path.startsWith('/branding/')||path==='/favicon.ico'||path==='/manifest.webmanifest'||path==='/service-worker.js'||path==='/offline.html')return env.ASSETS.fetch(request);
 
     const machineDisplay=path==='/frame'||path==='/api/frameos/feed'||path==='/api/frameos/image'||path==='/api/frameos/svg';
     if(machineDisplay){
