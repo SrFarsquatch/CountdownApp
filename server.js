@@ -7,6 +7,7 @@ const YahooFinance = require('yahoo-finance2').default;
 const puppeteer = require('puppeteer-core');
 const { quantizeSpectra6 } = require('./eink/quantize.cjs');
 const { URL } = require('url');
+const createPlaidFinance = require('./plaid-finance.cjs');
 
 const PORT = Number(process.env.PORT || 8080);
 const DATA_DIR = process.env.DATA_DIR || '/data';
@@ -77,6 +78,7 @@ const HEX = {
 };
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
+const plaidFinance = createPlaidFinance({ env: process.env, dataDir: DATA_DIR });
 const id = () => Date.now().toString(36) + crypto.randomBytes(4).toString('hex');
 const iso = value => {
   if (!value) return null;
@@ -3403,6 +3405,22 @@ const server = http.createServer(async (req, res) => {
       version: cleanText(process.env.APP_VERSION, 80) || 'edge'
     });
     if (p === '/api/state' && req.method === 'GET') return json(res, 200, state());
+
+    if (p === '/api/finance' && req.method === 'GET') return json(res, 200, await plaidFinance.summary(true));
+    if (p === '/api/finance/link-token' && req.method === 'POST') return json(res, 200, await plaidFinance.linkToken());
+    if (p === '/api/finance/exchange' && req.method === 'POST') {
+      const incoming = await body(req);
+      return json(res, 200, await plaidFinance.exchange(incoming.publicToken, incoming.metadata || {}));
+    }
+    if (p === '/api/finance/sync' && req.method === 'POST') {
+      await plaidFinance.sync(true);
+      return json(res, 200, await plaidFinance.summary(false));
+    }
+    if (p === '/api/finance/disconnect' && req.method === 'POST') {
+      const incoming = await body(req);
+      await plaidFinance.disconnect(incoming.itemId);
+      return json(res, 200, await plaidFinance.summary(false));
+    }
 
     if (p === '/api/notifications/config' && req.method === 'GET') return json(res, 200, publicNotificationConfig());
     if (p === '/api/notifications/preferences' && req.method === 'PUT') {
