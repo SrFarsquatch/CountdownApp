@@ -354,6 +354,21 @@ Recommended Worker variables:
 
 Before removing Cloudflare Access from the hostname, deploy and validate the native login branch first.
 
+### Safe migration from the existing Access login
+
+For an existing Quest Log installation, use this order:
+
+1. Keep the current Cloudflare Access application/policy enabled.
+2. Set `LEGACY_OWNER_EMAIL` to the email that currently owns the personal Quest Log workspace.
+3. Deploy the native-auth build.
+4. Visit `/login` through the existing Cloudflare Access gate and create the native Quest Log account using the same email. Quest Log verifies the Access identity before copying the legacy `default` workspace into that user's private workspace.
+5. Sign out and back in to confirm the native Quest Log session and existing planner data are present.
+6. Remove or disable the Cloudflare Access application/policy protecting the main Quest Log hostname. Do not remove Worker/D1/custom-domain configuration.
+7. Optionally enable Cloudflare Turnstile and keep `ALLOW_SIGNUPS=true` for public registration, or set it to `false` for a closed beta.
+
+Do not remove Access before step 4 if you need the automatic legacy workspace claim.
+
+
 ## 4. Configure Worker secrets
 
 In **Workers & Pages → Quest Log Worker → Settings → Variables and Secrets**, add only the integrations you plan to use.
