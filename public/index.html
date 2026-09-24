@@ -1961,6 +1961,14 @@ function renderAppView(name){
  const requestedPlannerSection=PLANNER_ROUTE_SECTIONS[name]||(name==='planner'?'calendar':null);
  const requestedSettingsSection=name==='displays'?'displays':(name==='settings'?'general':null);
  const visibleView=requestedPlannerSection?'planner':(requestedSettingsSection?'settings':name);
+ if(visibleView==='planner'&&!document.body.classList.contains('planner-mode')){
+   // Home/Finance use the document scroll, while Planner owns its own viewport.
+   // Clear the previous page scroll before locking the document so Planner cannot open cropped.
+   window.scrollTo(0,0);
+   if(document.scrollingElement)document.scrollingElement.scrollTop=0;
+   document.documentElement.scrollTop=0;
+   document.body.scrollTop=0;
+ }
  if(visibleView!=='planner')closePlannerDrawer();
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
