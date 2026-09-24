@@ -88,6 +88,38 @@ export async function marketData(state,env){
   const data={provider:'Yahoo Finance',quotes,watchlist:config.watchlist,symbols:config.watchlist.map(x=>x.symbol),updatedAt:new Date().toISOString(),refreshMinutes:config.refreshMinutes,effectiveRefreshMinutes:config.refreshMinutes,batchSize:50,unofficial:true};
   state.marketCache={key,expiresAt:Date.now()+config.refreshMinutes*60000,data};if(env.DB)await saveMarketCache(env,state.marketCache);return data;
 }
+const marketHistoryCache=new Map();
+export async function marketHistory(state){
+  const config=normalizeMarkets(state.markets),watchlist=(config.watchlist||[]).slice(0,8);
+  if(!watchlist.length)return{provider:'Yahoo Finance',mode:'equal-weight',symbols:[],points:[],updatedAt:new Date().toISOString()};
+  const key='annual:'+watchlist.map(item=>item.providerSymbol).join(',');
+  const cached=marketHistoryCache.get(key);
+  if(cached&&cached.expiresAt>Date.now())return cached.data;
+  const period2=new Date(),period1=new Date(period2.getTime()-370*86400000);
+  const settled=await Promise.allSettled(watchlist.map(async item=>{
+    const chart=await yahooFinance.chart(item.providerSymbol,{period1,period2,interval:'1d'});
+    const rows=(chart?.quotes||[]).map(row=>({date:isoDate(row.date).slice(0,10),close:marketNumber(row.adjclose??row.close)})).filter(row=>row.date&&row.close!==null&&row.close>0);
+    if(rows.length<2)return null;
+    const base=rows[0].close;
+    return{symbol:item.symbol,providerSymbol:item.providerSymbol,points:rows.map(row=>({date:row.date,value:(row.close/base-1)*100}))};
+  }));
+  const series=settled.filter(result=>result.status==='fulfilled'&&result.value).map(result=>result.value);
+  const buckets=new Map();
+  for(const item of series){
+    for(const point of item.points){
+      const bucket=buckets.get(point.date)||[];
+      bucket.push(point.value);buckets.set(point.date,bucket);
+    }
+  }
+  const points=[...buckets.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,values])=>({
+    date,
+    value:values.reduce((sum,value)=>sum+value,0)/values.length
+  }));
+  const data={provider:'Yahoo Finance',mode:'equal-weight',symbols:series.map(item=>item.symbol),points,updatedAt:new Date().toISOString()};
+  if(marketHistoryCache.size>50)marketHistoryCache.clear();
+  marketHistoryCache.set(key,{expiresAt:Date.now()+10*60000,data});
+  return data;
+}
 export async function marketSearch(query,state,env){
   const q=cleanText(query,80).trim();if(!q)return[];
   let raw;
