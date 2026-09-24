@@ -165,6 +165,15 @@ export async function signup(request,env,payload={}){
   `).bind(userId,email,displayName,b64u(hash),b64u(salt),PBKDF2_ITERATIONS).run();
  }
  await clearRateLimit(request,env,email,'signup');
+ const legacyOwner=emailValue(env.LEGACY_OWNER_EMAIL);
+ if(legacyOwner&&legacyOwner===email){
+  const target='user:'+userId;
+  const existing=await env.DB.prepare('SELECT workspace_id FROM questlog_state WHERE workspace_id=?').bind(target).first().catch(()=>null);
+  const legacy=await env.DB.prepare("SELECT state_json FROM questlog_state WHERE workspace_id='default'").first().catch(()=>null);
+  if(!existing&&legacy?.state_json){
+   await env.DB.prepare("INSERT INTO questlog_state(workspace_id,state_json,schema_version,created_at,updated_at) VALUES(?,?,1,datetime('now'),datetime('now'))").bind(target,legacy.state_json).run();
+  }
+ }
  user=await env.DB.prepare('SELECT * FROM questlog_users WHERE user_id=?').bind(userId).first();
  const session=await createSession(request,env,user);
  return{user:publicUser(user),session};
