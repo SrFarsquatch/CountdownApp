@@ -18,6 +18,7 @@ import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 import { nativeSession, signup, login, logout, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
+import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -231,6 +232,19 @@ async function handleApi(request,env,identity){
   env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
   if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
+  if(p==='/api/friends/request'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await requestFriend(env,identity,incoming.email),201);
+  }
+  if(p==='/api/friends/respond'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await respondFriend(env,identity,incoming.friendshipId,incoming.action));
+  }
+  if(p==='/api/friends/remove'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await removeFriend(env,identity,incoming.friendshipId));
+  }
   if(p.startsWith('/api/update/')){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});

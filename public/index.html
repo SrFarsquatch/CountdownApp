@@ -1234,6 +1234,33 @@ body.modal-open{overflow:hidden}
   }
 }
 
+
+/* Friends */
+.account-menu-action{font:inherit;text-align:left;cursor:pointer}
+.account-menu-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-contrast);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:850}
+.friends-shell{display:grid;gap:18px}
+.friend-add-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.friend-add-form input{min-width:0}
+.friend-status{font-size:12px;color:var(--muted)}
+.friend-status.error{color:var(--danger)}
+.friend-section{display:grid;gap:8px}
+.friend-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.friend-section-head h4{margin:0;font-size:13px}
+.friend-count{font-size:10px;color:var(--muted);font-weight:800}
+.friend-list{display:grid;gap:7px}
+.friend-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.friend-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:900;text-transform:uppercase}
+.friend-copy{min-width:0}
+.friend-name{font-size:12px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.friend-email{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.friend-actions{display:flex;gap:6px;align-items:center}
+.friend-empty{padding:14px;border:1px dashed var(--line);border-radius:11px;color:var(--muted);font-size:11px;text-align:center}
+@media(max-width:520px){
+ .friend-add-form{grid-template-columns:1fr}
+ .friend-row{grid-template-columns:38px minmax(0,1fr)}
+ .friend-actions{grid-column:1/-1;justify-content:flex-end}
+}
+
 /* Prevent iOS Safari from auto-zooming focused form controls */
 @media(max-width:760px){
   input,select,textarea{font-size:16px!important}
@@ -1259,6 +1286,11 @@ body.modal-open{overflow:hidden}
     <div class="account-menu-label">Signed in as</div>
     <div class="account-menu-email" id="accountMenuEmail"></div>
   </div>
+  <button class="account-menu-action" id="accountFriends" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.7-3.6 2.8-5.4 5.5-5.4s4.8 1.8 5.5 5.4"></path><path d="M14.5 14.5c2.9-.5 5.1 1 5.9 4.5"></path></svg>
+    <span>Friends</span>
+    <span class="account-menu-badge" id="friendRequestBadge" hidden></span>
+  </button>
   <a class="account-menu-action" id="accountLogout" href="/logout">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5"></path><path d="m14 8 4 4-4 4"></path><path d="M18 12H9"></path></svg>
     <span>Log out</span>
@@ -1749,9 +1781,10 @@ function toggleAccountMenu(source,event){
  const menu=$('accountMenu');if(!menu)return;
  const isOpen=!menu.hidden&&menu.dataset.source===source;
  setAccountMenuOpen(!isOpen,source);
+ if(isOpen===false&&runtimeInfo?.runtime==='cloudflare')refreshFriendBadge().catch(()=>{});
 }
 function renderRuntimeSession(){
- const foot=$('sideFoot'),mobile=$('mobileAccountButton'),menuEmail=$('accountMenuEmail'),logoutLink=$('accountLogout');
+ const foot=$('sideFoot'),mobile=$('mobileAccountButton'),menuEmail=$('accountMenuEmail'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends');
  if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
    const email=runtimeInfo.user||'Authenticated user';
@@ -1759,6 +1792,8 @@ function renderRuntimeSession(){
    foot.innerHTML='<button class="account-trigger" id="desktopAccountButton" type="button" aria-label="Open account menu" aria-expanded="false">'+accountIconMarkup()+'<span class="account-trigger-copy"><span class="account-trigger-label">Account</span><span class="account-trigger-email" title="'+esc(email)+'">'+esc(email)+'</span></span><span class="account-trigger-chevron">⌃</span></button>';
    if(menuEmail)menuEmail.textContent=email;
    if(logoutLink)logoutLink.href=logout;
+   if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
+   refreshFriendBadge().catch(()=>{});
    if(mobile){
      mobile.hidden=false;
      mobile.title=email;
@@ -1969,6 +2004,78 @@ function closeModal(){
 $('modalClose').onclick=closeModal;$('modalWrap').onclick=e=>{if(e.target===$('modalWrap'))closeModal()};
 function openChooser(){
  openModal('Add something','<div class="mobile-create-grid"><button class="btn" onclick="openCreate(\'event\')">Calendar event</button><button class="btn" onclick="openCreate(\'task\')">Task</button><button class="btn" onclick="openCreate(\'goal\')">Goal</button><button class="btn" onclick="openCreate(\'countdown\')">Countdown</button></div>',{sheet:true});
+}
+function friendInitial(person){
+ const source=String(person?.displayName||person?.email||'?').trim();
+ return (source[0]||'?').toUpperCase();
+}
+function friendLabel(person){return String(person?.displayName||person?.email||'Quest Log user')}
+function setFriendRequestBadge(count){
+ const badge=$('friendRequestBadge');if(!badge)return;
+ const value=Math.max(0,Number(count)||0);
+ badge.hidden=value===0;badge.textContent=value>9?'9+':String(value);
+}
+async function refreshFriendBadge(){
+ if(runtimeInfo?.runtime!=='cloudflare')return null;
+ const data=await api('/api/friends');
+ setFriendRequestBadge(data.incoming?.length||0);
+ return data;
+}
+function friendRowHtml(person,kind){
+ const label=friendLabel(person),email=String(person?.email||'');
+ let actions='';
+ if(kind==='incoming')actions='<div class="friend-actions"><button class="btn tiny primary" data-friend-action="accept" data-friendship-id="'+esc(person.friendshipId)+'">Accept</button><button class="btn tiny ghost" data-friend-action="decline" data-friendship-id="'+esc(person.friendshipId)+'">Decline</button></div>';
+ else if(kind==='outgoing')actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Cancel</button></div>';
+ else actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Remove</button></div>';
+ return '<div class="friend-row"><div class="friend-avatar">'+esc(friendInitial(person))+'</div><div class="friend-copy"><div class="friend-name">'+esc(label)+'</div><div class="friend-email">'+esc(email)+'</div></div>'+actions+'</div>';
+}
+function renderFriendCollection(id,items,kind,emptyText){
+ const el=$(id);if(!el)return;
+ el.innerHTML=items?.length?items.map(item=>friendRowHtml(item,kind)).join(''):'<div class="friend-empty">'+esc(emptyText)+'</div>';
+}
+async function refreshFriendsModal(){
+ const data=await refreshFriendBadge();
+ if(!data)return;
+ renderFriendCollection('friendIncoming',data.incoming,'incoming','No incoming requests.');
+ renderFriendCollection('friendList',data.friends,'friend','No friends yet.');
+ renderFriendCollection('friendOutgoing',data.outgoing,'outgoing','No sent requests.');
+ if($('friendIncomingCount'))$('friendIncomingCount').textContent=String(data.incoming?.length||0);
+ if($('friendCount'))$('friendCount').textContent=String(data.friends?.length||0);
+ if($('friendOutgoingCount'))$('friendOutgoingCount').textContent=String(data.outgoing?.length||0);
+ document.querySelectorAll('[data-friend-action]').forEach(button=>button.onclick=async()=>{
+   const action=button.dataset.friendAction,id=button.dataset.friendshipId;
+   button.disabled=true;
+   try{
+     if(action==='accept'||action==='decline')await api('/api/friends/respond',{method:'POST',body:JSON.stringify({friendshipId:id,action})});
+     else await api('/api/friends/remove',{method:'POST',body:JSON.stringify({friendshipId:id})});
+     await refreshFriendsModal();
+   }catch(error){
+     const note=$('friendStatus');if(note){note.textContent=error.message||'Could not update friends.';note.className='friend-status error'}
+     button.disabled=false;
+   }
+ });
+}
+async function openFriendsModal(){
+ openModal('Friends','<div class="friends-shell"><div><form class="friend-add-form" id="friendAddForm"><input id="friendEmail" type="email" autocomplete="email" placeholder="Friend\'s Quest Log email" required><button class="btn primary" type="submit">Add friend</button></form><div class="friend-status" id="friendStatus">Add someone who already has a Quest Log account.</div></div><section class="friend-section"><div class="friend-section-head"><h4>Requests</h4><span class="friend-count" id="friendIncomingCount">0</span></div><div class="friend-list" id="friendIncoming"><div class="friend-empty">Loading…</div></div></section><section class="friend-section"><div class="friend-section-head"><h4>Friends</h4><span class="friend-count" id="friendCount">0</span></div><div class="friend-list" id="friendList"><div class="friend-empty">Loading…</div></div></section><section class="friend-section"><div class="friend-section-head"><h4>Sent</h4><span class="friend-count" id="friendOutgoingCount">0</span></div><div class="friend-list" id="friendOutgoing"><div class="friend-empty">Loading…</div></div></section></div>');
+ const form=$('friendAddForm'),note=$('friendStatus');
+ form.onsubmit=async event=>{
+   event.preventDefault();
+   const email=$('friendEmail').value.trim(),button=form.querySelector('button');
+   button.disabled=true;
+   note.textContent='Sending request…';note.className='friend-status';
+   try{
+     await api('/api/friends/request',{method:'POST',body:JSON.stringify({email})});
+     $('friendEmail').value='';
+     note.textContent='Friend request sent.';
+     await refreshFriendsModal();
+   }catch(error){
+     note.textContent=error.message||'Could not send friend request.';
+     note.className='friend-status error';
+   }finally{button.disabled=false}
+ };
+ try{await refreshFriendsModal()}catch(error){
+   note.textContent=error.message||'Could not load friends.';note.className='friend-status error';
+ }
 }
 function showMobileUndo(message,undoAction){
  if(!isMobileUi())return;
