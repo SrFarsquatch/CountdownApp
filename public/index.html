@@ -2394,121 +2394,96 @@ async function unifiedEventModal(preset={}){
  if(!preset.start){start.setSeconds(0,0);start.setMinutes(Math.ceil(start.getMinutes()/30)*30)}
  let end=preset.end?new Date(preset.end):new Date(start.getTime()+3600000);
  if(end<=start)end=new Date(start.getTime()+3600000);
- const startDate=preset.startDate||dateKeyLocal(start),endDate=preset.endDate||startDate;
- const questOptions=questTargets.map(cal=>'<option value="quest|||'+esc(cal.id)+'">'+esc(cal.name)+'</option>').join('');
- const initialCalendarHtml=(questOptions?'<optgroup label="Quest Log calendars">'+questOptions+'</optgroup>':'')+
-   (googleAccounts.length?'<optgroup label="Other Calendars" id="unifiedOtherCalendars"><option value="" disabled>Loading connected calendars…</option></optgroup>':'')+
-   (!questOptions&&!googleAccounts.length?'<option value="" disabled selected>No writable calendars available</option>':'');
+
+ const selectedQuestId=questTargets[0]?.id||'';
+ const questOptions=questTargets.length
+   ?questTargets.map(cal=>'<option value="'+esc(cal.id)+'" '+(String(cal.id)===String(selectedQuestId)?'selected':'')+'>'+esc(cal.name)+'</option>').join('')
+   :'<option value="" selected disabled>No Quest Log calendars available</option>';
+
  let form='<form id="unifiedEventForm"><div class="form-grid">';
  form+='<div class="field full"><label>Title</label><input id="fUnifiedEventTitle" required placeholder="Event title"></div>';
- form+='<div class="field full"><label>Calendar</label><select id="fUnifiedEventCalendar">'+initialCalendarHtml+'</select><div class="meta" id="unifiedCalendarHint">Choose a Quest Log calendar or one of your connected calendars.</div></div>';
- form+='<div class="field full" id="unifiedAllDayWrap" hidden><label><input id="fUnifiedEventAllDay" type="checkbox" style="width:auto"> All day</label></div>';
- form+='<div class="field unified-event-timed"><label>Start</label><input id="fUnifiedEventStart" type="datetime-local" required value="'+localInput(start)+'"></div>';
- form+='<div class="field unified-event-timed"><label>End</label><input id="fUnifiedEventEnd" type="datetime-local" required value="'+localInput(end)+'"></div>';
- form+='<div class="field unified-event-allday" style="display:none"><label>Start date</label><input id="fUnifiedEventStartDate" type="date" value="'+esc(startDate)+'"></div>';
- form+='<div class="field unified-event-allday" style="display:none"><label>End date</label><input id="fUnifiedEventEndDate" type="date" value="'+esc(endDate)+'"></div>';
+ form+='<div class="field"><label>Start</label><input id="fUnifiedEventStart" type="datetime-local" required value="'+localInput(start)+'"></div>';
+ form+='<div class="field"><label>End</label><input id="fUnifiedEventEnd" type="datetime-local" required value="'+localInput(end)+'"></div>';
+ form+='<div class="field"><label>Quest Log calendar</label><select id="fUnifiedQuestCalendar">'+questOptions+'</select></div>';
+ form+='<div class="field"><label>Connected calendar <span class="meta">(optional)</span></label><select id="fUnifiedConnectedCalendar"><option value="">None — Quest Log only</option>'+(googleAccounts.length?'<option value="" disabled>Loading connected calendars…</option>':'')+'</select><div class="meta">Optionally add the same event to a connected calendar.</div></div>';
  form+='<div class="field full"><label>Location</label><input id="fUnifiedEventLocation" placeholder="Optional"></div>';
  form+='<div class="field full"><label>Notes</label><textarea id="fUnifiedEventDescription" placeholder="Optional notes"></textarea></div>';
- form+='<div class="field full" id="unifiedQuestInvites"><label>Invite Quest Log friends</label>'+friendPickerHtml([])+'<div class="meta">Only accepted Quest Log friends are listed here.</div></div>';
- form+='<div class="field full" id="unifiedGoogleOptions" hidden><div class="form-grid"><div class="field"><label>Repeat</label><select id="fUnifiedEventRepeat"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div><div class="field"><label>Show as</label><select id="fUnifiedEventTransparency"><option value="opaque">Busy</option><option value="transparent">Free</option></select></div></div><div class="meta" style="margin-top:6px">Quest Log friend invites are available only on Quest Log calendars.</div></div>';
- form+='</div><div id="unifiedEventStatus" class="meta" style="margin-top:10px"></div><div class="modal-actions"><button class="btn primary" id="saveUnifiedEvent">Create event</button></div></form>';
+ form+='<div class="field full"><label>Invite Quest Log friends</label>'+friendPickerHtml([])+'<div class="meta">Only accepted Quest Log friends are listed here.</div></div>';
+ form+='</div><div id="unifiedEventStatus" class="meta" style="margin-top:10px"></div><div class="modal-actions"><button class="btn primary" id="saveUnifiedEvent" '+(questTargets.length?'':'disabled')+'>Create event</button></div></form>';
  openModal('New event',form);
 
- const target=$('fUnifiedEventCalendar'),save=$('saveUnifiedEvent'),status=$('unifiedEventStatus');
- const targetParts=()=>String(target.value||'').split('|||');
- const targetKind=()=>targetParts()[0]||'';
- const syncAllDay=()=>{
-   const google=targetKind()==='google',allDay=google&&$('fUnifiedEventAllDay').checked;
-   document.querySelectorAll('.unified-event-timed').forEach(el=>el.style.display=allDay?'none':'grid');
-   document.querySelectorAll('.unified-event-allday').forEach(el=>el.style.display=allDay?'grid':'none');
-   $('fUnifiedEventStart').required=!allDay;$('fUnifiedEventEnd').required=!allDay;
- };
- const syncTarget=()=>{
-   const google=targetKind()==='google',quest=targetKind()==='quest';
-   $('unifiedQuestInvites').hidden=!quest;
-   $('unifiedGoogleOptions').hidden=!google;
-   $('unifiedAllDayWrap').hidden=!google;
-   $('unifiedCalendarHint').textContent=google?'This event will be created directly on the connected calendar.':'This event will live in Quest Log and can be shared with Quest Log friends.';
-   save.disabled=!target.value;
-   syncAllDay();
- };
- target.onchange=syncTarget;
- $('fUnifiedEventAllDay').onchange=syncAllDay;
- syncTarget();
+ const questSelect=$('fUnifiedQuestCalendar'),connectedSelect=$('fUnifiedConnectedCalendar'),save=$('saveUnifiedEvent'),status=$('unifiedEventStatus');
 
  async function populateConnectedTargets(){
    if(!googleAccounts.length)return;
-   const group=$('unifiedOtherCalendars');
-   if(!group)return;
    const options=[];
    for(const account of googleAccounts){
      try{
        const calendars=await googleCalendarsFor(account.id);
        calendars.filter(cal=>['writer','owner'].includes(cal.accessRole)).forEach(cal=>{
          options.push({
-           value:'google|||'+account.id+'|||'+cal.id,
+           value:account.id+'|||'+cal.id,
            label:(cal.summary||'Calendar')+' — '+(account.label||account.googleId||'Google')
          });
        });
      }catch(error){console.warn('Could not load connected calendars',error)}
    }
-   group.innerHTML=options.length
-     ?options.map(option=>'<option value="'+esc(option.value)+'">'+esc(option.label)+'</option>').join('')
-     :'<option value="" disabled>No writable connected calendars</option>';
-   if(!target.value&&options.length)target.value=options[0].value;
-   syncTarget();
+   connectedSelect.innerHTML='<option value="">None — Quest Log only</option>'+
+     (options.length
+       ?options.map(option=>'<option value="'+esc(option.value)+'">'+esc(option.label)+'</option>').join('')
+       :'<option value="" disabled>No writable connected calendars</option>');
  }
  populateConnectedTargets().catch(console.warn);
 
  $('unifiedEventForm').onsubmit=async e=>{
    e.preventDefault();
-   const parts=targetParts(),kind=parts[0],title=$('fUnifiedEventTitle').value.trim();
+   const title=$('fUnifiedEventTitle').value.trim();
+   const questCalendarId=questSelect.value;
    if(!title){status.textContent='Enter an event title.';return}
-   if(!target.value){status.textContent='Choose a calendar.';return}
-   save.disabled=true;status.textContent='Creating event…';
+   if(!questCalendarId){status.textContent='Choose a Quest Log calendar.';return}
+   if(!$('fUnifiedEventStart').value||!$('fUnifiedEventEnd').value){status.textContent='Start and end times are required.';return}
+   const startIso=zonedInputToIso($('fUnifiedEventStart').value),endIso=zonedInputToIso($('fUnifiedEventEnd').value);
+   if(new Date(endIso)<=new Date(startIso)){status.textContent='Event end time must be after its start time.';return}
+   const location=$('fUnifiedEventLocation').value.trim(),description=$('fUnifiedEventDescription').value;
+   save.disabled=true;status.textContent=connectedSelect.value?'Creating event in Quest Log and connected calendar…':'Creating event…';
+
    try{
-     if(kind==='quest'){
-       if(!$('fUnifiedEventStart').value||!$('fUnifiedEventEnd').value)throw new Error('Start and end times are required.');
-       const startIso=zonedInputToIso($('fUnifiedEventStart').value),endIso=zonedInputToIso($('fUnifiedEventEnd').value);
-       if(new Date(endIso)<=new Date(startIso))throw new Error('Event end time must be after its start time.');
-       await api('/api/events',{method:'POST',body:JSON.stringify({
-         title,
-         start:startIso,
-         end:endIso,
-         location:$('fUnifiedEventLocation').value.trim(),
-         description:$('fUnifiedEventDescription').value,
-         calendarId:parts[1]||'',
-         participantIds:selectedFriendIds()
-       })});
-       closeModal();plannerEventCache.clear();await loadAll(true);
-       return;
-     }
-     if(kind==='google'){
-       const accountId=parts[1]||'',calendarId=parts.slice(2).join('|||');
-       if(!accountId||!calendarId)throw new Error('Choose a writable connected calendar.');
-       const allDay=$('fUnifiedEventAllDay').checked;
-       const payload={
-         title,
-         allDay,
-         location:$('fUnifiedEventLocation').value.trim(),
-         description:$('fUnifiedEventDescription').value,
-         transparency:$('fUnifiedEventTransparency').value,
-         repeat:$('fUnifiedEventRepeat').value
-       };
-       if(allDay){
-         payload.startDate=$('fUnifiedEventStartDate').value;
-         payload.endDate=$('fUnifiedEventEndDate').value||payload.startDate;
-       }else{
-         if(!$('fUnifiedEventStart').value||!$('fUnifiedEventEnd').value)throw new Error('Start and end times are required.');
-         payload.start=zonedInputToIso($('fUnifiedEventStart').value);
-         payload.end=zonedInputToIso($('fUnifiedEventEnd').value);
-         if(new Date(payload.end)<=new Date(payload.start))throw new Error('Event end time must be after its start time.');
+     await api('/api/events',{method:'POST',body:JSON.stringify({
+       title,
+       start:startIso,
+       end:endIso,
+       location,
+       description,
+       calendarId:questCalendarId,
+       participantIds:selectedFriendIds()
+     })});
+
+     if(connectedSelect.value){
+       const parts=connectedSelect.value.split('|||'),accountId=parts[0]||'',calendarId=parts.slice(1).join('|||');
+       if(!accountId||!calendarId)throw new Error('The connected calendar selection is invalid.');
+       try{
+         await api('/api/google/accounts/'+encodeURIComponent(accountId)+'/calendars/'+encodeURIComponent(calendarId)+'/events',{
+           method:'POST',
+           body:JSON.stringify({
+             title,
+             allDay:false,
+             start:startIso,
+             end:endIso,
+             location,
+             description,
+             transparency:'opaque',
+             repeat:'none'
+           })
+         });
+       }catch(error){
+         calendarCache={};plannerEventCache.clear();await loadAll(true);
+         status.textContent='Created in Quest Log, but could not add it to the connected calendar: '+(error.message||'Unknown error')+'.';
+         save.textContent='Created in Quest Log';
+         return;
        }
-       await api('/api/google/accounts/'+encodeURIComponent(accountId)+'/calendars/'+encodeURIComponent(calendarId)+'/events',{method:'POST',body:JSON.stringify(payload)});
-       closeModal();calendarCache={};plannerEventCache.clear();await loadAll(true);
-       return;
      }
-     throw new Error('Choose a calendar.');
+
+     closeModal();calendarCache={};plannerEventCache.clear();await loadAll(true);
    }catch(error){
      status.textContent=error.message||'Could not create event.';
      save.disabled=false;
