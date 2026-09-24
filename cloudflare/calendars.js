@@ -181,6 +181,27 @@ function inRange(value,from,to){
 function participantSet(value){
   return Array.isArray(value)?[...new Set(value.map(String).filter(Boolean))].slice(0,50):[];
 }
+async function acceptedFriendIds(env,current){
+  const result=await env.DB.prepare(`
+    SELECT CASE WHEN user_low=? THEN user_high ELSE user_low END AS friend_id
+    FROM questlog_friendships
+    WHERE status='accepted' AND (user_low=? OR user_high=?)
+  `).bind(current,current,current).all();
+  return (result.results||[]).map(row=>String(row.friend_id||'')).filter(Boolean);
+}
+async function calendarRowById(env,calendarId,current){
+  if(!calendarId)return null;
+  const row=await env.DB.prepare(`
+    SELECT c.calendar_id,c.owner_user_id,c.name,c.color,c.created_at,c.updated_at,
+           CASE WHEN c.owner_user_id=? THEN 'owner' ELSE COALESCE(m.role,'') END AS role,
+           u.primary_email AS owner_email,u.display_name AS owner_name,u.avatar_data AS owner_avatar
+    FROM questlog_calendars c
+    JOIN questlog_users u ON u.user_id=c.owner_user_id
+    LEFT JOIN questlog_calendar_members m ON m.calendar_id=c.calendar_id AND m.user_id=?
+    WHERE c.calendar_id=?
+  `).bind(current,current,calendarId).first();
+  return row||null;
+}
 function sharedItem(type,item,owner,calendar){
   return{
     ...item,
@@ -196,18 +217,29 @@ function sharedItem(type,item,owner,calendar){
 }
 export async function sharedPlannerData(env,identity,fromValue,toValue){
   await ensureSchema(env);
-  const from=new Date(fromValue),to=new Date(toValue);
+  const current=userId(identity),from=new Date(fromValue),to=new Date(toValue);
   if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||to<=from||to-from>370*86400000){const e=new Error('Invalid shared calendar date range.');e.status=400;throw e}
   const rows=await visibleCalendarRows(env,identity),calendarMap=new Map(rows.map(r=>[r.calendar_id,r]));
-  const owners=[...new Set(rows.map(r=>r.owner_user_id))],events=[],tasks=[],goals=[],countdowns=[];
+  const friends=await acceptedFriendIds(env,current);
+  const owners=[...new Set([current,...friends,...rows.map(r=>r.owner_user_id)])],events=[],tasks=[],goals=[],countdowns=[];
   for(const ownerId of owners){
     const owner=await userProfile(env,ownerId)||{user_id:ownerId};
     const state=await loadState(scopedEnv(env,ownerId));
     for(const [type,list,target] of [['event',state.events||[],events],['task',state.tasks||[],tasks],['goal',state.goals||[],goals],['countdown',state.countdowns||[],countdowns]]){
       for(const item of list){
-        const calendar=calendarMap.get(item.calendarId);
-        if(!calendar||calendar.owner_user_id!==ownerId)continue;
         if(!inRange(itemDate(item,type),from,to))continue;
+        const participants=participantSet(item.participantIds),directInvite=ownerId!==current&&participants.includes(current);
+        let calendar=calendarMap.get(item.calendarId);
+        const ownsItem=ownerId===current;
+        if(!calendar&&directInvite){
+          const raw=await calendarRowById(env,item.calendarId,current);
+          calendar=raw?{...raw,role:'participant'}:{calendar_id:item.calendarId,owner_user_id:ownerId,name:'Shared item',color:'#6c5ce7',role:'participant'};
+        }
+        if(!ownsItem&&!calendar&&!directInvite)continue;
+        if(!calendar){
+          const raw=await calendarRowById(env,item.calendarId,current);
+          calendar=raw||{calendar_id:item.calendarId,owner_user_id:ownerId,name:'Quest Log',color:'#6c5ce7',role:'owner'};
+        }
         target.push(sharedItem(type,item,owner,calendar));
       }
     }
@@ -215,19 +247,25 @@ export async function sharedPlannerData(env,identity,fromValue,toValue){
   return{events,tasks,goals,countdowns};
 }
 async function sharedItemAccess(env,identity,type,ownerUserId,itemId){
-  const calendarRows=await visibleCalendarRows(env,identity),calendarMap=new Map(calendarRows.map(r=>[r.calendar_id,r]));
+  const current=userId(identity),calendarRows=await visibleCalendarRows(env,identity),calendarMap=new Map(calendarRows.map(r=>[r.calendar_id,r]));
   const state=await loadState(scopedEnv(env,ownerUserId));
   const key=type==='event'?'events':type==='task'?'tasks':type==='goal'?'goals':type==='countdown'?'countdowns':'';
   if(!key){const e=new Error('Unsupported shared item type.');e.status=400;throw e}
   const index=(state[key]||[]).findIndex(x=>x.id===itemId);
   if(index<0){const e=new Error('Shared item was not found.');e.status=404;throw e}
-  const item=state[key][index],calendar=calendarMap.get(item.calendarId);
+  const item=state[key][index],directInvite=participantSet(item.participantIds).includes(current);
+  let calendar=calendarMap.get(item.calendarId);
+  if(ownerUserId===current&&!calendar)calendar=await calendarRowById(env,item.calendarId,current);
+  if(!calendar&&directInvite){
+    const raw=await calendarRowById(env,item.calendarId,current);
+    calendar=raw?{...raw,role:'participant'}:{calendar_id:item.calendarId,owner_user_id:ownerUserId,name:'Shared item',color:'#6c5ce7',role:'participant'};
+  }
   if(!calendar||calendar.owner_user_id!==ownerUserId){const e=new Error('You do not have access to this item.');e.status=403;throw e}
-  return{state,key,index,item,calendar};
+  return{state,key,index,item,calendar,directInvite};
 }
 export async function updateSharedItem(env,identity,type,ownerUserId,itemId,payload={}){
   const access=await sharedItemAccess(env,identity,type,ownerUserId,itemId),current=userId(identity);
-  if(access.calendar.owner_user_id!==current&&access.calendar.role!=='editor'){const e=new Error('This shared calendar is view-only.');e.status=403;throw e}
+  if(access.calendar.owner_user_id!==current&&access.calendar.role!=='editor'&&access.calendar.role!=='participant'){const e=new Error('This shared item is view-only.');e.status=403;throw e}
   let next;
   const base={...access.item,...payload,id:itemId};
   if(type==='event')next=normalizeQuestEvent(base);
@@ -240,7 +278,7 @@ export async function updateSharedItem(env,identity,type,ownerUserId,itemId,payl
 }
 export async function deleteSharedItem(env,identity,type,ownerUserId,itemId){
   const access=await sharedItemAccess(env,identity,type,ownerUserId,itemId),current=userId(identity);
-  if(access.calendar.owner_user_id!==current&&access.calendar.role!=='editor'){const e=new Error('This shared calendar is view-only.');e.status=403;throw e}
+  if(access.calendar.owner_user_id!==current&&access.calendar.role!=='editor'){const e=new Error('Only the owner or a shared-calendar editor can delete this item.');e.status=403;throw e}
   access.state[access.key].splice(access.index,1);
   await saveState(scopedEnv(env,ownerUserId),access.state);
   return{ok:true};
