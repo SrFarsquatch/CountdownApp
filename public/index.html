@@ -2595,8 +2595,17 @@ function renderMarketSummary(rootId,limit=4){
 }
 function renderHomeMarketMovers(){
  const root=$('todayMarkets');if(!root)return;
- if(!marketData){root.innerHTML='<div class="empty" style="grid-column:1/-1">'+esc(marketError||'Markets are not configured yet.')+'</div>';return}
+ if(!marketData){
+   const signature='error:'+(marketError||'Markets are not configured yet.');
+   if(root.dataset.marketSignature===signature)return;
+   root.dataset.marketSignature=signature;
+   root.innerHTML='<div class="empty" style="grid-column:1/-1">'+esc(marketError||'Markets are not configured yet.')+'</div>';
+   return;
+ }
  const quotes=marketValidQuotes().sort((a,b)=>Math.abs(Number(b.percentChange)||0)-Math.abs(Number(a.percentChange)||0)).slice(0,4);
+ const signature=quotes.map(q=>[q.providerSymbol||q.symbol,q.close,q.percentChange,q.name].join('|')).join('||')||'empty';
+ if(root.dataset.marketSignature===signature)return;
+ root.dataset.marketSignature=signature;
  root.innerHTML=quotes.length?quotes.map(q=>{
    const s=marketQuoteState(q);
    return '<div class="market-home-card">'+marketLogoMarkup(q)+'<div class="market-home-copy"><div class="market-home-symbol">'+esc(q.symbol||'')+'</div><div class="market-home-name">'+esc(q.name||[q.exchange,q.currency].filter(Boolean).join(' · '))+'</div></div><div class="market-home-quote"><div class="market-home-price">'+esc(marketMoney(q.close,q.currency))+'</div><div class="market-home-change '+s.cls+'">'+esc((Number.isFinite(s.pct)?(s.pct>=0?'+':'')+s.pct.toFixed(2)+'%':'—'))+'</div></div></div>';
