@@ -1357,6 +1357,13 @@ body.modal-open{overflow:hidden}
 .friend-email{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .friend-actions{display:flex;gap:6px;align-items:center}
 .friend-empty{padding:14px;border:1px dashed var(--line);border-radius:11px;color:var(--muted);font-size:11px;text-align:center}
+.invite-picker{display:grid;gap:7px;margin-top:6px}
+.invite-person{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer}
+.invite-person input{width:auto;margin:0}
+.invite-person-copy{min-width:0;display:grid}
+.invite-person-copy strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.invite-person-copy span{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shared-note{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:750}
 @media(max-width:520px){
  .friend-add-form{grid-template-columns:1fr}
  .friend-row{grid-template-columns:38px minmax(0,1fr)}
@@ -1774,7 +1781,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -2237,6 +2244,33 @@ function friendInitial(person){
  return (source[0]||'?').toUpperCase();
 }
 function friendLabel(person){return String(person?.displayName||person?.email||'Quest Log user')}
+async function acceptedFriends(force=false){
+ if(runtimeInfo?.runtime!=='cloudflare')return[];
+ if(!force&&Array.isArray(friendDirectory))return friendDirectory;
+ try{const data=await api('/api/friends');friendDirectory=data.friends||[];setFriendRequestBadge(data.incoming?.length||0);return friendDirectory}
+ catch{return friendDirectory||[]}
+}
+function inviteFieldHtml(selected=[]){
+ if(runtimeInfo?.runtime!=='cloudflare')return'';
+ const friends=Array.isArray(friendDirectory)?friendDirectory:[],chosen=new Set((selected||[]).map(String));
+ if(!friends.length)return '<div class="field full"><label>Quest Log friends</label><div class="meta">Add friends from your account menu first, then you can invite them here.</div></div>';
+ return '<div class="field full"><label>Invite Quest Log friends</label><div class="invite-picker">'+friends.map(friend=>'<label class="invite-person"><input type="checkbox" data-invite-user="'+esc(friend.userId)+'" '+(chosen.has(String(friend.userId))?'checked':'')+'><span class="invite-person-copy"><strong>'+esc(friendLabel(friend))+'</strong><span>'+esc(friend.email||'Quest Log friend')+'</span></span></label>').join('')+'</div><div class="meta">Invited friends see this in their own Quest Log. They cannot edit it yet.</div></div>';
+}
+function selectedInviteUserIds(){
+ return [...document.querySelectorAll('[data-invite-user]:checked')].map(x=>x.dataset.inviteUser).filter(Boolean);
+}
+function sharedReadOnlyModal(item,type){
+ const title=type==='countdown'?(item.name||'Shared countdown'):(item.title||'Shared item');
+ const rows=[];
+ if(type==='task'&&item.due)rows.push(['Due',fmtDate(item.due)+' · '+fmtTime(item.due)]);
+ if(type==='goal'&&item.deadline)rows.push(['Deadline',fmtDate(item.deadline)+' · '+fmtTime(item.deadline)]);
+ if(type==='countdown'&&item.end)rows.push(['Target',fmtDate(item.end)+' · '+fmtTime(item.end)]);
+ if(item.description)rows.push(['Notes',item.description]);
+ let body='<div class="event-detail-grid"><div class="notice">Shared by '+esc(item.sharedByName||item.sharedByEmail||'a Quest Log friend')+'. Shared items are read-only for invitees for now.</div>';
+ body+=rows.map(([label,value])=>'<div class="event-detail-row"><strong>'+esc(label)+'</strong><div>'+esc(value).replace(/\n/g,'<br>')+'</div></div>').join('');
+ body+='</div>';openModal(title,body);
+}
+
 function setFriendRequestBadge(count){
  const badge=$('friendRequestBadge');if(!badge)return;
  const value=Math.max(0,Number(count)||0);
@@ -2245,7 +2279,7 @@ function setFriendRequestBadge(count){
 async function refreshFriendBadge(){
  if(runtimeInfo?.runtime!=='cloudflare')return null;
  const data=await api('/api/friends');
- setFriendRequestBadge(data.incoming?.length||0);
+ friendDirectory=data.friends||[];setFriendRequestBadge(data.incoming?.length||0);
  return data;
 }
 function friendRowHtml(person,kind){
@@ -2322,6 +2356,7 @@ function openCreate(type,item=null){
  if(type==='countdown')return countdownModal(item);
 }
 async function eventModal(item=null,preset={}){
+ await acceptedFriends();
  const allAccounts=state?.google?.accounts||[];
  const writable=allAccounts.filter(a=>a.canWrite);
  if(!item&&!writable.length){
@@ -2358,6 +2393,7 @@ async function eventModal(item=null,preset={}){
  form+='<div class="field full"><label>Location</label><input id="fEventLocation" value="'+esc(item?.location||'')+'" placeholder="Optional"></div>';
  form+='<div class="field full"><label>Description / notes</label><textarea id="fEventDescription" placeholder="Optional notes">'+esc(item?.description||'')+'</textarea></div>';
  form+=repeatField;
+ form+=inviteFieldHtml(item?.sharedWithUserIds||[]);
  form+='<div class="field"><label>Show as</label><select id="fEventTransparency"><option value="opaque">Busy</option><option value="transparent">Free</option></select></div>';
  form+='</div><div id="eventFormStatus" class="meta" style="margin-top:10px"></div>';
  form+='<div class="modal-actions">'+(editing&&canWrite?'<button type="button" class="btn" id="deleteGoogleEvent">Delete</button>':'')+'<button class="btn primary" id="saveGoogleEvent" '+(canWrite?'':'disabled')+'>'+(editing?'Save changes':'Create event')+'</button></div></form>';
@@ -2393,7 +2429,8 @@ async function eventModal(item=null,preset={}){
      allDay:allDayValue,
      location:$('fEventLocation').value.trim(),
      description:$('fEventDescription').value,
-     transparency:$('fEventTransparency').value
+     transparency:$('fEventTransparency').value,
+     sharedWithUserIds:selectedInviteUserIds()
    };
    if(allDayValue){
      payload.startDate=$('fEventStartDate').value;payload.endDate=$('fEventEndDate').value||payload.startDate;
@@ -2422,6 +2459,8 @@ async function eventModal(item=null,preset={}){
 }
 
 async function taskModal(item){
+ if(item?.shared)return sharedReadOnlyModal(item,'task');
+ await acceptedFriends();
  const goals=(state.goals||[]).map(g=>'<option value="'+esc(g.id)+'" '+(item?.goalId===g.id?'selected':'')+'>'+esc(g.title)+'</option>').join('');
  const linked=Boolean(item?.googleTaskId);
  let form='<form id="entityForm"><div class="form-grid">';
@@ -2432,6 +2471,7 @@ async function taskModal(item){
  form+='<div class="field"><label>Status</label><select id="fStatus"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Complete</option></select></div>';
  form+='<div class="field"><label>Project / list</label><input id="fProject" value="'+esc(item?.project||'')+'" placeholder="Personal"></div>';
  form+='<div class="field full"><label>Linked goal</label><select id="fGoal"><option value="">None</option>'+goals+'</select></div>';
+ form+=inviteFieldHtml(item?.sharedWithUserIds||[]);
  form+='<div class="field full"><label>Google Tasks sync</label><select id="fGoogleTaskList" '+(linked?'disabled':'')+'><option value="">Quest Log only</option></select><div class="meta task-sync-note">'+(linked?'Linked to '+esc(item.googleTaskListTitle||'Google Tasks')+'. Changes and completion status sync both ways.':'Choose a Google Task list to sync this task both ways. Google Tasks stores due dates but not due times; Quest Log keeps the local time.')+'</div></div>';
  form+='</div><div id="taskFormStatus" class="meta" style="margin-top:8px"></div><div class="modal-actions">'+(item?'<button type="button" class="btn" id="deleteEntity">Delete</button>':'')+'<button class="btn primary">Save task</button></div></form>';
  openModal(item?'Edit task':'New task',form);
@@ -2462,7 +2502,7 @@ async function taskModal(item){
    const b={
      title:$('fTitle').value.trim(),description:$('fDesc').value,status:$('fStatus').value,
      priority:$('fPriority').value,due:$('fDue').value?zonedInputToIso($('fDue').value):null,
-     project:$('fProject').value.trim(),goalId:$('fGoal').value
+     project:$('fProject').value.trim(),goalId:$('fGoal').value,sharedWithUserIds:selectedInviteUserIds()
    };
    if(!linked&&select.value){
      const parts=select.value.split('|||');b.googleAccountId=parts[0]||'';b.googleTaskListId=parts[1]||'';
@@ -2479,7 +2519,9 @@ async function taskModal(item){
    catch(error){$('taskFormStatus').textContent=error.message}
  };
 }
-function goalModal(item){
+async function goalModal(item){
+ if(item?.shared)return sharedReadOnlyModal(item,'goal');
+ await acceptedFriends();
  openModal(item?'Edit goal':'New goal',`<form id="entityForm"><div class="form-grid">
  <div class="field full"><label>Goal</label><input id="fTitle" required value="${esc(item?.title||'')}" placeholder="Save for vacation"></div>
  <div class="field full"><label>Description</label><textarea id="fDesc">${esc(item?.description||'')}</textarea></div>
@@ -2489,18 +2531,22 @@ function goalModal(item){
  <div class="field"><label>Target</label><input id="fTarget" type="number" step="any" min="0" value="${item?.target??100}"></div>
  <div class="field"><label>Unit</label><input id="fUnit" value="${esc(item?.unit||'')}" placeholder="$, books, km…"></div>
  <div class="field"><label>Project / list</label><input id="fProject" value="${esc(item?.project||'')}"></div>
+ ${inviteFieldHtml(item?.sharedWithUserIds||[])}
  </div><div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save goal</button></div></form>`);
  $('fType').value=item?.type||'number';
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?zonedInputToIso($('fDeadline').value):null,project:$('fProject').value.trim()};await api(item?'/api/goals/'+encodeURIComponent(item.id):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={title:$('fTitle').value.trim(),description:$('fDesc').value,type:$('fType').value,current:Number($('fCurrent').value)||0,target:Number($('fTarget').value)||0,unit:$('fUnit').value.trim(),deadline:$('fDeadline').value?zonedInputToIso($('fDeadline').value):null,project:$('fProject').value.trim(),sharedWithUserIds:selectedInviteUserIds()};await api(item?'/api/goals/'+encodeURIComponent(item.id):'/api/goals',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
  if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this goal?')){await api('/api/goals/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
 }
-function countdownModal(item){
+async function countdownModal(item){
+ if(item?.shared)return sharedReadOnlyModal(item,'countdown');
+ await acceptedFriends();
  openModal(item?'Edit countdown':'New countdown',`<form id="entityForm"><div class="form-grid">
  <div class="field full"><label>Name</label><input id="fTitle" required value="${esc(item?.name||'')}" placeholder="Vacation"></div>
  <div class="field"><label>Date and time</label><input id="fEnd" type="datetime-local" required value="${item?.end?localInput(item.end):localInput(new Date(Date.now()+86400000))}"></div>
  <div class="field"><label>Accent</label><select id="fAccent"><option value="black">Black</option><option value="purple">Purple</option><option value="blue">Blue</option><option value="green">Green</option><option value="red">Red</option><option value="yellow">Yellow</option></select></div>
  <div class="field"><label>Countdown display</label><select id="fTime"><option value="days">Days only — 27 days</option><option value="compact">Days + hours — 27d 06h</option><option value="full">Days + hours + minutes — 27d 06h 14m</option><option value="precise">Days + hours + minutes + seconds</option><option value="weeks">Weeks + days — 3w 6d</option><option value="date">Target date</option></select></div>
  <div class="field"><label>Progress</label><select id="fProgress"><option value="time">Time elapsed</option><option value="manual">Manual</option><option value="none">None</option></select></div>
+ ${inviteFieldHtml(item?.sharedWithUserIds||[])}
  </div>
  <div class="count-options">
    <label><input id="fShowDate" type="checkbox"> Show target date</label>
@@ -2509,7 +2555,7 @@ function countdownModal(item){
  </div>
  <div class="modal-actions">${item?`<button type="button" class="btn" id="deleteEntity">Delete</button>`:''}<button class="btn primary">Save countdown</button></div></form>`);
  $('fAccent').value=item?.accentColor||'purple';$('fTime').value=item?.timeDisplayStyle||'days';$('fProgress').value=item?.progressMode||'time';$('fShowDate').checked=item?.showExactDate!==false;$('fShowEink').checked=item?.displayEnabled!==false;$('fPinned').checked=!!item?.pinned;
- $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:zonedInputToIso($('fEnd').value),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked};await api(item?'/api/countdowns/'+encodeURIComponent(item.id):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
+ $('entityForm').onsubmit=async e=>{e.preventDefault();const b={name:$('fTitle').value.trim(),end:zonedInputToIso($('fEnd').value),accentColor:$('fAccent').value,timeDisplayStyle:$('fTime').value,progressMode:$('fProgress').value,progressStyle:item?.progressStyle||'solid',progressStart:item?.progressStart||new Date().toISOString(),progressCurrent:item?.progressCurrent||0,progressTotal:item?.progressTotal||100,showExactDate:$('fShowDate').checked,showProgressBar:$('fProgress').value!=='none',displayEnabled:$('fShowEink').checked,pinned:$('fPinned').checked,sharedWithUserIds:selectedInviteUserIds()};await api(item?'/api/countdowns/'+encodeURIComponent(item.id):'/api/countdowns',{method:item?'PUT':'POST',body:JSON.stringify(b)});closeModal();await loadAll()};
  if(item)$('deleteEntity').onclick=async()=>{if(confirm('Delete this countdown?')){await api('/api/countdowns/'+encodeURIComponent(item.id),{method:'DELETE'});closeModal();await loadAll()}};
 }
 
@@ -2987,7 +3033,7 @@ function calendarEventModal(e){
  const calendarWritable=['writer','owner'].includes(e.accessRole||''),canEdit=Boolean(account?.canWrite)&&calendarWritable;
  let body='<div class="event-detail-grid">';
  body+='<div class="event-detail-row"><strong>When</strong><div>'+(e.allDay?'All day · '+fmtDate(e.start,{year:'numeric'}):fmtDate(e.start,{weekday:'long',year:'numeric'})+' · '+fmtTime(e.start)+' – '+fmtTime(e.end))+'</div></div>';
- body+='<div class="event-detail-row"><strong>Calendar</strong><div><span class="cal-dot" style="background:'+eventColorFor(e)+'"></span> '+esc(e.calendarName||'Google Calendar')+'<div class="meta">'+esc(e.accountLabel||'')+'</div></div></div>';
+ body+='<div class="event-detail-row"><strong>Calendar</strong><div><span class="cal-dot" style="background:'+eventColorFor(e)+'"></span> '+esc(e.calendarName||'Google Calendar')+'<div class="meta">'+esc(e.shared?('Shared by '+(e.sharedByName||e.sharedByEmail||'Quest Log friend')):(e.accountLabel||''))+'</div></div></div>';
  if(e.location)body+='<div class="event-detail-row"><strong>Location</strong><div>'+esc(e.location)+'</div></div>';
  if(e.description)body+='<div class="event-detail-row"><strong>Notes</strong><div>'+esc(e.description).replace(/\n/g,'<br>')+'</div></div>';
  if(calendarWritable&&!account?.canWrite)body+='<div class="notice">Reconnect this Google account once to let Quest Log edit events.</div>';
@@ -4274,7 +4320,7 @@ $('agentDrawerBackdrop').onclick=closeAgentDrawer;
 $('todayAgentForm').onsubmit=e=>{e.preventDefault();submitTodayAgent()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('agentDrawer').classList.contains('open'))closeAgentDrawer()});
 
-async function loadCalendarEvents(){if(!state.google.connected){calEvents=[];return}const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+30);try{calEvents=(await api('/api/google/events?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString()))).events||[]}catch(e){calEvents=[]}}
+async function loadCalendarEvents(){if(!state.google.connected&&runtimeInfo?.runtime!=='cloudflare'){calEvents=[];return}const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+30);try{calEvents=(await api('/api/google/events?from='+encodeURIComponent(start.toISOString())+'&to='+encodeURIComponent(end.toISOString()))).events||[]}catch(e){calEvents=[]}}
 async function loadWeather(){
  try{const result=await api('/api/weather');weatherData=result.weather||null;weatherError=result.error||''}
  catch(error){weatherData=null;weatherError=error.message||'Weather is unavailable.'}
