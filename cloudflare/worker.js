@@ -19,7 +19,7 @@ import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
-import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend } from './sharing.js';
+import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots } from './sharing.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -494,7 +494,11 @@ async function handleApi(request,env,identity){
   if(p==='/api/google/tasklists'&&method==='GET'){
     const accountId=url.searchParams.get('accountId');if(!accountId)return json({error:'accountId is required.'},400);return json({taskLists:await taskLists(accountId,state,env)});
   }
-  if(p==='/api/google/tasks/sync'&&method==='POST')return json({ok:true,sync:await syncGoogleTasks(state,env)});
+  if(p==='/api/google/tasks/sync'&&method==='POST'){
+    const sync=await syncGoogleTasks(state,env);
+    await refreshOwnedShareSnapshots(env,identity,'task',state.tasks||[]);
+    return json({ok:true,sync});
+  }
   if(p==='/api/google/events'&&method==='GET'){
     const from=url.searchParams.get('from'),to=url.searchParams.get('to');
     return json({events:await mergeSharedEvents(env,identity,await eventsBetween(from,to,state,env),from,to)});
