@@ -894,78 +894,149 @@ body.modal-open{overflow:hidden}
   .planner-view-choice strong{font-size:18px;color:var(--accent)}
 }
 
-/* Compact Planner date drawer */
+/* Google Calendar-style mobile Planner slide tray */
 @media(max-width:760px){
-  .mobile-planner-bar{position:relative;overflow:visible}
+  .mobile-planner-bar{
+    position:relative;
+    overflow:hidden;
+    height:auto;
+    min-height:66px;
+    grid-template-rows:55px auto;
+    padding:4px 10px 0 14px;
+    row-gap:0;
+    transition:box-shadow .22s ease;
+  }
+  .mobile-planner-bar:has(.mobile-planner-drawer.open){
+    box-shadow:0 12px 24px rgba(0,0,0,.08);
+  }
   .mobile-planner-period.drawer-open .mobile-planner-caret{transform:rotate(180deg)}
-  .mobile-planner-caret{display:inline-block;transition:transform .16s ease}
+  .mobile-planner-caret{
+    display:inline-block;
+    transition:transform .24s cubic-bezier(.2,.8,.2,1);
+  }
   .mobile-planner-drawer{
-    position:absolute;
-    top:58px;left:12px;
-    width:min(310px,calc(100vw - 24px));
-    padding:10px;
-    border:1px solid var(--line);
-    border-radius:0 0 16px 16px;
-    background:color-mix(in srgb,var(--panel) 98%,transparent);
-    box-shadow:0 16px 34px rgba(0,0,0,.16);
-    backdrop-filter:blur(18px);
+    grid-column:1/-1;
+    position:relative;
+    width:auto;
+    max-height:0;
+    margin:0 -10px 0 -14px;
+    padding:0 18px;
+    overflow:hidden;
+    border:0;
+    border-top:1px solid transparent;
+    border-radius:0;
+    background:var(--panel);
+    box-shadow:none;
     opacity:0;
-    transform:translateY(-10px) scale(.985);
-    transform-origin:top left;
+    transform:translateY(-12px);
     pointer-events:none;
-    transition:opacity .14s ease,transform .18s cubic-bezier(.2,.8,.3,1);
-    z-index:80;
+    visibility:hidden;
+    transition:
+      max-height .30s cubic-bezier(.2,.8,.2,1),
+      padding .30s cubic-bezier(.2,.8,.2,1),
+      opacity .18s ease,
+      transform .30s cubic-bezier(.2,.8,.2,1),
+      border-color .22s ease,
+      visibility 0s linear .30s;
+    z-index:1;
   }
   .mobile-planner-drawer.open{
-    opacity:1;transform:translateY(0) scale(1);pointer-events:auto;
+    max-height:230px;
+    padding:10px 18px 13px;
+    border-top-color:color-mix(in srgb,var(--line) 72%,transparent);
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+    visibility:visible;
+    transition:
+      max-height .32s cubic-bezier(.2,.8,.2,1),
+      padding .32s cubic-bezier(.2,.8,.2,1),
+      opacity .18s ease .04s,
+      transform .32s cubic-bezier(.2,.8,.2,1),
+      border-color .22s ease,
+      visibility 0s;
   }
   .mobile-planner-view-row{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:5px;
-    padding-bottom:9px;border-bottom:1px solid var(--line);
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    padding:0 0 10px;
+    border-bottom:1px solid color-mix(in srgb,var(--line) 68%,transparent);
   }
   .mobile-planner-view-row button{
-    min-height:38px;border:0;border-radius:10px;
-    background:transparent;color:var(--text);
-    font-size:12px;font-weight:800;
+    min-height:44px;
+    border:0;
+    border-radius:12px;
+    background:transparent;
+    color:var(--text);
+    font-size:13px;
+    font-weight:820;
+    transition:background .16s ease,color .16s ease,transform .12s ease;
   }
   .mobile-planner-view-row button.on{
-    background:var(--accent-soft);color:var(--accent);
+    background:var(--accent-soft);
+    color:var(--accent);
   }
   .mobile-planner-view-row button:active{transform:scale(.97)}
-  .mobile-planner-drawer-settings{display:grid;padding-top:4px}
+  .mobile-planner-drawer-settings{
+    display:grid;
+    padding-top:3px;
+  }
   .mobile-planner-drawer-settings label{
-    min-height:54px;
-    display:grid;grid-template-columns:minmax(0,1fr) auto;
-    gap:14px;align-items:center;
-    padding:7px 4px;
+    min-height:58px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:16px;
+    align-items:center;
+    padding:8px 2px;
     border-top:1px solid color-mix(in srgb,var(--line) 58%,transparent);
   }
   .mobile-planner-drawer-settings label:first-child{border-top:0}
   .mobile-planner-drawer-settings strong{
-    display:block;font-size:12px;line-height:1.2
+    display:block;
+    font-size:13px;
+    line-height:1.2;
   }
   .mobile-planner-drawer-settings small{
-    display:block;margin-top:3px;
-    color:var(--muted);font-size:9px;line-height:1.25
+    display:block;
+    margin-top:3px;
+    color:var(--muted);
+    font-size:10px;
+    line-height:1.25;
   }
   .mobile-planner-drawer-settings input[type="checkbox"]{
-    appearance:none;-webkit-appearance:none;
-    width:38px;height:22px;min-height:22px;
+    appearance:none;
+    -webkit-appearance:none;
+    width:42px;
+    height:24px;
+    min-height:24px;
     border:1px solid var(--line);
-    border-radius:999px;background:var(--panel2);
-    position:relative;transition:background .15s ease,border-color .15s ease;
+    border-radius:999px;
+    background:var(--panel2);
+    position:relative;
+    transition:background .18s ease,border-color .18s ease;
   }
   .mobile-planner-drawer-settings input[type="checkbox"]:after{
-    content:"";position:absolute;top:2px;left:2px;
-    width:16px;height:16px;border-radius:50%;
+    content:"";
+    position:absolute;
+    top:2px;
+    left:2px;
+    width:18px;
+    height:18px;
+    border-radius:50%;
     background:var(--text);
-    transition:transform .16s ease,background .16s ease;
+    transition:transform .20s cubic-bezier(.2,.8,.2,1),background .18s ease;
   }
   .mobile-planner-drawer-settings input[type="checkbox"]:checked{
-    background:var(--accent);border-color:var(--accent)
+    background:var(--accent);
+    border-color:var(--accent);
   }
   .mobile-planner-drawer-settings input[type="checkbox"]:checked:after{
-    transform:translateX(16px);background:var(--accent-contrast)
+    transform:translateX(18px);
+    background:var(--accent-contrast);
+  }
+  @media(prefers-reduced-motion:reduce){
+    .mobile-planner-drawer,.mobile-planner-caret{transition:none!important}
   }
 }
 
@@ -1468,7 +1539,7 @@ body.modal-open{overflow:hidden}
 
 <section class="view" id="view-planner">
   <div class="mobile-planner-bar" id="mobilePlannerBar">
-    <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Calendar options" aria-expanded="false"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
+    <button class="mobile-planner-period" id="mobilePlannerPeriod" type="button" aria-label="Calendar options" aria-expanded="false" aria-controls="mobilePlannerDrawer"><span id="mobilePlannerTitle">Planner</span><span class="mobile-planner-caret">▾</span></button>
     <span class="mobile-planner-spacer"></span>
     <button class="mobile-planner-icon" id="mobilePlannerSearch" type="button" aria-label="Search calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg></button>
     <button class="mobile-planner-today" id="mobilePlannerToday" type="button" aria-label="Go to today"><span id="mobilePlannerTodayNumber"></span></button>
