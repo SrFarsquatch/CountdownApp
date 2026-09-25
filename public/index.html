@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Quest Log">
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script src="https://cdn.yodlee.com/fastlink/v4/initialize.js"></script>
 <script>
 (()=>{try{
   const cached=JSON.parse(localStorage.getItem('questlog-appearance')||'{}');
@@ -1773,7 +1774,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',plaidLinkLoading=false,financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -3537,10 +3538,11 @@ function renderFinance(){
  const data=financeData||{connections:[],accounts:[],transactions:[],preferences:{}},accounts=data.accounts||[],transactions=data.transactions||[],connections=data.connections||[],configured=Boolean(data.configured);
  const currency=financePrimaryCurrency(accounts),sameCurrencyAccounts=accounts.filter(a=>!a.currency||String(a.currency).toUpperCase()===String(currency).toUpperCase()),deposits=sameCurrencyAccounts.filter(a=>['depository','cash'].includes(String(a.type||'').toLowerCase()));
  const available=deposits.reduce((sum,a)=>sum+(Number(a.availableBalance??a.currentBalance)||0),0),month=financeMonthStats(transactions,currency),target=Number(data.preferences?.monthlySpendingTarget)||0,budgetLeft=target?target-month.spent:month.net,suggested=financeSuggestedBudget(transactions,currency),categories=financeCategories(transactions,currency);
- $('financeProviderStatus').textContent=configured?'Plaid '+(data.environment==='sandbox'?'Sandbox':'connected'):'Plaid not configured';
- $('connectBankButton').disabled=!configured||plaidLinkLoading;
+ const providers=Array.isArray(data.providers)?data.providers:[],configuredProviders=providers.filter(p=>p.configured);
+ $('financeProviderStatus').textContent=configuredProviders.length?configuredProviders.map(p=>p.name+(p.environment==='sandbox'?' Sandbox':'')).join(' · '):'No bank provider configured';
+ $('connectBankButton').disabled=!configuredProviders.length||financeLinkLoading||plaidLinkLoading;
  $('financeSyncButton').disabled=!configured||!connections.length;
- const status=$('financeStatus'),messages=[];if(financeError)messages.push(financeError);if(!configured)messages.push('Plaid credentials are required before bank accounts can sync.');for(const error of data.errors||[])if(error?.error)messages.push(error.error);
+ const status=$('financeStatus'),messages=[];if(financeError)messages.push(financeError);if(!configured)messages.push('Configure Plaid, Yodlee, or Flinks before connecting a bank.');for(const error of data.errors||[])if(error?.error)messages.push((error.provider?String(error.provider).toUpperCase()+': ':'')+error.error);
  status.style.display=messages.length?'block':'none';status.textContent=messages.join(' ');
  $('financeStats').innerHTML=[
    ['Available cash',financeMoney(available,currency),'Connected cash accounts',''],
@@ -3561,9 +3563,10 @@ function renderFinance(){
  }
  renderFinanceCategories(categories,currency);
  $('financeConnections').innerHTML=connections.length?connections.map(connection=>{
-   const synced=connection.lastSyncedAt?'Synced '+new Date(connection.lastSyncedAt).toLocaleString():'Waiting for first sync',meta=[synced,connection.status==='error'?connection.error:''].filter(Boolean).join(' · ');
-   return '<div class="finance-connection"><div><strong>'+esc(connection.institutionName||'Connected bank')+'</strong><div class="meta">'+esc(meta)+'</div></div><button class="btn tiny ghost" type="button" data-finance-disconnect="'+esc(connection.itemId)+'">Disconnect</button></div>';
+   const synced=connection.lastSyncedAt?'Synced '+new Date(connection.lastSyncedAt).toLocaleString():'Waiting for first sync',provider=connection.providerName||String(connection.provider||'').replace(/^./,x=>x.toUpperCase()),needsAction=connection.status==='user_action_required',meta=[provider,synced,needsAction?'Authentication required':connection.status==='error'?connection.error:''].filter(Boolean).join(' · ');
+   return '<div class="finance-connection"><div><strong>'+esc(connection.institutionName||'Connected bank')+'</strong><div class="meta">'+esc(meta)+'</div></div><div class="finance-actions">'+(needsAction?'<button class="btn tiny" type="button" data-finance-reconnect="'+esc(connection.itemId)+'" data-finance-provider="'+esc(connection.provider||'')+'">Re-authenticate</button>':'')+'<button class="btn tiny ghost" type="button" data-finance-disconnect="'+esc(connection.itemId)+'">Disconnect</button></div></div>';
  }).join(''):'<div class="empty">No bank accounts connected yet.</div>';
+ $('financeConnections').querySelectorAll('[data-finance-reconnect]').forEach(button=>button.onclick=()=>connectFinanceProvider(button.dataset.financeProvider,button.dataset.financeReconnect));
  $('financeConnections').querySelectorAll('[data-finance-disconnect]').forEach(button=>button.onclick=async()=>{
    if(!confirm('Disconnect this bank and remove its synced transactions from Quest Log?'))return;
    try{financeData=await api('/api/finance/disconnect',{method:'POST',body:JSON.stringify({itemId:button.dataset.financeDisconnect})});financeError='';renderFinance()}
@@ -3600,43 +3603,83 @@ async function finishPlaidConnection(publicToken,metadata={}){
  clearPlaidOauthState();
  renderFinance();
 }
-async function connectFinanceBank(){
- if(plaidLinkLoading)return;plaidLinkLoading=true;renderFinance();
- try{
-   if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
-   const redirectUri=location.origin+'/plaid-oauth';
-   const token=await api('/api/finance/link-token',{method:'POST',body:JSON.stringify({redirectUri})});
-   savePlaidOauthState(token.linkToken,token.redirectUri||redirectUri);
-   const handler=window.Plaid.create({
-     token:token.linkToken,
-     onSuccess:async(publicToken,metadata)=>{
-       try{await finishPlaidConnection(publicToken,metadata)}
-       catch(error){financeError=error.message;renderFinance()}
-       finally{plaidLinkLoading=false;renderFinance();handler.destroy?.()}
-     },
-     onExit:(error,metadata)=>{
-       plaidLinkLoading=false;
-       if(error){
-         financeError=plaidErrorText(error,metadata);
-         clearPlaidOauthState();
-       }
-       renderFinance();handler.destroy?.();
-     },
-     onEvent:(eventName,metadata)=>{
-       if(eventName==='ERROR')console.warn('Plaid Link error event',metadata);
-     }
-   });
-   handler.open();
- }catch(error){financeError=error.message;plaidLinkLoading=false;clearPlaidOauthState();renderFinance()}
+function configuredFinanceProviders(){
+ return (financeData?.providers||[]).filter(provider=>provider?.configured);
 }
+function openFinanceProviderPicker(){
+ const providers=configuredFinanceProviders();
+ if(!providers.length){financeError='No bank connection provider is configured yet.';renderFinance();return}
+ if(providers.length===1){connectFinanceProvider(providers[0].id);return}
+ openModal('Connect a bank','<div class="field"><label>Connection provider</label><div id="financeProviderChoices" style="display:grid;gap:8px"></div></div><div class="meta" style="margin-top:10px">For Canadian banks, try Yodlee first for direct/tokenized connections and Flinks when an interactive MFA reconnect is needed.</div>');
+ const root=$('financeProviderChoices');
+ root.innerHTML=providers.map(provider=>'<button class="btn" type="button" data-finance-provider-choice="'+esc(provider.id)+'"><strong>'+esc(provider.name)+'</strong><span class="meta" style="display:block">'+esc(provider.environment==='sandbox'?'Sandbox / testing':'Available')+'</span></button>').join('');
+ root.querySelectorAll('[data-finance-provider-choice]').forEach(button=>button.onclick=()=>{const id=button.dataset.financeProviderChoice;closeModal();connectFinanceProvider(id)});
+}
+async function completeFinanceProvider(provider,payload={}){
+ financeData=await api('/api/finance/complete',{method:'POST',body:JSON.stringify({provider,...payload})});
+ financeError='';financeLinkLoading=false;plaidLinkLoading=false;closeModal();renderFinance();
+}
+async function connectFinanceProvider(provider,itemId=''){
+ const id=String(provider||'plaid').toLowerCase();
+ if(financeLinkLoading||plaidLinkLoading)return;
+ financeLinkLoading=true;if(id==='plaid')plaidLinkLoading=true;renderFinance();
+ try{
+   const redirectUri=id==='flinks'?location.origin+'/flinks-oauth.html':location.origin+'/plaid-oauth';
+   const launch=await api('/api/finance/connect',{method:'POST',body:JSON.stringify({provider:id,itemId,redirectUri})});
+   if(id==='plaid'){
+     if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
+     savePlaidOauthState(launch.linkToken,launch.redirectUri||redirectUri);
+     const handler=window.Plaid.create({
+       token:launch.linkToken,
+       onSuccess:async(publicToken,metadata)=>{
+         try{const institution=metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null;await completeFinanceProvider('plaid',{publicToken,metadata:{institution}})}
+         catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
+         finally{handler.destroy?.()}
+       },
+       onExit:(error,metadata)=>{financeLinkLoading=false;plaidLinkLoading=false;if(error){financeError=plaidErrorText(error,metadata);clearPlaidOauthState()}renderFinance();handler.destroy?.()},
+       onEvent:(eventName,metadata)=>{if(eventName==='ERROR')console.warn('Plaid Link error event',metadata)}
+     });
+     handler.open();return;
+   }
+   if(id==='yodlee'){
+     if(!window.fastlink?.open)throw Error('Yodlee FastLink could not load.');
+     openModal(itemId?'Re-authenticate bank':'Connect with Yodlee','<div id="financeProviderLaunch" style="min-height:520px;height:min(72vh,680px)"></div>');
+     let finished=false;
+     window.fastlink.open({
+       fastLinkURL:launch.fastLinkURL,
+       accessToken:launch.accessToken,
+       params:launch.params||{},
+       forceIframe:true,
+       onSuccess:async()=>{if(finished)return;finished=true;try{await completeFinanceProvider('yodlee',{})}catch(error){financeError=error.message;financeLinkLoading=false;renderFinance()}},
+       onError:error=>{financeError=error?.message||error?.reason||'Yodlee could not connect this bank.';financeLinkLoading=false;renderFinance()},
+       onClose:()=>{if(!finished){financeLinkLoading=false;renderFinance()}},
+       onEvent:(name,data)=>{if(name==='OPEN_EXTERNAL_URL'&&data?.url)window.open(data.url,'_blank','noopener')}
+     },'financeProviderLaunch');
+     return;
+   }
+   if(id==='flinks'){
+     openModal(itemId?'Re-authenticate bank':'Connect with Flinks','<div style="height:min(72vh,680px);min-height:520px"><iframe id="financeFlinksFrame" title="Connect bank with Flinks" style="width:100%;height:100%;border:0;border-radius:12px;background:var(--panel)" allow="clipboard-read; clipboard-write"></iframe></div>');
+     const frame=$('financeFlinksFrame');financeFlinksOrigin=new URL(launch.url).origin;frame.src=launch.url;financeLinkLoading=false;renderFinance();
+     return;
+   }
+   throw Error('Unknown finance provider.');
+ }catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;clearPlaidOauthState();renderFinance()}
+}
+async function finishFlinksMessage(data){
+ const loginId=String(data?.loginId||data?.LoginId||'').trim();if(!loginId)return;
+ try{await completeFinanceProvider('flinks',{loginId,institution:data?.institution||data?.Institution||''})}
+ catch(error){financeError=error.message;financeLinkLoading=false;renderFinance()}
+}
+async function connectFinanceBank(){openFinanceProviderPicker()}
 window.addEventListener('message',async event=>{
- if(event.origin!==location.origin||event.data?.type!=='questlog-plaid-oauth-complete')return;
- if(event.data.ok){
-   try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
-   catch(error){financeError=error.message;renderFinance()}
- }else{
-   financeError=event.data.error||'Bank connection could not be completed.';
-   renderFinance();
+ if(event.origin===location.origin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
+ if(financeFlinksOrigin&&event.origin===financeFlinksOrigin&&event.data?.step==='REDIRECT'&&(event.data?.loginId||event.data?.LoginId)){await finishFlinksMessage(event.data);return}
+ if(event.origin===location.origin&&event.data?.type==='questlog-plaid-oauth-complete'){
+   financeLinkLoading=false;plaidLinkLoading=false;
+   if(event.data.ok){
+     try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
+     catch(error){financeError=error.message;renderFinance()}
+   }else{financeError=event.data.error||'Bank connection could not be completed.';renderFinance()}
  }
 });
 $('connectBankButton').onclick=connectFinanceBank;

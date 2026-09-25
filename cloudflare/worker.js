@@ -12,7 +12,7 @@ import {
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
 import { marketData, marketHistory, marketSearch, testMarketConnection } from './markets.js';
-import { financeSummary, createFinanceLinkToken, exchangeFinancePublicToken, syncFinance, disconnectFinanceItem, saveFinancePreferences } from './plaid.js';
+import { financeSummary, financeProviders, startFinanceConnection, completeFinanceConnection, syncFinance, disconnectFinanceItem, saveFinancePreferences } from './finance.js';
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
@@ -253,14 +253,25 @@ async function handleApi(request,env,identity){
   }
 
   if(p==='/api/finance'&&method==='GET')return json(await financeSummary(env,identity,{sync:true}));
+  if(p==='/api/finance/providers'&&method==='GET')return json({providers:financeProviders(env)});
+  if(p==='/api/finance/connect'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await startFinanceConnection(env,identity,incoming.provider||'plaid',incoming));
+  }
   if(p==='/api/finance/link-token'&&method==='POST'){
     const incoming=await body(request);
-    return json(await createFinanceLinkToken(env,identity,incoming.redirectUri||''));
+    return json(await startFinanceConnection(env,identity,'plaid',incoming));
   }
-  if(p==='/api/finance/preferences'&&method==='PUT')return json(await saveFinancePreferences(env,identity,await body(request)));
+  if(p==='/api/finance/preferences'&&method==='PUT'){await saveFinancePreferences(env,identity,await body(request));return json(await financeSummary(env,identity,{sync:false}))}
   if(p==='/api/finance/exchange'&&method==='POST'){
     const incoming=await body(request);
-    return json(await exchangeFinancePublicToken(env,identity,incoming.publicToken,incoming.metadata||{}));
+    await completeFinanceConnection(env,identity,'plaid',incoming);
+    return json(await financeSummary(env,identity,{sync:false}));
+  }
+  if(p==='/api/finance/complete'&&method==='POST'){
+    const incoming=await body(request);
+    await completeFinanceConnection(env,identity,incoming.provider,incoming);
+    return json(await financeSummary(env,identity,{sync:false}));
   }
   if(p==='/api/finance/sync'&&method==='POST'){
     await syncFinance(env,identity,{force:true});

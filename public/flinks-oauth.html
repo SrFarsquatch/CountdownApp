@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quest Log · Bank connection</title></head>
+<body>
+<script>
+(function(){
+  const p=new URLSearchParams(location.search);
+  const payload={
+    type:'questlog-flinks-complete',
+    loginId:p.get('loginId')||p.get('LoginId')||'',
+    requestId:p.get('requestId')||p.get('RequestId')||'',
+    institution:p.get('institution')||p.get('Institution')||''
+  };
+  if(window.parent&&window.parent!==window)window.parent.postMessage(payload,location.origin);
+  if(window.opener)window.opener.postMessage(payload,location.origin);
+  document.body.textContent=payload.loginId?'Bank connected. You can close this window.':'Returning to Quest Log…';
+})();
+</script>
+</body>
+</html>

@@ -28,6 +28,9 @@ jobs:
         run: |
           node --check server.js
           node --check plaid-finance.cjs
+          node --check yodlee-finance.cjs
+          node --check flinks-finance.cjs
+          node --check finance-router.cjs
 
       - name: Check browser JavaScript
         run: |
@@ -45,6 +48,8 @@ jobs:
       - name: Check Cloudflare modules
         run: |
           node --input-type=module --check < cloudflare/plaid.js
+          node --input-type=module --check < cloudflare/external-finance.js
+          node --input-type=module --check < cloudflare/finance.js
           node --input-type=module --check < cloudflare/worker.js
 
       - name: Validate Cloudflare bundle
