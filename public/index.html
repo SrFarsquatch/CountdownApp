@@ -271,13 +271,13 @@
 .timeline-lane.today-lane{background:repeating-linear-gradient(to bottom,color-mix(in srgb,var(--accent) 2%,transparent) 0,color-mix(in srgb,var(--accent) 2%,transparent) calc(var(--timeline-hour-height,26px) - 1px),var(--line) var(--timeline-hour-height,26px))}
 .calendar-event-block{position:absolute;z-index:3;min-height:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--event-color) 50%,var(--line));border-left:4px solid var(--event-color);border-radius:8px;background:color-mix(in srgb,var(--event-color) 16%,var(--panel));padding:5px 6px;text-align:left;color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.04);cursor:pointer}
 .calendar-event-block:hover{background:color-mix(in srgb,var(--event-color) 22%,var(--panel))}
-.calendar-event-block.task-time-block{--event-color:var(--muted);background:var(--panel2);border-color:var(--line);border-left-color:var(--muted)}
+.calendar-event-block.task-time-block{--event-color:var(--accent)}
 .cal-block-title{font-size:11px;font-weight:820;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-block-time,.cal-block-source{font-size:9px;line-height:1.3;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .now-line{position:absolute;left:0;right:0;height:2px;background:#d93025;z-index:2;pointer-events:none}
 .now-line:before{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:#d93025;left:-4px;top:-3px}
-.month-chip{--event-color:var(--accent);cursor:pointer;border-color:color-mix(in srgb,var(--event-color) 42%,var(--line));border-left:3px solid var(--event-color);background:color-mix(in srgb,var(--event-color) 14%,var(--panel))}
-.month-chip.task{--event-color:var(--muted);background:var(--panel2)}
+.month-chip{--event-color:var(--accent);cursor:pointer;border-color:color-mix(in srgb,var(--event-color) 42%,var(--line));border-left:3px solid var(--event-color);background:color-mix(in srgb,var(--event-color) 16%,var(--panel))}
+.month-chip.task{--event-color:var(--accent)}
 .cal-dot{display:inline-block;flex:0 0 auto;width:11px;height:11px;border-radius:4px;border:1px solid color-mix(in srgb,currentColor 16%,transparent)}
 .calendar-list label>span:last-child{min-width:0}
 .agenda-event{border-left:3px solid var(--event-color);padding-left:10px}
@@ -775,7 +775,7 @@ body.modal-open{overflow:hidden}
     border:0;
     border-left:3px solid var(--event-color,var(--accent));
     border-radius:5px;
-    background:color-mix(in srgb,var(--event-color,var(--accent)) 22%,var(--panel));
+    background:color-mix(in srgb,var(--event-color,var(--accent)) 16%,var(--panel));
     color:var(--text);
     font-size:9px;
     line-height:16px;
@@ -783,8 +783,7 @@ body.modal-open{overflow:hidden}
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   #calendarStage[data-calendar-mode="month"] .month-chip.task{
-    border-left-color:var(--accent);
-    background:var(--accent-soft);
+    --event-color:var(--accent);
   }
   #calendarStage[data-calendar-mode="month"] .month-more{
     padding:2px 3px;font-size:8px;font-weight:780;color:var(--muted)
@@ -3188,7 +3187,7 @@ function buildMonthHtml(range,anchor=plannerAnchor,eventSource=calEvents){
    const day=new Date(range.start);day.setDate(range.start.getDate()+i);const next=new Date(day);next.setDate(day.getDate()+1),dayKey=dateKeyLocal(day);
    const entries=[];
    eventSource.filter(e=>eventOverlapsDay(e,day,next)).forEach(e=>entries.push({sort:e.allDay?day.getTime():new Date(e.start).getTime(),html:monthEventChip(e)}));
-   if(plannerShowTasks)state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'">○ '+esc(t.title)+'</button>'})});
+   if(plannerShowTasks)state.tasks.filter(t=>{const span=taskCalendarSpan(t);return span&&t.status!=='done'&&span.start<next&&span.end>day}).forEach(t=>{const span=taskCalendarSpan(t);entries.push({sort:span?.start?.getTime?.()||day.getTime(),html:'<button type="button" class="month-chip task" data-cal-task="'+esc(t.id)+'" style="--event-color:var(--accent)">○ '+esc(t.title)+'</button>'})});
    entries.sort((a,b)=>a.sort-b.sort);const visible=entries.slice(0,limit),remaining=Math.max(0,entries.length-visible.length);
    const cls=(day.getMonth()!==month?' muted-day':'')+(day.toDateString()===today.toDateString()?' today-cell':'');
    h+='<div class="month-cell'+cls+'" data-month-date="'+dayKey+'"><button type="button" class="month-date-button" data-open-day="'+dayKey+'" aria-label="Open '+esc(day.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'}))+'">'+day.getDate()+'</button>'+visible.map(x=>x.html).join('')+(remaining?'<button type="button" class="month-more" data-open-day="'+dayKey+'">+'+remaining+' more</button>':'')+'</div>';
