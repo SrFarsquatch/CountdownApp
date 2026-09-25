@@ -20,7 +20,7 @@ import { notificationConfig, updateNotificationPreferences, registerSubscription
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
-import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification } from './activity.js';
+import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -264,7 +264,7 @@ async function handleApi(request,env,identity){
     return json(result,201);
   }
   if(p==='/api/friends/respond'&&method==='POST'){
-    const incoming=await body(request),before=await listFriends(env,identity),relation=(before.incoming||[]).find(x=>x.friendshipId===incoming.friendshipId),result=await respondFriend(env,identity,incoming.friendshipId,incoming.action);
+    const incoming=await body(request),before=await listFriends(env,identity),relation=(before.incoming||[]).find(x=>x.friendshipId===incoming.friendshipId),result=await respondFriend(env,identity,incoming.friendshipId,incoming.action);await resolveActivityByDedupe(env,identity,'friend-request:'+incoming.friendshipId);
     if(incoming.action==='accept'&&relation?.userId)await notifyUserActivity(env,relation.userId,{kind:'friend_accepted',actorUserId:identity.userId,dedupeKey:'friend-accepted:'+incoming.friendshipId,data:{friendshipId:incoming.friendshipId}});
     return json(result);
   }
@@ -279,7 +279,7 @@ async function handleApi(request,env,identity){
   if(p==='/api/shares/invitations'&&method==='GET')return json(await listShareInvitations(env,identity));
   if(p==='/api/shares/respond'&&method==='POST'){
     const incoming=await body(request),inviteList=await listShareInvitations(env,identity),invite=(inviteList.invitations||[]).find(x=>x.ownerUserId===incoming.ownerUserId&&x.itemType===incoming.itemType&&x.itemId===incoming.itemId);
-    const result=await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action);
+    const result=await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action);await resolveActivityByDedupe(env,identity,['share_invite',incoming.ownerUserId,incoming.itemType,incoming.itemId,identity.userId].join(':'));
     if(incoming.ownerUserId){
       await notifyUserActivity(env,incoming.ownerUserId,{
         kind:incoming.action==='accept'?'share_accepted':'share_declined',
