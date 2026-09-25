@@ -3659,7 +3659,7 @@ async function connectFinanceProvider(provider,itemId=''){
    }
    if(id==='flinks'){
      openModal(itemId?'Re-authenticate bank':'Connect with Flinks','<div style="height:min(72vh,680px);min-height:520px"><iframe id="financeFlinksFrame" title="Connect bank with Flinks" style="width:100%;height:100%;border:0;border-radius:12px;background:var(--panel)" allow="clipboard-read; clipboard-write"></iframe></div>');
-     const frame=$('financeFlinksFrame');financeFlinksOrigin=new URL(launch.url).origin;frame.src=launch.url;
+     const frame=$('financeFlinksFrame');financeFlinksOrigin=new URL(launch.url).origin;frame.src=launch.url;financeLinkLoading=false;renderFinance();
      return;
    }
    throw Error('Unknown finance provider.');
@@ -3682,6 +3682,7 @@ window.addEventListener('message',async event=>{
    }else{financeError=event.data.error||'Bank connection could not be completed.';renderFinance()}
  }
 });
+$('connectBankButton').onclick=connectFinanceBank;
 $('financeSyncButton').onclick=async()=>{
  const button=$('financeSyncButton');button.disabled=true;button.textContent='Syncing…';
  try{financeData=await api('/api/finance/sync',{method:'POST'});financeError='';renderFinance()}
