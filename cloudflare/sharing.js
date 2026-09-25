@@ -40,6 +40,19 @@ async function ensureSchema(env){
 function safeIds(values,current){
   return [...new Set((Array.isArray(values)?values:[]).map(v=>clean(v,120)).filter(v=>v&&v!==current))].slice(0,50);
 }
+function goalProgress(item={}){
+  if(item.type==='checklist'){
+    const list=Array.isArray(item.checklist)?item.checklist:[];
+    return list.length?Math.max(0,Math.min(100,list.filter(x=>x?.done).length/list.length*100)):0;
+  }
+  if(item.type==='deadline'){
+    const start=item.created?new Date(item.created).getTime():NaN,end=item.deadline?new Date(item.deadline).getTime():NaN;
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return item.status==='complete'?100:0;
+    return Math.max(0,Math.min(100,(Date.now()-start)/(end-start)*100));
+  }
+  const target=Number(item.target)||0,current=Number(item.current)||0;
+  return target>0?Math.max(0,Math.min(100,current/target*100)):0;
+}
 function safeSnapshot(type,item={}){
   const id=clean(item.id,240);
   if(!id)throw Object.assign(new Error('Shared item ID is required.'),{status:400});
@@ -53,7 +66,7 @@ function safeSnapshot(type,item={}){
     id,title:clean(item.title,160),description:clean(item.description,2000),type:clean(item.type,30),current:Number(item.current)||0,
     target:Number(item.target)||0,unit:clean(item.unit,30),deadline:item.deadline||null,project:clean(item.project,80),status:clean(item.status,30),
     accentColor:clean(item.accentColor,30),checklist:Array.isArray(item.checklist)?item.checklist.slice(0,100):[],
-    created:item.created||null,updated:item.updated||null,displayEnabled:item.displayEnabled!==false,progress:Number(item.progress)||0
+    created:item.created||null,updated:item.updated||null,displayEnabled:item.displayEnabled!==false,progress:goalProgress(item)
   };
   if(type==='countdown')return{
     id,name:clean(item.name,100),end:item.end||null,created:item.created||null,accentColor:clean(item.accentColor,30),
