@@ -120,6 +120,17 @@ export async function deleteItemShare(env,identity,itemType,itemId){
     env.DB.prepare('DELETE FROM questlog_shared_items WHERE owner_user_id=? AND item_type=? AND item_id=?').bind(owner,type,id)
   ]);
 }
+export async function refreshOwnedShareSnapshots(env,identity,itemType,items=[]){
+  await ensureSchema(env);
+  const owner=userId(identity),type=typeValue(itemType);
+  const existing=await env.DB.prepare('SELECT item_id FROM questlog_shared_items WHERE owner_user_id=? AND item_type=?').bind(owner,type).all();
+  const ids=new Set((existing.results||[]).map(x=>String(x.item_id)));
+  const updates=(items||[]).filter(item=>ids.has(String(item.id))).map(item=>
+    env.DB.prepare("UPDATE questlog_shared_items SET item_json=?,updated_at=datetime('now') WHERE owner_user_id=? AND item_type=? AND item_id=?")
+      .bind(JSON.stringify(safeSnapshot(type,item)),owner,type,String(item.id))
+  );
+  if(updates.length)await env.DB.batch(updates);
+}
 export async function decorateOwnedShares(env,identity,itemType,items=[]){
   await ensureSchema(env);
   const owner=userId(identity),type=typeValue(itemType);
