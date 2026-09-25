@@ -4,7 +4,7 @@ import { externalProviders, startExternalFinance, completeExternalFinance, syncE
 function prefixPlaid(items=[]){return items.map(x=>({...x,itemId:String(x.itemId||'').startsWith('plaid:')?x.itemId:'plaid:'+x.itemId,provider:'plaid',providerName:'Plaid'}))}
 export async function financeSummary(env,identity,{sync=true}={}){
   const plaid=await plaidSummary(env,identity,{sync});
-  const external=await externalFinanceSummary(env,identity,{sync});
+  const external=await externalFinanceSummary(env,identity,{sync:false});
   const providers=[{id:'plaid',name:'Plaid',configured:plaidConfigured(env),environment:plaid.environment||''},...externalProviders(env)];
   const connections=[...prefixPlaid(plaid.connections),...(external.connections||[])];
   return {
