@@ -2281,7 +2281,7 @@ function friendLabel(person){return String(person?.displayName||person?.email||'
 async function acceptedFriends(force=false){
  if(runtimeInfo?.runtime!=='cloudflare')return[];
  if(!force&&Array.isArray(friendDirectory))return friendDirectory;
- try{const data=await api('/api/friends');friendDirectory=data.friends||[];setFriendRequestBadge(data.incoming?.length||0);return friendDirectory}
+ try{const data=await api('/api/friends');friendDirectory=data.friends||[];return friendDirectory}
  catch{return friendDirectory||[]}
 }
 function collaborationPermissionOptions(type,current='view'){
