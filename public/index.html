@@ -1368,6 +1368,19 @@ body.modal-open{overflow:hidden}
 .invite-state{font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-radius:999px;background:var(--panel);color:var(--muted)}.invite-state.accepted{color:var(--success)}.invite-state.pending{color:var(--warning)}.invite-state.declined{color:var(--danger)}
 .share-invite-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}.share-invite-actions{display:flex;gap:6px;align-items:center}.share-permission{font-size:10px;color:var(--muted);font-weight:750}
 .shared-note{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:750}
+.activity-shell{display:grid;gap:12px}
+.activity-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.activity-list{display:grid;gap:7px}
+.activity-group-label{font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:3px 2px}
+.activity-card{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:start;padding:11px;border:1px solid var(--line);border-radius:13px;background:var(--panel2);cursor:pointer;transition:border-color .15s,background .15s}
+.activity-card.unread{background:color-mix(in srgb,var(--accent-soft) 55%,var(--panel2));border-color:color-mix(in srgb,var(--accent) 25%,var(--line))}
+.activity-card:hover{border-color:color-mix(in srgb,var(--accent) 32%,var(--line))}
+.activity-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--panel);color:var(--accent);font-size:15px;font-weight:900;overflow:hidden}.activity-avatar img{width:100%;height:100%;object-fit:cover}
+.activity-copy{min-width:0}.activity-title{font-size:12px;font-weight:850;line-height:1.3}.activity-body{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35}.activity-time{font-size:9px;color:var(--muted);margin-top:5px}
+.activity-side{display:grid;justify-items:end;gap:7px}.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}.activity-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.account-trigger-notification,.mobile-notification-badge{min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-contrast);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900}
+.mobile-account-nav{position:relative}.mobile-notification-badge{position:absolute;top:1px;right:calc(50% - 20px);border:2px solid var(--panel);height:18px;min-width:18px}
+@media(max-width:520px){.activity-card{grid-template-columns:36px minmax(0,1fr)}.activity-side{grid-column:2;justify-items:start}.activity-actions{justify-content:flex-start}}
 @media(max-width:520px){
  .friend-add-form{grid-template-columns:1fr}
  .friend-row{grid-template-columns:38px minmax(0,1fr)}
@@ -1403,6 +1416,11 @@ body.modal-open{overflow:hidden}
   <button class="account-menu-action" id="accountManage" type="button">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg>
     <span>Manage account</span>
+  </button>
+  <button class="account-menu-action" id="accountNotifications" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+    <span>Notifications</span>
+    <span class="account-menu-badge" id="notificationBadge" hidden></span>
   </button>
   <button class="account-menu-action" id="accountFriends" type="button">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.7-3.6 2.8-5.4 5.5-5.4s4.8 1.8 5.5 5.4"></path><path d="M14.5 14.5c2.9-.5 5.1 1 5.9 4.5"></path></svg>
@@ -1671,6 +1689,8 @@ body.modal-open{overflow:hidden}
       <div class="setting-row"><span>Event lead time</span><select id="notifyEventLead"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
       <label class="setting-row"><span>Goal reminders</span><input id="notifyGoals" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Goal lead time</span><select id="notifyGoalLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
+      <label class="setting-row"><span>Social & collaboration</span><input id="notifySocial" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="meta" style="margin:-4px 0 4px">Friend requests, planner invites, responses, permission changes, and shared-item activity.</div>
       <label class="setting-row"><span>Countdown reminders</span><input id="notifyCountdowns" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Countdown lead time</span><select id="notifyCountdownLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
       <div class="modal-actions"><button class="btn" id="testNotification" type="button" disabled>Send test</button><button class="btn" id="disableNotifications" type="button" disabled>Disable on this device</button><button class="btn primary" id="enableNotifications" type="button">Enable notifications</button></div>
@@ -1774,7 +1794,7 @@ body.modal-open{overflow:hidden}
   <button class="on" data-view="today" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg><span class="sr-only">Home</span></button>
   <button data-view="planner" aria-label="Planner" title="Planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path><path d="M8 14h2M14 14h2M8 18h2"></path></svg><span class="sr-only">Planner</span></button>
   <button data-view="markets" aria-label="Finance" title="Finance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path><path d="M2 19h22"></path></svg><span class="sr-only">Finance</span></button>
-  <button id="mobileAccountNav" class="mobile-account-nav" type="button" aria-label="Account" title="Account" aria-expanded="false"><span class="account-avatar" id="mobileNavAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span><span class="sr-only">Account</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
+  <button id="mobileAccountNav" class="mobile-account-nav" type="button" aria-label="Account" title="Account" aria-expanded="false"><span class="mobile-notification-badge" id="mobileNotificationBadge" hidden></span><span class="account-avatar" id="mobileNavAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span><span class="sr-only">Account</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
 <div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
@@ -1785,7 +1805,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,friendDirectory=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -1880,6 +1900,7 @@ async function renderNotificationSettings(){
  $('notifyEvents').checked=cfg.eventReminders!==false;
  $('notifyGoals').checked=cfg.goalReminders!==false;
  $('notifyCountdowns').checked=cfg.countdownReminders!==false;
+ $('notifySocial').checked=cfg.socialUpdates!==false;
  $('notifyTaskLead').value=String(cfg.taskLeadMinutes||30);
  $('notifyEventLead').value=String(cfg.eventLeadMinutes||15);
  $('notifyGoalLead').value=String(cfg.goalLeadMinutes||1440);
@@ -1911,6 +1932,7 @@ async function saveNotificationPreferences(){
    eventReminders:$('notifyEvents').checked,
    goalReminders:$('notifyGoals').checked,
    countdownReminders:$('notifyCountdowns').checked,
+   socialUpdates:$('notifySocial').checked,
    taskLeadMinutes:Number($('notifyTaskLead').value),
    eventLeadMinutes:Number($('notifyEventLead').value),
    goalLeadMinutes:Number($('notifyGoalLead').value),
@@ -1989,17 +2011,17 @@ function toggleAccountMenu(source,event){
  const menu=$('accountMenu');if(!menu)return;
  const isOpen=!menu.hidden&&menu.dataset.source===source;
  setAccountMenuOpen(!isOpen,source);
- if(isOpen===false&&runtimeInfo?.runtime==='cloudflare')refreshFriendBadge().catch(()=>{});
+ if(isOpen===false&&runtimeInfo?.runtime==='cloudflare'){refreshFriendBadge().catch(()=>{});refreshActivityBadge().catch(()=>{})}refreshActivityBadge().catch(()=>{});
 }
 function renderRuntimeSession(){
- const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
+ const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),notificationsButton=$('accountNotifications'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
  if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
    const profile=runtimeInfo.profile||{email:runtimeInfo.user||'',displayName:'',avatarData:''};
    const email=profile.email||runtimeInfo.user||'Authenticated user';
    const name=profile.displayName||email.split('@')[0]||'Account';
    const logout=runtimeInfo.logoutPath||'/logout';
-   foot.innerHTML='<button class="account-trigger account-menu-toggle" id="desktopAccountButton" type="button" aria-label="Open account menu" aria-expanded="false">'+accountIconMarkup(profile)+'<span class="account-trigger-copy"><span class="account-trigger-label">'+esc(name)+'</span><span class="account-trigger-email" title="'+esc(email)+'">'+esc(email)+'</span></span><span class="account-trigger-chevron">⌃</span></button>';
+   foot.innerHTML='<button class="account-trigger account-menu-toggle" id="desktopAccountButton" type="button" aria-label="Open account menu" aria-expanded="false">'+accountIconMarkup(profile)+'<span class="account-trigger-copy"><span class="account-trigger-label">'+esc(name)+'</span><span class="account-trigger-email" title="'+esc(email)+'">'+esc(email)+'</span></span><span class="account-trigger-notification" id="desktopNotificationBadge" hidden></span><span class="account-trigger-chevron">⌃</span></button>';
    if(menuEmail)menuEmail.textContent=email;
    if(menuName)menuName.textContent=name;
    if(menuAvatar)menuAvatar.innerHTML=accountAvatarInner(profile);
@@ -2007,6 +2029,7 @@ function renderRuntimeSession(){
    if(logoutLink)logoutLink.href=logout;
    if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
    if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
+    if(notificationsButton)notificationsButton.onclick=()=>{setAccountMenuOpen(false);openNotificationCenter()};
    if(settingsButton)settingsButton.onclick=()=>{setAccountMenuOpen(false);setView('settings')};
    refreshFriendBadge().catch(()=>{});
    const desktop=$('desktopAccountButton');
@@ -2023,6 +2046,13 @@ function renderRuntimeSession(){
    setAccountMenuOpen(false);
  }
 }
+
+function startActivityPolling(){
+ clearInterval(activityPollTimer);
+ if(runtimeInfo?.runtime!=='cloudflare')return;
+ activityPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshActivityBadge().catch(()=>{})},60000);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare')refreshActivityBadge().catch(()=>{})});
 
 document.addEventListener('click',event=>{
  const menu=$('accountMenu');
@@ -2251,7 +2281,7 @@ function friendLabel(person){return String(person?.displayName||person?.email||'
 async function acceptedFriends(force=false){
  if(runtimeInfo?.runtime!=='cloudflare')return[];
  if(!force&&Array.isArray(friendDirectory))return friendDirectory;
- try{const data=await api('/api/friends');friendDirectory=data.friends||[];setFriendRequestBadge(data.incoming?.length||0);return friendDirectory}
+ try{const data=await api('/api/friends');friendDirectory=data.friends||[];return friendDirectory}
  catch{return friendDirectory||[]}
 }
 function collaborationPermissionOptions(type,current='view'){
@@ -2322,6 +2352,64 @@ function sharedEditModal(item,type){
  };
 }
 
+function activityRelativeTime(value){
+ const time=new Date(value).getTime();if(!Number.isFinite(time))return'';
+ const diff=Math.max(0,Date.now()-time),mins=Math.floor(diff/60000);
+ if(mins<1)return'Just now';if(mins<60)return mins+'m ago';const hours=Math.floor(mins/60);
+ if(hours<24)return hours+'h ago';const days=Math.floor(hours/24);if(days<7)return days+'d ago';
+ return new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
+}
+function activityIcon(item){
+ const map={friend_request:'+',friend_accepted:'✓',share_invite:'↗',share_accepted:'✓',share_declined:'×',share_permission:'✎',share_revoked:'−',shared_item_completed:'✓',shared_item_updated:'✦'};
+ return map[item?.kind]||'•';
+}
+function setActivityBadge(count){
+ const value=Math.max(0,Number(count)||0),text=value>99?'99+':String(value);
+ for(const id of ['notificationBadge','desktopNotificationBadge','mobileNotificationBadge']){
+   const el=$(id);if(!el)continue;el.hidden=value===0;el.textContent=text;
+ }
+}
+async function refreshActivityBadge(){
+ if(runtimeInfo?.runtime!=='cloudflare'){setActivityBadge(0);return activityData}
+ try{activityData=await api('/api/activity?limit=60');setActivityBadge(activityData.unreadCount||0);return activityData}catch{return activityData}
+}
+function activityCardHtml(item){
+ const avatar=profileAvatarData({avatarData:item.actorAvatarData}),initial=(item.actorName||'?').trim().charAt(0).toUpperCase(),pending=item.kind==='friend_request'||item.kind==='share_invite';
+ let actions='';
+ if(item.kind==='friend_request'&&item.data?.friendshipId)actions='<div class="activity-actions"><button class="btn tiny primary" data-activity-friend="accept" data-notification-id="'+esc(item.notificationId)+'" data-friendship-id="'+esc(item.data.friendshipId)+'">Accept</button><button class="btn tiny ghost" data-activity-friend="decline" data-notification-id="'+esc(item.notificationId)+'" data-friendship-id="'+esc(item.data.friendshipId)+'">Decline</button></div>';
+ if(item.kind==='share_invite')actions='<div class="activity-actions"><button class="btn tiny primary" data-activity-share="accept" data-notification-id="'+esc(item.notificationId)+'" data-owner-id="'+esc(item.targetOwnerUserId)+'" data-item-type="'+esc(item.targetType)+'" data-item-id="'+esc(item.targetId)+'">Accept</button><button class="btn tiny ghost" data-activity-share="decline" data-notification-id="'+esc(item.notificationId)+'" data-owner-id="'+esc(item.targetOwnerUserId)+'" data-item-type="'+esc(item.targetType)+'" data-item-id="'+esc(item.targetId)+'">Decline</button></div>';
+ return '<div class="activity-card '+(item.read?'':'unread')+'" data-activity-open="'+esc(item.notificationId)+'" data-activity-route="'+esc(item.route||'')+'"><div class="activity-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':(initial||activityIcon(item)))+'</div><div class="activity-copy"><div class="activity-title">'+esc(item.title)+'</div><div class="activity-body">'+esc(item.body||'')+'</div><div class="activity-time">'+esc(activityRelativeTime(item.createdAt))+'</div></div><div class="activity-side">'+(item.read?'':'<span class="activity-dot" aria-label="Unread"></span>')+actions+'</div></div>';
+}
+async function renderNotificationCenter(){
+ const root=$('activityList');if(!root)return;
+ const data=await refreshActivityBadge(),items=data.notifications||[];
+ if($('activityUnreadCount'))$('activityUnreadCount').textContent=(data.unreadCount||0)+' unread';
+ if(!items.length){root.innerHTML='<div class="friend-empty">No notifications yet.</div>';return}
+ const recent=[],earlier=[],cutoff=Date.now()-24*60*60*1000;
+ for(const item of items)((new Date(item.createdAt).getTime()>=cutoff)?recent:earlier).push(item);
+ root.innerHTML=(recent.length?'<div class="activity-group-label">Recent</div>'+recent.map(activityCardHtml).join(''):'')+(earlier.length?'<div class="activity-group-label">Earlier</div>'+earlier.map(activityCardHtml).join(''):'');
+ root.querySelectorAll('[data-activity-friend]').forEach(button=>button.onclick=async event=>{
+   event.stopPropagation();button.disabled=true;
+   try{await api('/api/friends/respond',{method:'POST',body:JSON.stringify({friendshipId:button.dataset.friendshipId,action:button.dataset.activityFriend})});await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[button.dataset.notificationId]})});await renderNotificationCenter();await refreshFriendBadge()}catch(error){button.disabled=false}
+ });
+ root.querySelectorAll('[data-activity-share]').forEach(button=>button.onclick=async event=>{
+   event.stopPropagation();button.disabled=true;
+   try{await api('/api/shares/respond',{method:'POST',body:JSON.stringify({ownerUserId:button.dataset.ownerId,itemType:button.dataset.itemType,itemId:button.dataset.itemId,action:button.dataset.activityShare})});await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[button.dataset.notificationId]})});await renderNotificationCenter();await loadAll(true)}catch(error){button.disabled=false}
+ });
+ root.querySelectorAll('[data-activity-open]').forEach(card=>card.onclick=async()=>{
+   const id=card.dataset.activityOpen,route=card.dataset.activityRoute;
+   await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[id]})}).catch(()=>{});
+   setActivityBadge(Math.max(0,(activityData.unreadCount||0)-1));
+   if(route){const view=new URL(route,location.origin).searchParams.get('view');if(view)setView(view)}
+   closeModal();
+ });
+}
+async function openNotificationCenter(){
+ openModal('Notifications','<div class="activity-shell"><div class="activity-toolbar"><div><strong>Activity</strong><div class="meta" id="activityUnreadCount">Loading…</div></div><button class="btn tiny ghost" id="activityMarkAll">Mark all read</button></div><div class="activity-list" id="activityList"><div class="friend-empty">Loading…</div></div></div>');
+ $('activityMarkAll').onclick=async()=>{await api('/api/activity/read',{method:'POST',body:JSON.stringify({all:true})});await renderNotificationCenter()};
+ try{await renderNotificationCenter()}catch(error){$('activityList').innerHTML='<div class="friend-empty">'+esc(error.message||'Could not load notifications.')+'</div>'}
+}
+
 function setFriendRequestBadge(count){
  const badge=$('friendRequestBadge');if(!badge)return;
  const value=Math.max(0,Number(count)||0);
@@ -2349,6 +2437,16 @@ async function refreshFriendsModal(){
  const data=await refreshFriendBadge();
  if(!data)return;
  renderFriendCollection('friendIncoming',data.incoming,'incoming','No incoming requests.');
+ const invites=data.shareInvitations||[],inviteRoot=$('plannerInvites');
+ if(inviteRoot)inviteRoot.innerHTML=invites.length?invites.map(invite=>'<div class="share-invite-row"><div class="friend-avatar">'+(invite.avatarData?'<img src="'+esc(invite.avatarData)+'" alt="">':esc((invite.sharedByName||invite.sharedByEmail||'?')[0].toUpperCase()))+'</div><div class="friend-copy"><div class="friend-name">'+esc(invite.title||'Shared item')+'</div><div class="friend-email">'+esc(invite.sharedByName||invite.sharedByEmail||'Quest Log friend')+' · '+esc(invite.itemType)+' · <span class="share-permission">'+esc(invite.permission==='edit'?'Can edit':invite.permission==='complete'?'Can complete':'View only')+'</span></div></div><div class="share-invite-actions"><button class="btn tiny primary" data-share-response="accept" data-share-owner="'+esc(invite.ownerUserId)+'" data-share-type="'+esc(invite.itemType)+'" data-share-id="'+esc(invite.itemId)+'">Accept</button><button class="btn tiny ghost" data-share-response="decline" data-share-owner="'+esc(invite.ownerUserId)+'" data-share-type="'+esc(invite.itemType)+'" data-share-id="'+esc(invite.itemId)+'">Decline</button></div></div>').join(''):'<div class="friend-empty">No planner invitations.</div>';
+ if($('plannerInviteCount'))$('plannerInviteCount').textContent=String(invites.length);
+ document.querySelectorAll('[data-share-response]').forEach(button=>button.onclick=async()=>{
+   button.disabled=true;
+   try{
+     await api('/api/shares/respond',{method:'POST',body:JSON.stringify({ownerUserId:button.dataset.shareOwner,itemType:button.dataset.shareType,itemId:button.dataset.shareId,action:button.dataset.shareResponse})});
+     await refreshFriendsModal();await refreshActivityBadge();await loadAll(true);
+   }catch(error){const note=$('friendStatus');if(note){note.textContent=error.message||'Could not update invitation.';note.className='friend-status error'}button.disabled=false}
+ });
  renderFriendCollection('friendList',data.friends,'friend','No friends yet.');
  renderFriendCollection('friendOutgoing',data.outgoing,'outgoing','No sent requests.');
  if($('friendIncomingCount'))$('friendIncomingCount').textContent=String(data.incoming?.length||0);
@@ -2360,7 +2458,7 @@ async function refreshFriendsModal(){
    try{
      if(action==='accept'||action==='decline')await api('/api/friends/respond',{method:'POST',body:JSON.stringify({friendshipId:id,action})});
      else await api('/api/friends/remove',{method:'POST',body:JSON.stringify({friendshipId:id})});
-     await refreshFriendsModal();
+     await refreshFriendsModal();await refreshActivityBadge();
    }catch(error){
      const note=$('friendStatus');if(note){note.textContent=error.message||'Could not update friends.';note.className='friend-status error'}
      button.disabled=false;

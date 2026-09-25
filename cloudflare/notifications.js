@@ -109,6 +109,7 @@ export function notificationConfig(state,env){
     eventReminders:cfg.eventReminders,
     goalReminders:cfg.goalReminders,
     countdownReminders:cfg.countdownReminders,
+    socialUpdates:cfg.socialUpdates,
     taskLeadMinutes:cfg.taskLeadMinutes,
     eventLeadMinutes:cfg.eventLeadMinutes,
     goalLeadMinutes:cfg.goalLeadMinutes,
@@ -125,6 +126,7 @@ export function updateNotificationPreferences(state,input={}){
     eventReminders:input.eventReminders??state.notifications?.eventReminders,
     goalReminders:input.goalReminders??state.notifications?.goalReminders,
     countdownReminders:input.countdownReminders??state.notifications?.countdownReminders,
+    socialUpdates:input.socialUpdates??state.notifications?.socialUpdates,
     taskLeadMinutes:input.taskLeadMinutes??state.notifications?.taskLeadMinutes,
     eventLeadMinutes:input.eventLeadMinutes??state.notifications?.eventLeadMinutes,
     goalLeadMinutes:input.goalLeadMinutes??state.notifications?.goalLeadMinutes,
@@ -168,6 +170,21 @@ async function sendToSubscriptions(state,payload,env,onlyEndpoint=''){
   }else cfg.subscriptions=keep;
   state.notifications=normalizeNotifications(cfg);
   return results;
+}
+export async function sendInstantNotification(state,env,payload={}){
+  const cfg=normalizeNotifications(state.notifications);state.notifications=cfg;
+  if(!cfg.enabled||!cfg.socialUpdates||!cfg.subscriptions.length||!vapidConfig(env).configured)return{sent:0,skipped:true};
+  const safePayload={
+    title:cleanText(payload.title||'Quest Log',180),
+    body:cleanText(payload.body||'',360),
+    tag:cleanText(payload.tag||('questlog-activity-'+Date.now()),220),
+    url:cleanText(payload.url||'/?view=today',500),
+    kind:cleanText(payload.kind||'activity',80),
+    timestamp:new Date().toISOString()
+  };
+  const results=await sendToSubscriptions(state,safePayload,env);
+  await saveState(env,state);
+  return{sent:results.filter(item=>item.ok).length,results};
 }
 export async function sendTestNotification(state,env,endpoint=''){
   const payload={

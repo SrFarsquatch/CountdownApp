@@ -16,10 +16,11 @@ import { financeSummary, financeProviders, startFinanceConnection, completeFinan
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
-import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
+import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
+import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -229,6 +230,27 @@ function cloudUpdateStatus(env){
 function ensureItemTitle(value,label,max){
   if(!cleanText(value,max)){const e=new Error(label+' is required.');e.status=400;throw e}
 }
+async function notifyUserActivity(env,userId,input={}){
+  const activity=await createActivityNotification(env,{...input,userId});
+  try{
+    const targetEnv=scopedUserEnv(env,{userId}),targetState=await loadState(targetEnv);
+    await sendInstantNotification(targetState,targetEnv,{
+      title:activity.title,body:activity.body,url:activity.route,kind:activity.kind,
+      tag:'questlog-activity-'+activity.notificationId
+    });
+  }catch(error){console.warn('Quest Log activity push failed',error)}
+  return activity;
+}
+async function emitShareActivity(env,identity,itemType,itemId,subject,share={}){
+  const label=value=>value==='edit'?'Can edit':value==='complete'?'Can complete':'View only';
+  for(const event of share.activityEvents||[]){
+    await notifyUserActivity(env,event.userId,{
+      kind:event.kind,actorUserId:identity.userId,targetType:itemType,targetId:itemId,targetOwnerUserId:identity.userId,
+      subject,dedupeKey:[event.kind,identity.userId,itemType,itemId,event.userId].join(':'),
+      meta:{permissionLabel:label(event.permission)},data:{permission:event.permission,status:event.status}
+    });
+  }
+}
 async function handleApi(request,env,identity){
   env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
@@ -236,12 +258,15 @@ async function handleApi(request,env,identity){
   if(p==='/api/profile'&&method==='PUT')return json(await updateProfile(env,identity,await body(request)));
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await requestFriend(env,identity,incoming.email),201);
+    const incoming=await body(request),before=await listFriends(env,identity),result=await requestFriend(env,identity,incoming.email),after=await listFriends(env,identity);
+    const target=(after.outgoing||[]).find(x=>x.friendshipId===result.friendshipId);
+    if(target?.userId)await notifyUserActivity(env,target.userId,{kind:'friend_request',actorUserId:identity.userId,dedupeKey:'friend-request:'+result.friendshipId,data:{friendshipId:result.friendshipId}});
+    return json(result,201);
   }
   if(p==='/api/friends/respond'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await respondFriend(env,identity,incoming.friendshipId,incoming.action));
+    const incoming=await body(request),before=await listFriends(env,identity),relation=(before.incoming||[]).find(x=>x.friendshipId===incoming.friendshipId),result=await respondFriend(env,identity,incoming.friendshipId,incoming.action);await resolveActivityByDedupe(env,identity,'friend-request:'+incoming.friendshipId);
+    if(incoming.action==='accept'&&relation?.userId)await notifyUserActivity(env,relation.userId,{kind:'friend_accepted',actorUserId:identity.userId,dedupeKey:'friend-accepted:'+incoming.friendshipId,data:{friendshipId:incoming.friendshipId}});
+    return json(result);
   }
   if(p==='/api/friends/remove'&&method==='POST'){
     const incoming=await body(request);
@@ -253,8 +278,18 @@ async function handleApi(request,env,identity){
   }
   if(p==='/api/shares/invitations'&&method==='GET')return json(await listShareInvitations(env,identity));
   if(p==='/api/shares/respond'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action));
+    const incoming=await body(request),inviteList=await listShareInvitations(env,identity),invite=(inviteList.invitations||[]).find(x=>x.ownerUserId===incoming.ownerUserId&&x.itemType===incoming.itemType&&x.itemId===incoming.itemId);
+    const result=await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action);await resolveActivityByDedupe(env,identity,['share_invite',incoming.ownerUserId,incoming.itemType,incoming.itemId,identity.userId].join(':'));
+    if(incoming.ownerUserId){
+      await notifyUserActivity(env,incoming.ownerUserId,{
+        kind:incoming.action==='accept'?'share_accepted':'share_declined',
+        actorUserId:identity.userId,targetType:incoming.itemType,targetId:incoming.itemId,targetOwnerUserId:incoming.ownerUserId,
+        subject:invite?.title||('shared '+incoming.itemType),
+        dedupeKey:'share-response:'+incoming.ownerUserId+':'+incoming.itemType+':'+incoming.itemId+':'+identity.userId,
+        data:{action:incoming.action}
+      });
+    }
+    return json(result);
   }
   if(p==='/api/shares/item'&&method==='PUT'){
     const incoming=await body(request),ownerUserId=cleanText(incoming.ownerUserId,120),itemType=cleanText(incoming.itemType,30),itemId=cleanText(incoming.itemId,240);
@@ -279,6 +314,7 @@ async function handleApi(request,env,identity){
         next=await updateLinkedGoogleTask(next,ownerState,ownerEnv);
       }
       ownerState.tasks[index]=next;await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'task',[next]);
+      await notifyUserActivity(env,ownerUserId,{kind:next.status==='done'&&existing.status!=='done'?'shared_item_completed':'shared_item_updated',actorUserId:identity.userId,targetType:'task',targetId:itemId,targetOwnerUserId:ownerUserId,subject:next.title,dedupeKey:'shared-change:'+ownerUserId+':task:'+itemId+':'+identity.userId+':'+Date.now()});
       return json({ok:true,item:next});
     }
     if(itemType==='goal'){
@@ -290,8 +326,9 @@ async function handleApi(request,env,identity){
       }
       if(allowed.title!==undefined)ensureItemTitle(allowed.title,'Goal title',160);
       ownerState.goals[index]=normalizeGoal({...ownerState.goals[index],...allowed,id:itemId,created:ownerState.goals[index].created,updated:new Date().toISOString()});
-      await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'goal',[ownerState.goals[index]]);
-      return json({ok:true,item:ownerState.goals[index]});
+      const goalAfter=ownerState.goals[index];await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'goal',[goalAfter]);
+      await notifyUserActivity(env,ownerUserId,{kind:goalAfter.status==='complete'?'shared_item_completed':'shared_item_updated',actorUserId:identity.userId,targetType:'goal',targetId:itemId,targetOwnerUserId:ownerUserId,subject:goalAfter.title,dedupeKey:'shared-change:'+ownerUserId+':goal:'+itemId+':'+identity.userId+':'+Date.now()});
+      return json({ok:true,item:goalAfter});
     }
     if(itemType==='countdown'){
       if(!access.canEdit){const e=new Error('This countdown is view-only.');e.status=403;throw e}
@@ -299,8 +336,9 @@ async function handleApi(request,env,identity){
       if(changes.name!==undefined)ensureItemTitle(changes.name,'Countdown name',100);
       if(changes.end!==undefined&&!iso(changes.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
       ownerState.countdowns[index]=normalizeCountdown({...ownerState.countdowns[index],...changes,id:itemId,created:ownerState.countdowns[index].created});
-      await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'countdown',[ownerState.countdowns[index]]);
-      return json({ok:true,item:ownerState.countdowns[index]});
+      const countdownAfter=ownerState.countdowns[index];await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'countdown',[countdownAfter]);
+      await notifyUserActivity(env,ownerUserId,{kind:'shared_item_updated',actorUserId:identity.userId,targetType:'countdown',targetId:itemId,targetOwnerUserId:ownerUserId,subject:countdownAfter.name,dedupeKey:'shared-change:'+ownerUserId+':countdown:'+itemId+':'+identity.userId+':'+Date.now()});
+      return json({ok:true,item:countdownAfter});
     }
     if(itemType==='event'){
       if(!access.canEdit){const e=new Error('This event is view-only.');e.status=403;throw e}
@@ -309,10 +347,14 @@ async function handleApi(request,env,identity){
       const event=await mutateEvent(accountId,calendarId,itemId,'PATCH',changes,ownerState,ownerEnv);
       const snapshot=sharedEventSnapshot(event,{...changes,id:itemId,sourceAccountId:accountId,sourceCalendarId:calendarId});
       await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'event',[snapshot]);
+      await notifyUserActivity(env,ownerUserId,{kind:'shared_item_updated',actorUserId:identity.userId,targetType:'event',targetId:itemId,targetOwnerUserId:ownerUserId,subject:snapshot.title,dedupeKey:'shared-change:'+ownerUserId+':event:'+itemId+':'+identity.userId+':'+Date.now()});
       return json({ok:true,event});
     }
     const e=new Error('Unsupported shared item type.');e.status=400;throw e;
   }
+  if(p==='/api/activity'&&method==='GET')return json(await listActivityNotifications(env,identity,{limit:Number(url.searchParams.get('limit'))||60}));
+  if(p==='/api/activity/read'&&method==='POST')return json(await markActivityNotifications(env,identity,await body(request)));
+  if(p==='/api/activity/remove'&&method==='POST'){const incoming=await body(request);return json(await removeActivityNotification(env,identity,incoming.notificationId))}
   if(p.startsWith('/api/update/')){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});
@@ -396,7 +438,7 @@ async function handleApi(request,env,identity){
   if(p==='/api/countdowns'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
     if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
-    const item=normalizeCountdown({...incoming,id:id(),created:new Date().toISOString()});state.countdowns.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'countdown',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,...share},201);
+    const item=normalizeCountdown({...incoming,id:id(),created:new Date().toISOString()});state.countdowns.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'countdown',item,incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'countdown',item.id,item.name,share);return json({...item,...share},201);
   }
   if(p.startsWith('/api/countdowns/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.countdowns.findIndex(x=>x.id===itemId);
@@ -404,7 +446,7 @@ async function handleApi(request,env,identity){
     if(method==='PUT'){
       const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
       if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
-      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'countdown',[state.countdowns[index]]);const decorated=(await decorateOwnedShares(env,identity,'countdown',[state.countdowns[index]]))[0];return json(decorated);
+      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined){const share=await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'countdown',itemId,state.countdowns[index].name,share)}else await refreshOwnedShareSnapshots(env,identity,'countdown',[state.countdowns[index]]);const decorated=(await decorateOwnedShares(env,identity,'countdown',[state.countdowns[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){state.countdowns.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'countdown',itemId);return json({ok:true})}
   }
@@ -413,7 +455,7 @@ async function handleApi(request,env,identity){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Task title',160);
     const now=new Date().toISOString();let item=normalizeTask({...incoming,id:id(),created:now,updated:now});
     if(incoming.googleAccountId&&incoming.googleTaskListId)item=await createGoogleTaskLink(item,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
-    state.tasks.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'task',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,...share},201);
+    state.tasks.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'task',item,incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'task',item.id,item.title,share);return json({...item,...share},201);
   }
   if(p.startsWith('/api/tasks/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.tasks.findIndex(x=>x.id===itemId);
@@ -430,7 +472,7 @@ async function handleApi(request,env,identity){
       }else if(incoming.googleAccountId&&incoming.googleTaskListId){
         next=await createGoogleTaskLink(next,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
       }
-      state.tasks[index]=next;await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'task',next,incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'task',[next]);const decorated=(await decorateOwnedShares(env,identity,'task',[state.tasks[index]]))[0];return json(decorated);
+      state.tasks[index]=next;await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined){const share=await syncItemShare(env,identity,'task',next,incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'task',itemId,next.title,share)}else await refreshOwnedShareSnapshots(env,identity,'task',[next]);const decorated=(await decorateOwnedShares(env,identity,'task',[state.tasks[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){const item=state.tasks[index];await deleteLinkedGoogleTask(item,state,env);state.tasks.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'task',itemId);return json({ok:true})}
   }
@@ -438,14 +480,14 @@ async function handleApi(request,env,identity){
   if(p==='/api/goals'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Goal title',160);
     const now=new Date().toISOString(),item=normalizeGoal({...incoming,id:id(),created:now,updated:now});
-    state.goals.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'goal',{...item,progress:0},incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,progress:0,...share},201);
+    state.goals.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'goal',{...item,progress:0},incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'goal',item.id,item.title,share);return json({...item,progress:0,...share},201);
   }
   if(p.startsWith('/api/goals/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.goals.findIndex(x=>x.id===itemId);
     if(index<0)return json({error:'Not found'},404);
     if(method==='PUT'){
       const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Goal title',160);
-      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'goal',[state.goals[index]]);const decorated=(await decorateOwnedShares(env,identity,'goal',[state.goals[index]]))[0];return json(decorated);
+      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined){const share=await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'goal',itemId,state.goals[index].title,share)}else await refreshOwnedShareSnapshots(env,identity,'goal',[state.goals[index]]);const decorated=(await decorateOwnedShares(env,identity,'goal',[state.goals[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){
       state.goals.splice(index,1);state.tasks=state.tasks.map(t=>t.goalId===itemId?{...t,goalId:''}:t);state.countdowns=state.countdowns.map(c=>c.goalId===itemId?{...c,goalId:''}:c);await saveState(env,state);await deleteItemShare(env,identity,'goal',itemId);return json({ok:true});
@@ -571,12 +613,12 @@ async function handleApi(request,env,identity){
     const accountId=decodeURIComponent(eventMatch[1]),calendarId=decodeURIComponent(eventMatch[2]),eventId=eventMatch[3]?decodeURIComponent(eventMatch[3]):'';
     if(method==='POST'&&!eventId){
       const incoming=await body(request),event=await mutateEvent(accountId,calendarId,'','POST',incoming,state,env);
-      await syncItemShare(env,identity,'event',sharedEventSnapshot(event,{...incoming,sourceAccountId:accountId,sourceCalendarId:calendarId}),incoming.sharedMembers??incoming.sharedWithUserIds);
+      const snapshot=sharedEventSnapshot(event,{...incoming,sourceAccountId:accountId,sourceCalendarId:calendarId}),share=await syncItemShare(env,identity,'event',snapshot,incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'event',snapshot.id,snapshot.title,share);
       return json({ok:true,event},201);
     }
     if((method==='PATCH'||method==='PUT')&&eventId){
       const incoming=await body(request),event=await mutateEvent(accountId,calendarId,eventId,method,incoming,state,env),snapshot=sharedEventSnapshot(event,{...incoming,id:eventId,sourceAccountId:accountId,sourceCalendarId:calendarId});
-      if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'event',snapshot,incoming.sharedMembers??incoming.sharedWithUserIds);
+      if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined){const share=await syncItemShare(env,identity,'event',snapshot,incoming.sharedMembers??incoming.sharedWithUserIds);await emitShareActivity(env,identity,'event',eventId,snapshot.title,share)}
       else await refreshOwnedShareSnapshots(env,identity,'event',[snapshot]);
       return json({ok:true,event});
     }

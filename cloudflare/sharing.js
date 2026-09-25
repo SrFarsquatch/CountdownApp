@@ -146,25 +146,28 @@ export async function syncItemShare(env,identity,itemType,item,requestedMembers=
     const invalid=members.filter(member=>!allowed.has(member.userId));
     if(invalid.length){const e=new Error('Only accepted Quest Log friends can be invited.');e.status=403;throw e}
   }
+  const previousMembers=await itemMembers(env,owner,type,snapshot.id),previousMap=new Map(previousMembers.map(x=>[x.userId,x])),activityEvents=[];
   if(!members.length){
     await env.DB.batch([
       env.DB.prepare('DELETE FROM questlog_shared_item_members WHERE owner_user_id=? AND item_type=? AND item_id=?').bind(owner,type,snapshot.id),
       env.DB.prepare('DELETE FROM questlog_shared_items WHERE owner_user_id=? AND item_type=? AND item_id=?').bind(owner,type,snapshot.id)
     ]);
-    return{sharedWithUserIds:[],sharedMembers:[]};
+    for(const member of previousMembers)activityEvents.push({kind:'share_revoked',userId:member.userId,permission:member.permission,status:member.status});
+    return{sharedWithUserIds:[],sharedMembers:[],activityEvents};
   }
   await env.DB.prepare(`
     INSERT INTO questlog_shared_items(owner_user_id,item_type,item_id,item_json,created_at,updated_at)
     VALUES(?,?,?,?,datetime('now'),datetime('now'))
     ON CONFLICT(owner_user_id,item_type,item_id) DO UPDATE SET item_json=excluded.item_json,updated_at=datetime('now')
   `).bind(owner,type,snapshot.id,JSON.stringify(snapshot)).run();
-  const existing=await itemMembers(env,owner,type,snapshot.id),existingMap=new Map(existing.map(x=>[x.userId,x]));
+  const existing=previousMembers,existingMap=previousMap;
   const desiredIds=new Set(members.map(x=>x.userId));
   const removed=existing.filter(x=>!desiredIds.has(x.userId));
   if(removed.length){
     await env.DB.batch(removed.map(member=>env.DB.prepare(
       'DELETE FROM questlog_shared_item_members WHERE owner_user_id=? AND item_type=? AND item_id=? AND user_id=?'
     ).bind(owner,type,snapshot.id,member.userId)));
+    for(const member of removed)activityEvents.push({kind:'share_revoked',userId:member.userId,permission:member.permission,status:member.status});
   }
   const writes=[];
   for(const member of members){
@@ -174,6 +177,7 @@ export async function syncItemShare(env,identity,itemType,item,requestedMembers=
         INSERT INTO questlog_shared_item_members(owner_user_id,item_type,item_id,user_id,status,permission,created_at,updated_at)
         VALUES(?,?,?,?,'pending',?,datetime('now'),datetime('now'))
       `).bind(owner,type,snapshot.id,member.userId,member.permission));
+      activityEvents.push({kind:'share_invite',userId:member.userId,permission:member.permission,status:'pending'});
       continue;
     }
     const nextStatus=previous.status==='declined'&&member.reinvite?'pending':previous.status;
@@ -182,10 +186,12 @@ export async function syncItemShare(env,identity,itemType,item,requestedMembers=
       SET permission=?,status=?,responded_at=CASE WHEN ?='pending' THEN NULL ELSE responded_at END,updated_at=datetime('now')
       WHERE owner_user_id=? AND item_type=? AND item_id=? AND user_id=?
     `).bind(member.permission,nextStatus,nextStatus,owner,type,snapshot.id,member.userId));
+    if(previous.status==='declined'&&nextStatus==='pending')activityEvents.push({kind:'share_invite',userId:member.userId,permission:member.permission,status:'pending'});
+    else if(previous.permission!==member.permission)activityEvents.push({kind:'share_permission',userId:member.userId,permission:member.permission,status:nextStatus});
   }
   if(writes.length)await env.DB.batch(writes);
   const sharedMembers=await itemMembers(env,owner,type,snapshot.id);
-  return{sharedWithUserIds:sharedMembers.map(x=>x.userId),sharedMembers};
+  return{sharedWithUserIds:sharedMembers.map(x=>x.userId),sharedMembers,activityEvents};
 }
 export async function deleteItemShare(env,identity,itemType,itemId){
   await ensureSchema(env);
