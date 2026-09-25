@@ -1805,7 +1805,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -2011,7 +2011,7 @@ function toggleAccountMenu(source,event){
  const menu=$('accountMenu');if(!menu)return;
  const isOpen=!menu.hidden&&menu.dataset.source===source;
  setAccountMenuOpen(!isOpen,source);
- if(isOpen===false&&runtimeInfo?.runtime==='cloudflare')refreshFriendBadge().catch(()=>{});refreshActivityBadge().catch(()=>{});
+ if(isOpen===false&&runtimeInfo?.runtime==='cloudflare'){refreshFriendBadge().catch(()=>{});refreshActivityBadge().catch(()=>{})}refreshActivityBadge().catch(()=>{});
 }
 function renderRuntimeSession(){
  const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),notificationsButton=$('accountNotifications'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
@@ -2046,6 +2046,13 @@ function renderRuntimeSession(){
    setAccountMenuOpen(false);
  }
 }
+
+function startActivityPolling(){
+ clearInterval(activityPollTimer);
+ if(runtimeInfo?.runtime!=='cloudflare')return;
+ activityPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshActivityBadge().catch(()=>{})},60000);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare')refreshActivityBadge().catch(()=>{})});
 
 document.addEventListener('click',event=>{
  const menu=$('accountMenu');
@@ -2430,6 +2437,16 @@ async function refreshFriendsModal(){
  const data=await refreshFriendBadge();
  if(!data)return;
  renderFriendCollection('friendIncoming',data.incoming,'incoming','No incoming requests.');
+ const invites=data.shareInvitations||[],inviteRoot=$('plannerInvites');
+ if(inviteRoot)inviteRoot.innerHTML=invites.length?invites.map(invite=>'<div class="share-invite-row"><div class="friend-avatar">'+(invite.avatarData?'<img src="'+esc(invite.avatarData)+'" alt="">':esc((invite.sharedByName||invite.sharedByEmail||'?')[0].toUpperCase()))+'</div><div class="friend-copy"><div class="friend-name">'+esc(invite.title||'Shared item')+'</div><div class="friend-email">'+esc(invite.sharedByName||invite.sharedByEmail||'Quest Log friend')+' · '+esc(invite.itemType)+' · <span class="share-permission">'+esc(invite.permission==='edit'?'Can edit':invite.permission==='complete'?'Can complete':'View only')+'</span></div></div><div class="share-invite-actions"><button class="btn tiny primary" data-share-response="accept" data-share-owner="'+esc(invite.ownerUserId)+'" data-share-type="'+esc(invite.itemType)+'" data-share-id="'+esc(invite.itemId)+'">Accept</button><button class="btn tiny ghost" data-share-response="decline" data-share-owner="'+esc(invite.ownerUserId)+'" data-share-type="'+esc(invite.itemType)+'" data-share-id="'+esc(invite.itemId)+'">Decline</button></div></div>').join(''):'<div class="friend-empty">No planner invitations.</div>';
+ if($('plannerInviteCount'))$('plannerInviteCount').textContent=String(invites.length);
+ document.querySelectorAll('[data-share-response]').forEach(button=>button.onclick=async()=>{
+   button.disabled=true;
+   try{
+     await api('/api/shares/respond',{method:'POST',body:JSON.stringify({ownerUserId:button.dataset.shareOwner,itemType:button.dataset.shareType,itemId:button.dataset.shareId,action:button.dataset.shareResponse})});
+     await refreshFriendsModal();await refreshActivityBadge();await loadAll(true);
+   }catch(error){const note=$('friendStatus');if(note){note.textContent=error.message||'Could not update invitation.';note.className='friend-status error'}button.disabled=false}
+ });
  renderFriendCollection('friendList',data.friends,'friend','No friends yet.');
  renderFriendCollection('friendOutgoing',data.outgoing,'outgoing','No sent requests.');
  if($('friendIncomingCount'))$('friendIncomingCount').textContent=String(data.incoming?.length||0);
@@ -2441,7 +2458,7 @@ async function refreshFriendsModal(){
    try{
      if(action==='accept'||action==='decline')await api('/api/friends/respond',{method:'POST',body:JSON.stringify({friendshipId:id,action})});
      else await api('/api/friends/remove',{method:'POST',body:JSON.stringify({friendshipId:id})});
-     await refreshFriendsModal();
+     await refreshFriendsModal();await refreshActivityBadge();
    }catch(error){
      const note=$('friendStatus');if(note){note.textContent=error.message||'Could not update friends.';note.className='friend-status error'}
      button.disabled=false;
