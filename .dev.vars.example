@@ -22,6 +22,16 @@
 # PLAID_SECRET
 # PLAID_ENV=sandbox
 # PLAID_COUNTRY_CODES=CA
+# YODLEE_CLIENT_ID
+# YODLEE_SECRET
+# YODLEE_API_URL=https://sandbox.api.yodlee.com/ysl
+# YODLEE_FASTLINK_URL=https://fl4.sandbox.yodlee.com/authenticate/restserver/fastlink
+# YODLEE_FASTLINK_CONFIG_NAME
+# FLINKS_AUTH_KEY
+# FLINKS_API_KEY
+# FLINKS_API_BASE=https://<instance>-api.private.fin.ag/v3/<customerId>/BankingServices
+# FLINKS_IFRAME_URL=https://<instance>-iframe.private.fin.ag/v2/
+# FLINKS_REDIRECT_URL=https://questlog.example.com/flinks-oauth.html
 #
 # Cloud AI provider keys can normally be entered in Quest Log itself and encrypted into D1.
 # The provider variables below are optional deployment-level fallbacks:
