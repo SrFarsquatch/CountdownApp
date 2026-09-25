@@ -2727,13 +2727,11 @@ function renderToday(){
  renderWeather();renderHomeMarketMovers();
 }
 function taskRow(t){
- const source=t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'',toggle=t.status==='done'?'Reopen':'Complete';
- return `<div class="task-swipe" data-task-swipe="${esc(t.id)}">
-   <div class="task-swipe-reveal" aria-hidden="true">
-     <button class="task-swipe-action task-swipe-complete" type="button" data-task-swipe-toggle="${esc(t.id)}">✓ ${toggle}</button>
-     <div class="task-swipe-secondary"><button class="task-swipe-action task-swipe-snooze" type="button" data-task-swipe-snooze="${esc(t.id)}">Later</button><button class="task-swipe-action task-swipe-edit" type="button" data-task-swipe-edit="${esc(t.id)}">Edit</button></div>
-   </div>
-   <div class="item task-swipe-content" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" data-check="${esc(t.id)}">${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${esc(t.priority)}</span></div>
+ const source=t.shared?'<span class="shared-note">Shared by '+esc(t.sharedByName||t.sharedByEmail||'friend')+'</span>':(t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'');
+ const toggle=t.status==='done'?'Reopen':'Complete',locked=Boolean(t.shared);
+ return `<div class="task-swipe" data-task-swipe="${esc(t.id)}" data-shared="${locked?'1':'0'}">
+   ${locked?'':'<div class="task-swipe-reveal" aria-hidden="true"><button class="task-swipe-action task-swipe-complete" type="button" data-task-swipe-toggle="'+esc(t.id)+'">✓ '+toggle+'</button><div class="task-swipe-secondary"><button class="task-swipe-action task-swipe-snooze" type="button" data-task-swipe-snooze="'+esc(t.id)+'">Later</button><button class="task-swipe-action task-swipe-edit" type="button" data-task-swipe-edit="'+esc(t.id)+'">Edit</button></div></div>'}
+   <div class="item task-swipe-content" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" ${locked?'disabled aria-label="Shared task is read only"':'data-check="'+esc(t.id)+'"'}>${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${locked?'shared':esc(t.priority)}</span></div>
  </div>`;
 }
 function setTaskSwipeOffset(wrap,offset,animate=true){
@@ -2761,6 +2759,7 @@ function taskSnoozeSheet(task){
 function bindTaskSwipes(root){
  if(!isMobileUi())return;
  root.querySelectorAll('[data-task-swipe]').forEach(wrap=>{
+   if(wrap.dataset.shared==='1')return;
    const content=wrap.querySelector('.task-swipe-content');if(!content||content.dataset.swipeBound==='1')return;content.dataset.swipeBound='1';
    let startX=0,startY=0,startOffset=0,horizontal=false,moved=false,pointerId=null;
    content.addEventListener('pointerdown',e=>{
@@ -2799,7 +2798,7 @@ function bindTaskChecks(root){
 }
 function renderTasks(){let list=state.tasks;if(taskFilter==='open')list=list.filter(t=>t.status!=='done');if(taskFilter==='done')list=list.filter(t=>t.status==='done');$('taskCount').textContent=list.length+' task'+(list.length===1?'':'s');$('taskList').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">Nothing here yet.</div>';bindTaskChecks($('taskList'))}
 document.querySelectorAll('#taskFilters button').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.filter;document.querySelectorAll('#taskFilters button').forEach(x=>x.classList.toggle('on',x===b));renderTasks()});
-function renderGoals(){$('goalGrid').innerHTML=state.goals.length?state.goals.map(g=>`<div class="card goal-card" data-goal="${esc(g.id)}"><div class="eyebrow">${esc(g.type)}</div><h3>${esc(g.title)}</h3><div class="goal-number">${g.type==='number'?`${g.current} / ${g.target} ${esc(g.unit||'')}`:`${Math.round(g.progress||0)}%`}</div><div class="progress" style="margin:10px 0"><i style="width:${Math.round(g.progress||0)}%"></i></div><div class="meta">${g.deadline?'Target '+fmtDate(g.deadline,{year:'numeric'}):'No deadline'}${g.project?' · '+esc(g.project):''}</div><div class="goal-actions"><button class="btn tiny" onclick="event.stopPropagation();goalModal(state.goals.find(x=>x.id==='${esc(g.id)}'))">Edit</button></div></div>`).join(''):'<div class="card empty">Create your first goal.</div>'}
+function renderGoals(){$('goalGrid').innerHTML=state.goals.length?state.goals.map(g=>`<div class="card goal-card" data-goal="${esc(g.id)}"><div class="eyebrow">${g.shared?'Shared · ':''}${esc(g.type)}</div><h3>${esc(g.title)}</h3><div class="goal-number">${g.type==='number'?`${g.current} / ${g.target} ${esc(g.unit||'')}`:`${Math.round(g.progress||0)}%`}</div><div class="progress" style="margin:10px 0"><i style="width:${Math.round(g.progress||0)}%"></i></div><div class="meta">${g.deadline?'Target '+fmtDate(g.deadline,{year:'numeric'}):'No deadline'}${g.project?' · '+esc(g.project):''}${g.shared?' · Shared by '+esc(g.sharedByName||g.sharedByEmail||'friend'):''}</div><div class="goal-actions"><button class="btn tiny" onclick="event.stopPropagation();goalModal(state.goals.find(x=>x.id==='${esc(g.id)}'))">${g.shared?'View':'Edit'}</button></div></div>`).join(''):'<div class="card empty">Create your first goal.</div>'}
 function countdownLabel(c){
  const ms=new Date(c.end)-Date.now();if(ms<=0)return{label:'Complete',dense:false};
  const total=Math.floor(ms/1000),days=Math.floor(total/86400),hours=Math.floor(total%86400/3600),minutes=Math.floor(total%3600/60),seconds=total%60,pad=n=>String(n).padStart(2,'0');
@@ -2810,7 +2809,7 @@ function countdownLabel(c){
  if(c.timeDisplayStyle==='precise')return{label:days+'d '+pad(hours)+'h '+pad(minutes)+'m '+pad(seconds)+'s',dense:true};
  const rounded=Math.ceil(ms/86400000);return{label:rounded+' day'+(rounded===1?'':'s'),dense:false}
 }
-function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==false&&c.timeDisplayStyle!=='date'?'<small>'+fmtDate(c.end,{year:'numeric'})+'</small>':'';return `<div class="count-card" data-count="${esc(c.id)}">${date}<strong class="${display.dense?'dense':''}">${esc(display.label)}</strong><div class="title">${esc(c.name)}</div></div>`}
+function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==false&&c.timeDisplayStyle!=='date'?'<small>'+fmtDate(c.end,{year:'numeric'})+'</small>':'',shared=c.shared?'<div class="meta">Shared by '+esc(c.sharedByName||c.sharedByEmail||'friend')+'</div>':'';return `<div class="count-card" data-count="${esc(c.id)}">${date}<strong class="${display.dense?'dense':''}">${esc(display.label)}</strong><div class="title">${esc(c.name)}</div>${shared}</div>`}
 function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" onclick="countdownModal(state.countdowns.find(x=>x.id==='${esc(c.id)}'))">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>'}
 function updateCountdownTimers(){
  if(!state)return;
