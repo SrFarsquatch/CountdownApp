@@ -500,8 +500,9 @@ async function handleApi(request,env,identity){
     return json({ok:true,sync});
   }
   if(p==='/api/google/events'&&method==='GET'){
-    const from=url.searchParams.get('from'),to=url.searchParams.get('to');
-    return json({events:await mergeSharedEvents(env,identity,await eventsBetween(from,to,state,env),from,to)});
+    const from=url.searchParams.get('from'),to=url.searchParams.get('to'),ownEvents=await eventsBetween(from,to,state,env);
+    await refreshOwnedShareSnapshots(env,identity,'event',ownEvents);
+    return json({events:await mergeSharedEvents(env,identity,ownEvents,from,to)});
   }
   const eventMatch=p.match(/^\/api\/google\/accounts\/([^/]+)\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
   if(eventMatch){
