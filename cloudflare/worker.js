@@ -396,7 +396,7 @@ async function handleApi(request,env,identity){
   if(p==='/api/countdowns'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
     if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
-    const item=normalizeCountdown({...incoming,id:id(),created:new Date().toISOString()});state.countdowns.push(item);await saveState(env,state);await syncItemShare(env,identity,'countdown',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,sharedWithUserIds:Array.isArray(incoming.sharedMembers??incoming.sharedWithUserIds)?incoming.sharedMembers??incoming.sharedWithUserIds:[]},201);
+    const item=normalizeCountdown({...incoming,id:id(),created:new Date().toISOString()});state.countdowns.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'countdown',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,...share},201);
   }
   if(p.startsWith('/api/countdowns/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.countdowns.findIndex(x=>x.id===itemId);
@@ -404,7 +404,7 @@ async function handleApi(request,env,identity){
     if(method==='PUT'){
       const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
       if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
-      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);if(incoming.sharedMembers??incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'countdown',[state.countdowns[index]]);const decorated=(await decorateOwnedShares(env,identity,'countdown',[state.countdowns[index]]))[0];return json(decorated);
+      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'countdown',[state.countdowns[index]]);const decorated=(await decorateOwnedShares(env,identity,'countdown',[state.countdowns[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){state.countdowns.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'countdown',itemId);return json({ok:true})}
   }
@@ -413,7 +413,7 @@ async function handleApi(request,env,identity){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Task title',160);
     const now=new Date().toISOString();let item=normalizeTask({...incoming,id:id(),created:now,updated:now});
     if(incoming.googleAccountId&&incoming.googleTaskListId)item=await createGoogleTaskLink(item,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
-    state.tasks.push(item);await saveState(env,state);await syncItemShare(env,identity,'task',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,sharedWithUserIds:Array.isArray(incoming.sharedMembers??incoming.sharedWithUserIds)?incoming.sharedMembers??incoming.sharedWithUserIds:[]},201);
+    state.tasks.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'task',item,incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,...share},201);
   }
   if(p.startsWith('/api/tasks/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.tasks.findIndex(x=>x.id===itemId);
@@ -430,7 +430,7 @@ async function handleApi(request,env,identity){
       }else if(incoming.googleAccountId&&incoming.googleTaskListId){
         next=await createGoogleTaskLink(next,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
       }
-      state.tasks[index]=next;await saveState(env,state);if(incoming.sharedMembers??incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'task',next,incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'task',[next]);const decorated=(await decorateOwnedShares(env,identity,'task',[state.tasks[index]]))[0];return json(decorated);
+      state.tasks[index]=next;await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'task',next,incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'task',[next]);const decorated=(await decorateOwnedShares(env,identity,'task',[state.tasks[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){const item=state.tasks[index];await deleteLinkedGoogleTask(item,state,env);state.tasks.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'task',itemId);return json({ok:true})}
   }
@@ -438,14 +438,14 @@ async function handleApi(request,env,identity){
   if(p==='/api/goals'&&method==='POST'){
     const incoming=await body(request);ensureItemTitle(incoming.title,'Goal title',160);
     const now=new Date().toISOString(),item=normalizeGoal({...incoming,id:id(),created:now,updated:now});
-    state.goals.push(item);await saveState(env,state);await syncItemShare(env,identity,'goal',{...item,progress:0},incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,progress:0,sharedWithUserIds:Array.isArray(incoming.sharedMembers??incoming.sharedWithUserIds)?incoming.sharedMembers??incoming.sharedWithUserIds:[]},201);
+    state.goals.push(item);await saveState(env,state);const share=await syncItemShare(env,identity,'goal',{...item,progress:0},incoming.sharedMembers??incoming.sharedWithUserIds);return json({...item,progress:0,...share},201);
   }
   if(p.startsWith('/api/goals/')){
     const itemId=decodeURIComponent(p.split('/').pop()),index=state.goals.findIndex(x=>x.id===itemId);
     if(index<0)return json({error:'Not found'},404);
     if(method==='PUT'){
       const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Goal title',160);
-      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);if(incoming.sharedMembers??incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'goal',[state.goals[index]]);const decorated=(await decorateOwnedShares(env,identity,'goal',[state.goals[index]]))[0];return json(decorated);
+      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedMembers??incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'goal',[state.goals[index]]);const decorated=(await decorateOwnedShares(env,identity,'goal',[state.goals[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){
       state.goals.splice(index,1);state.tasks=state.tasks.map(t=>t.goalId===itemId?{...t,goalId:''}:t);state.countdowns=state.countdowns.map(c=>c.goalId===itemId?{...c,goalId:''}:c);await saveState(env,state);await deleteItemShare(env,identity,'goal',itemId);return json({ok:true});
@@ -576,7 +576,7 @@ async function handleApi(request,env,identity){
     }
     if((method==='PATCH'||method==='PUT')&&eventId){
       const incoming=await body(request),event=await mutateEvent(accountId,calendarId,eventId,method,incoming,state,env),snapshot=sharedEventSnapshot(event,{...incoming,id:eventId,sourceAccountId:accountId,sourceCalendarId:calendarId});
-      if(incoming.sharedMembers??incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'event',snapshot,incoming.sharedMembers??incoming.sharedWithUserIds);
+      if(incoming.sharedMembers!==undefined||incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'event',snapshot,incoming.sharedMembers??incoming.sharedWithUserIds);
       else await refreshOwnedShareSnapshots(env,identity,'event',[snapshot]);
       return json({ok:true,event});
     }
