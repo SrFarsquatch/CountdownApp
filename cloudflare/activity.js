@@ -135,6 +135,13 @@ export async function markActivityNotifications(env,identity,input={}){
   const row=await env.DB.prepare('SELECT COUNT(*) AS total FROM questlog_activity_notifications WHERE user_id=? AND is_read=0').bind(userId).first();
   return{ok:true,unreadCount:Number(row?.total)||0};
 }
+export async function resolveActivityByDedupe(env,identity,dedupeKey){
+  await ensureSchema(env);
+  const userId=currentUserId(identity),key=clean(dedupeKey,240);
+  if(!key)return{ok:true};
+  await env.DB.prepare("UPDATE questlog_activity_notifications SET is_read=1,read_at=COALESCE(read_at,datetime('now')) WHERE user_id=? AND dedupe_key=?").bind(userId,key).run();
+  return{ok:true};
+}
 export async function removeActivityNotification(env,identity,notificationId){
   await ensureSchema(env);
   const userId=currentUserId(identity),idValue=clean(notificationId,120);
