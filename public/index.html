@@ -3687,11 +3687,23 @@ function renderSectionLayoutEditor(renderSettings=true){
 function renderDisplay(){
  const d=state.display,wc=state.weather||{};
  $('displayMode').value=d.mode||'daily';$('displayLayout').value=d.layout||'auto';$('displayPalette').value=d.palette||'spectra6';$('displayRefresh').value=String(d.refreshMinutes||15);
+ syncDisplayPreviewOrientation(d.layout||'auto');
  if($('weatherConfigStatus'))$('weatherConfigStatus').textContent=wc.locationLabel?'Weather: '+wc.locationLabel+' · location managed in Settings.':'Choose a weather location in Settings.';
  displayLayoutsDraft=cloneModeLayouts(d.modeLayouts);displaySectionsDraft=cloneModeSections(d.modeSections);displayLayoutDraft=displayLayoutsDraft[currentDisplayMode()];
  const root=location.origin;
  if($('imageUrl'))$('imageUrl').textContent=root+(d.imagePath||d.svgPath)+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('svgUrl').textContent=root+d.svgPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);$('feedUrl').textContent=root+d.feedPath;$('viewUrl').textContent=root+d.viewPath+'&w='+Math.max(300,Number($('previewW').value)||800)+'&h='+Math.max(300,Number($('previewH').value)||480);
  renderSectionLayoutEditor();previewDisplay();
+}
+function syncDisplayPreviewOrientation(layout,{announce=false}={}){
+ const widthInput=$('previewW'),heightInput=$('previewH');if(!widthInput||!heightInput)return false;
+ let w=Math.max(300,Number(widthInput.value)||800),h=Math.max(300,Number(heightInput.value)||480),changed=false;
+ if(layout==='portrait'&&w>h){[w,h]=[h,w];changed=true}
+ if(layout==='landscape'&&h>w){[w,h]=[h,w];changed=true}
+ if(changed){widthInput.value=String(w);heightInput.value=String(h)}
+ if(announce&&layout!=='auto'){
+   setLayoutStatus((layout==='portrait'?'Portrait':'Landscape')+' output set to '+w+' × '+h+'. Existing widget positions were preserved; use Auto arrange if you want a fresh '+layout+' layout.');
+ }
+ return changed;
 }
 function previewDisplay(){
  if(!state)return;
@@ -3704,8 +3716,13 @@ function previewDisplay(){
  if($('einkLayoutShell'))renderSectionLayoutEditor();
 }
 $('previewW').onchange=$('previewH').onchange=()=>{renderSectionLayoutEditor(false);previewDisplay()};
-$('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;renderSectionLayoutEditor(false);previewDisplay()};
-$('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;renderSectionLayoutEditor(false);previewDisplay()};
+$('displayLayout').onchange=()=>{
+ const layout=$('displayLayout').value;
+ syncDisplayPreviewOrientation(layout,{announce:true});
+ renderSectionLayoutEditor(false);previewDisplay();
+};
+$('landPreset').onclick=()=>{$('previewW').value=800;$('previewH').value=480;$('displayLayout').value='landscape';renderSectionLayoutEditor(false);previewDisplay();setLayoutStatus('Landscape output set to 800 × 480. Save display to apply.')};
+$('portPreset').onclick=()=>{$('previewW').value=480;$('previewH').value=800;$('displayLayout').value='portrait';renderSectionLayoutEditor(false);previewDisplay();setLayoutStatus('Portrait output set to 480 × 800. Save display to apply.')};
 $('openFrame').onclick=async()=>{
  const popup=window.open('about:blank','_blank');
  try{
