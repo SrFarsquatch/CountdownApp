@@ -262,7 +262,7 @@ async function handleApi(request,env,identity){
     const incoming=await body(request);
     return json(await startFinanceConnection(env,identity,'plaid',incoming));
   }
-  if(p==='/api/finance/preferences'&&method==='PUT')return json(await saveFinancePreferences(env,identity,await body(request)));
+  if(p==='/api/finance/preferences'&&method==='PUT'){await saveFinancePreferences(env,identity,await body(request));return json(await financeSummary(env,identity,{sync:false}))}
   if(p==='/api/finance/exchange'&&method==='POST'){
     const incoming=await body(request);
     await completeFinanceConnection(env,identity,'plaid',incoming);
