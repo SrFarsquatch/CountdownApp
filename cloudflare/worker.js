@@ -342,7 +342,7 @@ async function handleApi(request,env,identity){
     if(method==='PUT'){
       const incoming=await body(request);ensureItemTitle(incoming.name,'Countdown name',100);
       if(!iso(incoming.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
-      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedWithUserIds);return json({...state.countdowns[index],sharedWithUserIds:Array.isArray(incoming.sharedWithUserIds)?incoming.sharedWithUserIds:[]});
+      state.countdowns[index]=normalizeCountdown({...state.countdowns[index],...incoming,id:itemId,created:state.countdowns[index].created});await saveState(env,state);if(incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'countdown',state.countdowns[index],incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'countdown',[state.countdowns[index]]);const decorated=(await decorateOwnedShares(env,identity,'countdown',[state.countdowns[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){state.countdowns.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'countdown',itemId);return json({ok:true})}
   }
@@ -368,7 +368,7 @@ async function handleApi(request,env,identity){
       }else if(incoming.googleAccountId&&incoming.googleTaskListId){
         next=await createGoogleTaskLink(next,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
       }
-      state.tasks[index]=next;await saveState(env,state);await syncItemShare(env,identity,'task',next,incoming.sharedWithUserIds);return json({...state.tasks[index],sharedWithUserIds:Array.isArray(incoming.sharedWithUserIds)?incoming.sharedWithUserIds:[]});
+      state.tasks[index]=next;await saveState(env,state);if(incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'task',next,incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'task',[next]);const decorated=(await decorateOwnedShares(env,identity,'task',[state.tasks[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){const item=state.tasks[index];await deleteLinkedGoogleTask(item,state,env);state.tasks.splice(index,1);await saveState(env,state);await deleteItemShare(env,identity,'task',itemId);return json({ok:true})}
   }
@@ -383,7 +383,7 @@ async function handleApi(request,env,identity){
     if(index<0)return json({error:'Not found'},404);
     if(method==='PUT'){
       const incoming=await body(request);if(incoming.title!==undefined)ensureItemTitle(incoming.title,'Goal title',160);
-      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedWithUserIds);return json({...state.goals[index],sharedWithUserIds:Array.isArray(incoming.sharedWithUserIds)?incoming.sharedWithUserIds:[]});
+      state.goals[index]=normalizeGoal({...state.goals[index],...incoming,id:itemId,created:state.goals[index].created,updated:new Date().toISOString()});await saveState(env,state);if(incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'goal',state.goals[index],incoming.sharedWithUserIds);else await refreshOwnedShareSnapshots(env,identity,'goal',[state.goals[index]]);const decorated=(await decorateOwnedShares(env,identity,'goal',[state.goals[index]]))[0];return json(decorated);
     }
     if(method==='DELETE'){
       state.goals.splice(index,1);state.tasks=state.tasks.map(t=>t.goalId===itemId?{...t,goalId:''}:t);state.countdowns=state.countdowns.map(c=>c.goalId===itemId?{...c,goalId:''}:c);await saveState(env,state);await deleteItemShare(env,identity,'goal',itemId);return json({ok:true});
@@ -512,8 +512,9 @@ async function handleApi(request,env,identity){
       return json({ok:true,event},201);
     }
     if((method==='PATCH'||method==='PUT')&&eventId){
-      const incoming=await body(request),event=await mutateEvent(accountId,calendarId,eventId,method,incoming,state,env);
-      await syncItemShare(env,identity,'event',sharedEventSnapshot(event,{...incoming,id:eventId}),incoming.sharedWithUserIds);
+      const incoming=await body(request),event=await mutateEvent(accountId,calendarId,eventId,method,incoming,state,env),snapshot=sharedEventSnapshot(event,{...incoming,id:eventId});
+      if(incoming.sharedWithUserIds!==undefined)await syncItemShare(env,identity,'event',snapshot,incoming.sharedWithUserIds);
+      else await refreshOwnedShareSnapshots(env,identity,'event',[snapshot]);
       return json({ok:true,event});
     }
     if(method==='DELETE'&&eventId){await mutateEvent(accountId,calendarId,eventId,'DELETE',null,state,env);await deleteItemShare(env,identity,'event',eventId);return json({ok:true})}
