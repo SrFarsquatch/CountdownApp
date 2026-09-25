@@ -1774,7 +1774,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script>
-let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
@@ -3659,7 +3659,7 @@ async function connectFinanceProvider(provider,itemId=''){
    }
    if(id==='flinks'){
      openModal(itemId?'Re-authenticate bank':'Connect with Flinks','<div style="height:min(72vh,680px);min-height:520px"><iframe id="financeFlinksFrame" title="Connect bank with Flinks" style="width:100%;height:100%;border:0;border-radius:12px;background:var(--panel)" allow="clipboard-read; clipboard-write"></iframe></div>');
-     const frame=$('financeFlinksFrame');frame.src=launch.url;
+     const frame=$('financeFlinksFrame');financeFlinksOrigin=new URL(launch.url).origin;frame.src=launch.url;
      return;
    }
    throw Error('Unknown finance provider.');
@@ -3673,7 +3673,14 @@ async function finishFlinksMessage(data){
 async function connectFinanceBank(){openFinanceProviderPicker()}
 window.addEventListener('message',async event=>{
  if(event.origin===location.origin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
- if(event.data?.step==='REDIRECT'&&(event.data?.loginId||event.data?.LoginId)){await finishFlinksMessage(event.data)}
+ if(financeFlinksOrigin&&event.origin===financeFlinksOrigin&&event.data?.step==='REDIRECT'&&(event.data?.loginId||event.data?.LoginId)){await finishFlinksMessage(event.data);return}
+ if(event.origin===location.origin&&event.data?.type==='questlog-plaid-oauth-complete'){
+   financeLinkLoading=false;plaidLinkLoading=false;
+   if(event.data.ok){
+     try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
+     catch(error){financeError=error.message;renderFinance()}
+   }else{financeError=event.data.error||'Bank connection could not be completed.';renderFinance()}
+ }
 });
 $('financeSyncButton').onclick=async()=>{
  const button=$('financeSyncButton');button.disabled=true;button.textContent='Syncing…';
