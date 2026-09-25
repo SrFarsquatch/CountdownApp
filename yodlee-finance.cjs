@@ -96,6 +96,14 @@ async function yodleeGet(env, token, endpoint) {
   });
   return responseJson(response);
 }
+function accountType(container) {
+  const value = clean(container, 80).toLowerCase();
+  if (value === 'bank') return 'depository';
+  if (value === 'creditcard' || value === 'credit_card') return 'credit';
+  if (value === 'loan') return 'loan';
+  if (value === 'investment') return 'investment';
+  return value || 'other';
+}
 function mapAccount(account) {
   const id = clean(account?.id, 120);
   const providerAccountId = clean(account?.providerAccountId, 120);
@@ -107,7 +115,7 @@ function mapAccount(account) {
     name: clean(account?.accountName || account?.name || account?.accountType || 'Account', 180),
     officialName: clean(account?.accountName || '', 180),
     mask: accountMask(account),
-    type: clean(account?.container || 'bank', 80).toLowerCase(),
+    type: accountType(account?.container || account?.CONTAINER || 'bank'),
     subtype: clean(account?.accountType || '', 100).toLowerCase(),
     currency: currency(account?.balance || account?.currentBalance || account?.availableBalance),
     currentBalance: balance,
