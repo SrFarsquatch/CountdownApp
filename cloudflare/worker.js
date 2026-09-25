@@ -16,10 +16,11 @@ import { financeSummary, financeProviders, startFinanceConnection, completeFinan
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
-import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep } from './notifications.js';
+import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
+import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification } from './activity.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -229,6 +230,17 @@ function cloudUpdateStatus(env){
 function ensureItemTitle(value,label,max){
   if(!cleanText(value,max)){const e=new Error(label+' is required.');e.status=400;throw e}
 }
+async function notifyUserActivity(env,userId,input={}){
+  const activity=await createActivityNotification(env,{...input,userId});
+  try{
+    const targetEnv=scopedUserEnv(env,{userId}),targetState=await loadState(targetEnv);
+    await sendInstantNotification(targetState,targetEnv,{
+      title:activity.title,body:activity.body,url:activity.route,kind:activity.kind,
+      tag:'questlog-activity-'+activity.notificationId
+    });
+  }catch(error){console.warn('Quest Log activity push failed',error)}
+  return activity;
+}
 async function handleApi(request,env,identity){
   env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
@@ -236,12 +248,15 @@ async function handleApi(request,env,identity){
   if(p==='/api/profile'&&method==='PUT')return json(await updateProfile(env,identity,await body(request)));
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await requestFriend(env,identity,incoming.email),201);
+    const incoming=await body(request),before=await listFriends(env,identity),result=await requestFriend(env,identity,incoming.email),after=await listFriends(env,identity);
+    const target=(after.outgoing||[]).find(x=>x.friendshipId===result.friendshipId);
+    if(target?.userId)await notifyUserActivity(env,target.userId,{kind:'friend_request',actorUserId:identity.userId,dedupeKey:'friend-request:'+result.friendshipId,data:{friendshipId:result.friendshipId}});
+    return json(result,201);
   }
   if(p==='/api/friends/respond'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await respondFriend(env,identity,incoming.friendshipId,incoming.action));
+    const incoming=await body(request),before=await listFriends(env,identity),relation=(before.incoming||[]).find(x=>x.friendshipId===incoming.friendshipId),result=await respondFriend(env,identity,incoming.friendshipId,incoming.action);
+    if(incoming.action==='accept'&&relation?.userId)await notifyUserActivity(env,relation.userId,{kind:'friend_accepted',actorUserId:identity.userId,dedupeKey:'friend-accepted:'+incoming.friendshipId,data:{friendshipId:incoming.friendshipId}});
+    return json(result);
   }
   if(p==='/api/friends/remove'&&method==='POST'){
     const incoming=await body(request);
@@ -253,8 +268,18 @@ async function handleApi(request,env,identity){
   }
   if(p==='/api/shares/invitations'&&method==='GET')return json(await listShareInvitations(env,identity));
   if(p==='/api/shares/respond'&&method==='POST'){
-    const incoming=await body(request);
-    return json(await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action));
+    const incoming=await body(request),inviteList=await listShareInvitations(env,identity),invite=(inviteList.invitations||[]).find(x=>x.ownerUserId===incoming.ownerUserId&&x.itemType===incoming.itemType&&x.itemId===incoming.itemId);
+    const result=await respondShareInvitation(env,identity,incoming.ownerUserId,incoming.itemType,incoming.itemId,incoming.action);
+    if(incoming.ownerUserId){
+      await notifyUserActivity(env,incoming.ownerUserId,{
+        kind:incoming.action==='accept'?'share_accepted':'share_declined',
+        actorUserId:identity.userId,targetType:incoming.itemType,targetId:incoming.itemId,targetOwnerUserId:incoming.ownerUserId,
+        subject:invite?.title||('shared '+incoming.itemType),
+        dedupeKey:'share-response:'+incoming.ownerUserId+':'+incoming.itemType+':'+incoming.itemId+':'+identity.userId,
+        data:{action:incoming.action}
+      });
+    }
+    return json(result);
   }
   if(p==='/api/shares/item'&&method==='PUT'){
     const incoming=await body(request),ownerUserId=cleanText(incoming.ownerUserId,120),itemType=cleanText(incoming.itemType,30),itemId=cleanText(incoming.itemId,240);
@@ -279,6 +304,7 @@ async function handleApi(request,env,identity){
         next=await updateLinkedGoogleTask(next,ownerState,ownerEnv);
       }
       ownerState.tasks[index]=next;await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'task',[next]);
+      await notifyUserActivity(env,ownerUserId,{kind:next.status==='done'&&existing.status!=='done'?'shared_item_completed':'shared_item_updated',actorUserId:identity.userId,targetType:'task',targetId:itemId,targetOwnerUserId:ownerUserId,subject:next.title,dedupeKey:'shared-change:'+ownerUserId+':task:'+itemId+':'+identity.userId+':'+Date.now()});
       return json({ok:true,item:next});
     }
     if(itemType==='goal'){
@@ -290,8 +316,9 @@ async function handleApi(request,env,identity){
       }
       if(allowed.title!==undefined)ensureItemTitle(allowed.title,'Goal title',160);
       ownerState.goals[index]=normalizeGoal({...ownerState.goals[index],...allowed,id:itemId,created:ownerState.goals[index].created,updated:new Date().toISOString()});
-      await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'goal',[ownerState.goals[index]]);
-      return json({ok:true,item:ownerState.goals[index]});
+      const goalAfter=ownerState.goals[index];await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'goal',[goalAfter]);
+      await notifyUserActivity(env,ownerUserId,{kind:goalAfter.status==='complete'?'shared_item_completed':'shared_item_updated',actorUserId:identity.userId,targetType:'goal',targetId:itemId,targetOwnerUserId:ownerUserId,subject:goalAfter.title,dedupeKey:'shared-change:'+ownerUserId+':goal:'+itemId+':'+identity.userId+':'+Date.now()});
+      return json({ok:true,item:goalAfter});
     }
     if(itemType==='countdown'){
       if(!access.canEdit){const e=new Error('This countdown is view-only.');e.status=403;throw e}
@@ -299,8 +326,9 @@ async function handleApi(request,env,identity){
       if(changes.name!==undefined)ensureItemTitle(changes.name,'Countdown name',100);
       if(changes.end!==undefined&&!iso(changes.end)){const e=new Error('A valid end date is required.');e.status=400;throw e}
       ownerState.countdowns[index]=normalizeCountdown({...ownerState.countdowns[index],...changes,id:itemId,created:ownerState.countdowns[index].created});
-      await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'countdown',[ownerState.countdowns[index]]);
-      return json({ok:true,item:ownerState.countdowns[index]});
+      const countdownAfter=ownerState.countdowns[index];await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'countdown',[countdownAfter]);
+      await notifyUserActivity(env,ownerUserId,{kind:'shared_item_updated',actorUserId:identity.userId,targetType:'countdown',targetId:itemId,targetOwnerUserId:ownerUserId,subject:countdownAfter.name,dedupeKey:'shared-change:'+ownerUserId+':countdown:'+itemId+':'+identity.userId+':'+Date.now()});
+      return json({ok:true,item:countdownAfter});
     }
     if(itemType==='event'){
       if(!access.canEdit){const e=new Error('This event is view-only.');e.status=403;throw e}
@@ -309,10 +337,14 @@ async function handleApi(request,env,identity){
       const event=await mutateEvent(accountId,calendarId,itemId,'PATCH',changes,ownerState,ownerEnv);
       const snapshot=sharedEventSnapshot(event,{...changes,id:itemId,sourceAccountId:accountId,sourceCalendarId:calendarId});
       await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'event',[snapshot]);
+      await notifyUserActivity(env,ownerUserId,{kind:'shared_item_updated',actorUserId:identity.userId,targetType:'event',targetId:itemId,targetOwnerUserId:ownerUserId,subject:snapshot.title,dedupeKey:'shared-change:'+ownerUserId+':event:'+itemId+':'+identity.userId+':'+Date.now()});
       return json({ok:true,event});
     }
     const e=new Error('Unsupported shared item type.');e.status=400;throw e;
   }
+  if(p==='/api/activity'&&method==='GET')return json(await listActivityNotifications(env,identity,{limit:Number(url.searchParams.get('limit'))||60}));
+  if(p==='/api/activity/read'&&method==='POST')return json(await markActivityNotifications(env,identity,await body(request)));
+  if(p==='/api/activity/remove'&&method==='POST'){const incoming=await body(request);return json(await removeActivityNotification(env,identity,incoming.notificationId))}
   if(p.startsWith('/api/update/')){
     if(p==='/api/update/status'&&method==='GET')return json(cloudUpdateStatus(env));
     if(p==='/api/update/check'&&method==='POST')return json({ok:true,...cloudUpdateStatus(env)});
