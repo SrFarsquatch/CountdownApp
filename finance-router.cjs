@@ -5,7 +5,7 @@ module.exports=function createFinanceRouter({plaid,yodlee,flinks}){
  const available=()=>Object.entries(providers).map(([id,p])=>({id,name:names[id],configured:Boolean(p?.configured?.()),environment:p?.environment?.()||''}));
  const providerForItem=itemId=>String(itemId||'').split(':')[0]||'plaid';
  async function summary(sync=true){
-  const results=[];for(const [id,p] of Object.entries(providers)){if(!p)continue;try{results.push([id,await p.summary(sync)])}catch(e){results.push([id,{configured:p.configured?.()||false,connections:[],accounts:[],transactions:[],errors:[{provider:id,error:e.message}]}])}}
+  const results=[];for(const [id,p] of Object.entries(providers)){if(!p)continue;try{results.push([id,await p.summary(id==='flinks'?false:sync)])}catch(e){results.push([id,{configured:p.configured?.()||false,connections:[],accounts:[],transactions:[],errors:[{provider:id,error:e.message}]}])}}
   const plaidResult=results.find(x=>x[0]==='plaid')?.[1]||{};
   const connections=[],accounts=[],transactions=[],errors=[];
   for(const [id,r] of results){connections.push(...(r.connections||[]).map(x=>({...x,itemId:id==='plaid'&&!String(x.itemId).startsWith('plaid:')?'plaid:'+x.itemId:x.itemId,provider:id,providerName:names[id]})));accounts.push(...(r.accounts||[]).map(x=>({...x,itemId:id==='plaid'&&!String(x.itemId).startsWith('plaid:')?'plaid:'+x.itemId:x.itemId,provider:id})));transactions.push(...(r.transactions||[]).map(x=>({...x,itemId:id==='plaid'&&!String(x.itemId).startsWith('plaid:')?'plaid:'+x.itemId:x.itemId,provider:id})));errors.push(...(r.errors||[]).map(e=>typeof e==='string'?{provider:id,error:e}:{provider:id,...e}))}
