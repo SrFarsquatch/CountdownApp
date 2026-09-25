@@ -42,12 +42,14 @@ If both runtimes are connected to the same external service, such as the same Go
 - Cloud runtime currently uses **Open-Meteo** directly.
 - No weather API key is required.
 
-### Finance and Plaid
+### Finance and bank connections
 
 - The former Markets page is evolving into a lightweight **Finance** workspace.
-- Plaid Link can connect bank accounts without Quest Log ever receiving online-banking credentials.
-- Connected accounts, balances, and recent Transactions data are shown alongside the existing Yahoo Finance watchlist.
-- Plaid access tokens are encrypted with `APP_SECRET` and are never returned in browser API responses.
+- Quest Log supports **Plaid, Envestnet | Yodlee, and Flinks** behind one Finance API. Users can choose any provider that is configured for the deployment.
+- **Yodlee FastLink 4** is available for direct/tokenized Canadian connections and can reopen an existing provider account in refresh mode when MFA is required.
+- **Flinks Connect** is available as a Canadian-focused fallback. Flinks connections retain their `loginId` so Quest Log can reopen Connect for interactive MFA/reconnect; Flinks refresh is user-triggered rather than silently run whenever Finance opens.
+- Connected accounts, balances, and recent transactions from all configured providers are normalized into the same Finance dashboard alongside the Yahoo Finance watchlist.
+- Plaid access tokens remain encrypted with `APP_SECRET`; Yodlee client credentials and Flinks API/auth keys stay server-side and are never persisted in browser storage.
 - Cloud deployments use native **Quest Log user IDs**. Planner state, connected services, Plaid Items, accounts, and transactions are isolated per user, and one user can connect multiple institutions without exposing data to other users.
 - Self-hosted deployments keep Plaid data in a separate `/data/finance-data.json` store; the current self-hosted runtime remains a trusted single-user installation until Quest Log's native multi-user login is added. Only the Plaid access token is encrypted, so treat the persistent data directory as private.
 - This first finance slice syncs when Finance is opened (with a short cache) and when the user presses **Sync**. Budget rules, spending categories, cash-flow planning, goals, and webhook-driven background refresh are intended follow-on layers.
@@ -260,6 +262,17 @@ The CasaOS one-click updater also requires the Docker socket. A normal Docker de
 | `PLAID_SECRET` | For Finance | Plaid Sandbox or Production secret; keep secret |
 | `PLAID_ENV` | Optional | `sandbox` while developing, `production` for live bank connections |
 | `PLAID_COUNTRY_CODES` | Optional | Comma-separated Plaid countries; defaults to `CA` |
+| `YODLEE_CLIENT_ID` | For Yodlee | Yodlee client-credential application ID |
+| `YODLEE_SECRET` | For Yodlee | Yodlee client-credential secret; keep secret |
+| `YODLEE_API_URL` | Optional | Yodlee YSL API base; defaults to sandbox |
+| `YODLEE_FASTLINK_URL` | For Yodlee | FastLink 4 launch URL supplied by Yodlee |
+| `YODLEE_FASTLINK_CONFIG_NAME` | For Yodlee | FastLink configuration name |
+| `YODLEE_LOGIN_NAME` | Self-hosted Yodlee | Stable Yodlee user login; defaults to `questlog_selfhosted` |
+| `FLINKS_AUTH_KEY` | For Flinks | Flinks Connect authorization key; keep secret |
+| `FLINKS_API_KEY` | For Flinks | Flinks data API key; keep secret |
+| `FLINKS_API_BASE` | For Flinks | BankingServices API base supplied by Flinks |
+| `FLINKS_IFRAME_URL` | For Flinks | Flinks Connect v2 iframe URL |
+| `FLINKS_REDIRECT_URL` | Optional | Absolute Quest Log `/flinks-oauth.html` URL |
 | `VAPID_PUBLIC_KEY` | For notifications | Web Push public application-server key |
 | `VAPID_PRIVATE_KEY` | For notifications | Web Push private application-server key; keep secret |
 | `VAPID_SUBJECT` | For notifications | Contact URI, usually `mailto:you@example.com` |
@@ -383,6 +396,9 @@ Core/integration secrets:
 | `GOOGLE_CLIENT_SECRET` | Secret | Google Calendar/Tasks |
 | `TURNSTILE_SECRET_KEY` | Secret | Native signup/login bot protection |
 | `PLAID_SECRET` | Secret | Plaid bank connections |
+| `YODLEE_SECRET` | Secret | Yodlee bank connections |
+| `FLINKS_AUTH_KEY` | Secret | Flinks Connect authorization |
+| `FLINKS_API_KEY` | Secret | Flinks account/transaction retrieval |
 | `OPENAI_API_KEY` | Secret | Optional fallback for Cloud Navi OpenAI |
 | `ANTHROPIC_API_KEY` | Secret | Optional fallback for Cloud Navi Anthropic |
 | `GEMINI_API_KEY` | Secret | Optional fallback for Cloud Navi Gemini |
@@ -401,6 +417,13 @@ Useful non-secret variables:
 | Name | Used for |
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `YODLEE_CLIENT_ID` | Yodlee client-credential application ID |
+| `YODLEE_API_URL` | Yodlee YSL API base |
+| `YODLEE_FASTLINK_URL` | Yodlee FastLink 4 URL |
+| `YODLEE_FASTLINK_CONFIG_NAME` | Yodlee FastLink configuration |
+| `FLINKS_API_BASE` | Flinks BankingServices API base |
+| `FLINKS_IFRAME_URL` | Flinks Connect v2 iframe URL |
+| `FLINKS_REDIRECT_URL` | Optional Quest Log Flinks callback URL |
 | `VAPID_PUBLIC_KEY` | Web Push public key |
 | `VAPID_SUBJECT` | Web Push contact URI |
 | `OPENAI_MODEL` | Optional OpenAI model override |
