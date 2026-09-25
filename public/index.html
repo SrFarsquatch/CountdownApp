@@ -2783,7 +2783,7 @@ function renderToday(){
 function taskRow(t){
  const source=t.shared?'<span class="shared-note">Shared by '+esc(t.sharedByName||t.sharedByEmail||'friend')+'</span>':(t.googleTaskId?'<span class="sync-source">'+esc(t.googleTaskListTitle||'Google Tasks')+'</span>':'');
  const toggle=t.status==='done'?'Reopen':'Complete',locked=Boolean(t.shared&&!t.canComplete),editable=Boolean(!t.shared||t.canEdit);
- return `<div class="task-swipe" data-task-swipe="${esc(t.id)}" data-shared="${locked?'1':'0'}">
+ return `<div class="task-swipe" data-task-swipe="${esc(t.id)}" data-shared="${t.shared?'1':'0'}">
    ${t.shared?'':'<div class="task-swipe-reveal" aria-hidden="true"><button class="task-swipe-action task-swipe-complete" type="button" data-task-swipe-toggle="'+esc(t.id)+'">✓ '+toggle+'</button><div class="task-swipe-secondary"><button class="task-swipe-action task-swipe-snooze" type="button" data-task-swipe-snooze="'+esc(t.id)+'">Later</button><button class="task-swipe-action task-swipe-edit" type="button" data-task-swipe-edit="'+esc(t.id)+'">Edit</button></div></div>'}
    <div class="item task-swipe-content" data-task="${esc(t.id)}"><button class="check ${t.status==='done'?'done':''}" ${locked?'disabled aria-label="Shared task is read only"':'data-check="'+esc(t.id)+'"'}>${t.status==='done'?'✓':''}</button><div><div class="title">${esc(t.title)}</div><div class="meta">${t.due?fmtDate(t.due)+' · '+fmtTime(t.due):'No due date'}${t.project?' · '+esc(t.project):''}${source?' · '+source:''}</div></div><span class="pill ${t.priority}">${locked?'shared':esc(t.priority)}</span></div>
  </div>`;
