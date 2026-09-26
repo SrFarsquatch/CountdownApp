@@ -291,6 +291,7 @@
 .event-detail-grid{display:grid;gap:12px}
 .event-detail-row{display:grid;grid-template-columns:95px minmax(0,1fr);gap:12px;padding-top:10px;border-top:1px solid var(--line)}
 .event-detail-row:first-child{border-top:0;padding-top:0}
+[data-task],[data-goal][role="button"],[data-countdown-detail],[data-home-goal],[data-home-countdown],[data-cal-task]{cursor:pointer}
 @media(max-width:760px){
   .calendar-stage{max-height:calc(100vh - 235px)}
   .week-day-heads,.week-all-day,.week-time-grid{min-width:780px;grid-template-columns:58px repeat(7,minmax(103px,1fr))}
@@ -3000,6 +3001,78 @@ async function eventModal(item=null,preset={}){
  };
 }
 
+function questDetailRow(label,value,options={}){
+ if(value===undefined||value===null||value==='')return'';
+ const html=options.html?String(value):esc(String(value)).replace(/\n/g,'<br>');
+ return '<div class="event-detail-row"><strong>'+esc(label)+'</strong><div>'+html+'</div></div>';
+}
+function collaboratorDetail(item){
+ const members=Array.isArray(item?.sharedMembers)?item.sharedMembers:[];
+ if(!members.length)return'';
+ const accepted=members.filter(member=>member?.status==='accepted').length,pending=members.filter(member=>member?.status==='pending').length;
+ return [accepted?accepted+' collaborator'+(accepted===1?'':'s'):'',pending?pending+' pending':''].filter(Boolean).join(' · ');
+}
+function taskDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'task');
+ const goal=(state.goals||[]).find(goal=>String(goal.id)===String(item.goalId||'')),linked=Boolean(item.googleTaskId);
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('Due',item.due?fmtDate(item.due,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.due):'No due date');
+ body+=questDetailRow('Status',item.status==='done'?'Complete':item.status==='progress'?'In progress':'To do');
+ body+=questDetailRow('Priority',(item.priority||'medium').replace(/^./,x=>x.toUpperCase()));
+ if(item.project)body+=questDetailRow('Project',item.project);
+ if(goal)body+=questDetailRow('Goal',goal.title);
+ if(linked)body+=questDetailRow('Google Tasks',item.googleTaskListTitle||'Linked task');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ if(item.description)body+=questDetailRow('Notes',item.description);
+ body+='<div class="modal-actions"><button class="btn" id="toggleTaskDetail" type="button">'+(item.status==='done'?'Reopen':'Complete')+'</button><button class="btn primary" id="editTaskDetail" type="button">Edit</button></div></div>';
+ openModal(item.title||'Task',body);
+ $('editTaskDetail').onclick=()=>taskModal(item);
+ $('toggleTaskDetail').onclick=async()=>{
+   $('toggleTaskDetail').disabled=true;
+   try{closeModal();await toggleTaskWithUndo(item)}
+   catch(error){console.warn(error)}
+ };
+}
+function goalDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'goal');
+ const progress=Math.max(0,Math.min(100,Math.round(Number(item.progress)||0))),unit=item.unit?' '+item.unit:'';
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('Progress',item.type==='number'?String(item.current??0)+' / '+String(item.target??0)+unit:progress+'%');
+ if(item.deadline)body+=questDetailRow('Target',fmtDate(item.deadline,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.deadline));
+ if(item.project)body+=questDetailRow('Project',item.project);
+ body+=questDetailRow('Type',item.type==='deadline'?'Deadline':'Number');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ if(item.description)body+=questDetailRow('Notes',item.description);
+ body+='<div class="event-detail-row"><strong>Progress</strong><div><div class="progress"><i style="width:'+progress+'%"></i></div></div></div>';
+ body+='<div class="modal-actions"><button class="btn primary" id="editGoalDetail" type="button">Edit</button></div></div>';
+ openModal(item.title||'Goal',body);
+ $('editGoalDetail').onclick=()=>goalModal(item);
+}
+function countdownDisplayName(value){
+ return({days:'Days only',compact:'Days + hours',full:'Days + hours + minutes',precise:'Precise',weeks:'Weeks + days',date:'Target date'})[value]||'Days only';
+}
+function countdownProgressName(value){
+ return({time:'Time elapsed',manual:'Manual',none:'None'})[value]||'Time elapsed';
+}
+function countdownDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'countdown');
+ const display=countdownLabel(item);
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('When',fmtDate(item.end,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.end));
+ body+=questDetailRow('Remaining',display.label);
+ body+=questDetailRow('Display',countdownDisplayName(item.timeDisplayStyle));
+ body+=questDetailRow('Progress',countdownProgressName(item.progressMode));
+ if(item.pinned)body+=questDetailRow('Pinned','Yes');
+ body+=questDetailRow('E-ink',item.displayEnabled===false?'Hidden':'Shown');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ body+='<div class="modal-actions"><button class="btn primary" id="editCountdownDetail" type="button">Edit</button></div></div>';
+ openModal(item.name||'Countdown',body);
+ $('editCountdownDetail').onclick=()=>countdownModal(item);
+}
+
 async function taskModal(item){
  if(item?.shared)return sharedItemModal(item,'task');
  await acceptedFriends();
@@ -3266,8 +3339,8 @@ function renderToday(){
  $('todayAgenda').innerHTML=todaysEvents.length?todaysEvents.map(e=>'<div class="item agenda-event" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'"><div class="pill">'+(e.allDay?'All day':fmtTime(e.start))+'</div><div><div class="title">'+esc(e.title)+'</div><div class="meta">'+esc(e.calendarName||'Google Calendar')+(e.location?' · '+esc(e.location):'')+'</div></div><span></span></div>').join(''):'<div class="empty">No calendar events today.</div>';
  $('todayAgenda').querySelectorAll('[data-event-key]').forEach(el=>el.onclick=()=>{const item=calEvents.find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
  const tasks=open.slice(0,6);$('todayTasks').innerHTML=tasks.length?tasks.map(taskRow).join(''):'<div class="empty">No open tasks.</div>';bindTaskChecks($('todayTasks'));
- const goals=state.goals.filter(g=>g.status==='active').slice(0,4);$('todayGoals').innerHTML=goals.length?goals.map(g=>'<div class="item"><div></div><div><div class="title">'+esc(g.title)+'</div><div class="progress" style="margin-top:7px"><i style="width:'+Math.round(g.progress||0)+'%"></i></div></div><strong>'+Math.round(g.progress||0)+'%</strong></div>').join(''):'<div class="empty">No active goals.</div>';
- const cds=state.countdowns.filter(c=>new Date(c.end)>now).slice(0,4);$('todayCountdowns').innerHTML=cds.length?cds.map(c=>countCard(c)).join(''):'<div class="empty">No upcoming countdowns.</div>';
+ const goals=state.goals.filter(g=>g.status==='active').slice(0,4);$('todayGoals').innerHTML=goals.length?goals.map(g=>'<div class="item" data-home-goal="'+esc(g.id)+'" role="button" tabindex="0"><div></div><div><div class="title">'+esc(g.title)+'</div><div class="progress" style="margin-top:7px"><i style="width:'+Math.round(g.progress||0)+'%"></i></div></div><strong>'+Math.round(g.progress||0)+'%</strong></div>').join(''):'<div class="empty">No active goals.</div>';$('todayGoals').querySelectorAll('[data-home-goal]').forEach(el=>{const open=()=>{const goal=state.goals.find(x=>x.id===el.dataset.homeGoal);if(goal)goalDetailModal(goal)};el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
+ const cds=state.countdowns.filter(c=>new Date(c.end)>now).slice(0,4);$('todayCountdowns').innerHTML=cds.length?cds.map(c=>'<div data-home-countdown="'+esc(c.id)+'" role="button" tabindex="0">'+countCard(c)+'</div>').join(''):'<div class="empty">No upcoming countdowns.</div>';$('todayCountdowns').querySelectorAll('[data-home-countdown]').forEach(el=>{const open=()=>{const item=state.countdowns.find(x=>x.id===el.dataset.homeCountdown);if(item)countdownDetailModal(item)};el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
  renderWeather();renderHomeMarketMovers();
 }
 function taskRow(t){
@@ -3335,7 +3408,7 @@ function bindTaskSwipes(root){
 }
 function bindTaskChecks(root){
  root.querySelectorAll('[data-check]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===b.dataset.check);if(!t)return;if(isMobileUi())await toggleTaskWithUndo(t);else{await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PUT',body:JSON.stringify({status:t.status==='done'?'todo':'done'})});await loadAll()}});
- root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>{const wrap=r.closest('[data-task-swipe]');if(wrap?.dataset.swipeMoved==='1')return;const task=state.tasks.find(x=>x.id===r.dataset.task);if(task)taskModal(task)});
+ root.querySelectorAll('[data-task]').forEach(r=>r.onclick=()=>{const wrap=r.closest('[data-task-swipe]');if(wrap?.dataset.swipeMoved==='1')return;const task=state.tasks.find(x=>x.id===r.dataset.task);if(task)taskDetailModal(task)});
  root.querySelectorAll('[data-task-swipe-toggle]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeToggle);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)toggleTaskWithUndo(task).catch(console.warn)});
  root.querySelectorAll('[data-task-swipe-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeEdit);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)taskModal(task)});
  root.querySelectorAll('[data-task-swipe-snooze]').forEach(b=>b.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===b.dataset.taskSwipeSnooze);closeTaskSwipe(b.closest('[data-task-swipe]'));if(task)taskSnoozeSheet(task)});
@@ -3343,7 +3416,7 @@ function bindTaskChecks(root){
 }
 function renderTasks(){let list=state.tasks;if(taskFilter==='open')list=list.filter(t=>t.status!=='done');if(taskFilter==='done')list=list.filter(t=>t.status==='done');$('taskCount').textContent=list.length+' task'+(list.length===1?'':'s');$('taskList').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">Nothing here yet.</div>';bindTaskChecks($('taskList'))}
 document.querySelectorAll('#taskFilters button').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.filter;document.querySelectorAll('#taskFilters button').forEach(x=>x.classList.toggle('on',x===b));renderTasks()});
-function renderGoals(){$('goalGrid').innerHTML=state.goals.length?state.goals.map(g=>`<div class="card goal-card" data-goal="${esc(g.id)}"><div class="eyebrow">${g.shared?'Shared · ':''}${esc(g.type)}</div><h3>${esc(g.title)}</h3><div class="goal-number">${g.type==='number'?`${g.current} / ${g.target} ${esc(g.unit||'')}`:`${Math.round(g.progress||0)}%`}</div><div class="progress" style="margin:10px 0"><i style="width:${Math.round(g.progress||0)}%"></i></div><div class="meta">${g.deadline?'Target '+fmtDate(g.deadline,{year:'numeric'}):'No deadline'}${g.project?' · '+esc(g.project):''}${g.shared?' · Shared by '+esc(g.sharedByName||g.sharedByEmail||'friend'):''}</div><div class="goal-actions"><button class="btn tiny" onclick="event.stopPropagation();goalModal(state.goals.find(x=>x.id==='${esc(g.id)}'))">${g.shared?(g.canEdit?'Edit':'View'):'Edit'}</button></div></div>`).join(''):'<div class="card empty">Create your first goal.</div>'}
+function renderGoals(){$('goalGrid').innerHTML=state.goals.length?state.goals.map(g=>`<div class="card goal-card" data-goal="${esc(g.id)}" role="button" tabindex="0"><div class="eyebrow">${g.shared?'Shared · ':''}${esc(g.type)}</div><h3>${esc(g.title)}</h3><div class="goal-number">${g.type==='number'?`${g.current} / ${g.target} ${esc(g.unit||'')}`:`${Math.round(g.progress||0)}%`}</div><div class="progress" style="margin:10px 0"><i style="width:${Math.round(g.progress||0)}%"></i></div><div class="meta">${g.deadline?'Target '+fmtDate(g.deadline,{year:'numeric'}):'No deadline'}${g.project?' · '+esc(g.project):''}${g.shared?' · Shared by '+esc(g.sharedByName||g.sharedByEmail||'friend'):''}</div><div class="goal-actions"><button class="btn tiny" onclick="event.stopPropagation();goalModal(state.goals.find(x=>x.id==='${esc(g.id)}'))">${g.shared?(g.canEdit?'Edit':'View'):'Edit'}</button></div></div>`).join(''):'<div class="card empty">Create your first goal.</div>';const root=$('goalGrid');root.querySelectorAll('[data-goal]').forEach(card=>{const open=()=>{const goal=state.goals.find(x=>x.id===card.dataset.goal);if(goal)goalDetailModal(goal)};card.onclick=e=>{if(e.target.closest('button'))return;open()};card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}})}
 function countdownLabel(c){
  const ms=new Date(c.end)-Date.now();if(ms<=0)return{label:'Complete',dense:false};
  const total=Math.floor(ms/1000),days=Math.floor(total/86400),hours=Math.floor(total%86400/3600),minutes=Math.floor(total%3600/60),seconds=total%60,pad=n=>String(n).padStart(2,'0');
@@ -3355,7 +3428,7 @@ function countdownLabel(c){
  const rounded=Math.ceil(ms/86400000);return{label:rounded+' day'+(rounded===1?'':'s'),dense:false}
 }
 function countCard(c){const display=countdownLabel(c),date=c.showExactDate!==false&&c.timeDisplayStyle!=='date'?'<small>'+fmtDate(c.end,{year:'numeric'})+'</small>':'',shared=c.shared?'<div class="meta">Shared by '+esc(c.sharedByName||c.sharedByEmail||'friend')+'</div>':'';return `<div class="count-card" data-count="${esc(c.id)}">${date}<strong class="${display.dense?'dense':''}">${esc(display.label)}</strong><div class="title">${esc(c.name)}</div>${shared}</div>`}
-function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" onclick="countdownModal(state.countdowns.find(x=>x.id==='${esc(c.id)}'))">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>'}
+function renderCountdowns(){$('countGrid').innerHTML=state.countdowns.length?state.countdowns.map(c=>`<div class="card goal-card" data-countdown-detail="${esc(c.id)}" role="button" tabindex="0">${countCard(c)}</div>`).join(''):'<div class="card empty">Create your first countdown.</div>';const root=$('countGrid');root.querySelectorAll('[data-countdown-detail]').forEach(card=>{const open=()=>{const item=state.countdowns.find(x=>x.id===card.dataset.countdownDetail);if(item)countdownDetailModal(item)};card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}})}
 function updateCountdownTimers(){
  if(!state)return;
  const byId=new Map((state.countdowns||[]).map(c=>[String(c.id),c]));
@@ -3556,7 +3629,7 @@ function scrollTimeline(range,root=$('calendarStage'),eventSource=calEvents){
 function bindCalendarInteractions(root=$('calendarStage')){
  if(!root)return;
  root.querySelectorAll('[data-event-key]').forEach(el=>el.onclick=e=>{e.stopPropagation();const item=cachedPlannerEvents().find(x=>eventKey(x)===el.dataset.eventKey);if(item)calendarEventModal(item)});
- root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskModal(task)});
+ root.querySelectorAll('[data-cal-task]').forEach(el=>el.onclick=e=>{e.stopPropagation();const task=state.tasks.find(x=>x.id===el.dataset.calTask);if(task)taskDetailModal(task)});
  root.querySelectorAll('[data-open-day]').forEach(el=>el.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(el.dataset.openDay);savePlannerViewPreference('day');syncPlannerViewButtons();renderPlanner()});
  root.querySelectorAll('[data-week-day]').forEach(button=>button.onclick=e=>{e.stopPropagation();plannerAnchor=parseDateKey(button.dataset.weekDay);renderPlanner()});
  root.querySelectorAll('.timeline-lane[data-day]').forEach(lane=>lane.onclick=e=>{
