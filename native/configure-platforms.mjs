@@ -39,18 +39,20 @@ async function configureAndroid() {
     xml = xml.slice(0, applicationEnd) + pushMetadata + xml.slice(applicationEnd);
   }
 
-  if (!xml.includes('android:scheme="questlog"')) {
+  const legacyQuestLogScheme = '<data android:scheme="questlog" android:host="oauth" />';
+  if (xml.includes(legacyQuestLogScheme)) {
+    xml = xml.replace(legacyQuestLogScheme, '<data android:scheme="questlog" />');
+  } else if (!xml.includes('<data android:scheme="questlog" />')) {
     const filter = `
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="questlog" android:host="oauth" />
+                <data android:scheme="questlog" />
             </intent-filter>`;
     const activityEnd = xml.indexOf('</activity>');
     if (activityEnd < 0) throw new Error('Could not locate Android MainActivity in AndroidManifest.xml.');
     xml = xml.slice(0, activityEnd) + filter + '\n        ' + xml.slice(activityEnd);
-    await writeFile(file, xml);
   }
 
   if (!xml.includes('android:host="questlog.mattmoonie.ca"')) {
@@ -66,11 +68,16 @@ async function configureAndroid() {
     xml = xml.slice(0, activityEnd) + filter + '\n        ' + xml.slice(activityEnd);
     await writeFile(file, xml);
   }
+  await writeFile(file, xml);
+
   const gradle = resolve(root, 'android/app/build.gradle');
   if (await exists(gradle)) {
     const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
     const versionName = String(pkg.version || '0.1.0');
-    const versionCode = Math.max(1, Number.parseInt(process.env.NATIVE_BUILD_NUMBER || '1', 10) || 1);
+    const parts = versionName.split('.').map(value => Number.parseInt(value, 10) || 0);
+    const derivedVersionCode = Math.max(1, (parts[0] || 0) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0));
+    const requestedVersionCode = Number.parseInt(process.env.NATIVE_BUILD_NUMBER || '', 10);
+    const versionCode = Number.isFinite(requestedVersionCode) && requestedVersionCode > 0 ? requestedVersionCode : derivedVersionCode;
     let buildFile = await readFile(gradle, 'utf8');
     buildFile = buildFile.replace(/versionCode\s+\d+/, 'versionCode ' + versionCode);
     buildFile = buildFile.replace(/versionName\s+"[^"]+"/, 'versionName "' + versionName + '"');
