@@ -34,6 +34,7 @@
     "pngjs": "^7.0.0",
     "puppeteer-core": "^25.11.0",
     "@capacitor/app": "^8.1.1",
-    "@capacitor/browser": "^8.0.4"
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/push-notifications": "^8.1.2"
   }
 }
