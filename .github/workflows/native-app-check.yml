@@ -44,6 +44,12 @@ jobs:
           grep -q 'display:none;place-items:center' native-web/index.html
           ! grep -q 'id="nativeBootOverlay" hidden style="[^"]*display:grid' native-web/index.html
 
+      - name: Verify native safe-area handling
+        run: |
+          grep -q 'html\[data-native-app="1"\] body:not(.planner-mode) .content' native-web/index.html
+          grep -q 'padding-top:calc(18px + env(safe-area-inset-top, 0px))' native-web/index.html
+          grep -q 'setOverlaysWebView({ overlay: false })' native-web/native-runtime.js
+
       - name: Compile Cloudflare Worker
         run: npx wrangler deploy --dry-run --outdir .wrangler/native-check
 
