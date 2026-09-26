@@ -785,6 +785,11 @@ export default{
       assetUrl.search=url.search;
       return env.ASSETS.fetch(new Request(assetUrl,request));
     }
+    if(path==='/flinks-oauth.html'){
+      const assetUrl=new URL('/flinks-oauth.html',url);
+      assetUrl.search=url.search;
+      return env.ASSETS.fetch(new Request(assetUrl,request));
+    }
 
     if(path==='/login'){
       const identity=await nativeSession(request,env).catch(()=>null);
