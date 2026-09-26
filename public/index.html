@@ -1990,13 +1990,30 @@ async function renderNotificationSettings(){
  $('notifyEventLead').value=String(cfg.eventLeadMinutes||15);
  $('notifyGoalLead').value=String(cfg.goalLeadMinutes||1440);
  $('notifyCountdownLead').value=String(cfg.countdownLeadMinutes||1440);
+
+ if(window.QuestLogNative?.isNative){
+   const native=await window.QuestLogNative.push.status().catch(()=>({supported:false,permission:'denied',registered:false}));
+   const configured=window.QuestLogNative.platform==='android'?cfg.androidConfigured:cfg.iosConfigured;
+   if(!configured){
+     status.textContent=window.QuestLogNative.platform==='android'?'Android push is not configured on the server.':'iOS push is not configured on the server.';
+     enable.disabled=true;disable.disabled=!native.registered;test.disabled=true;return;
+   }
+   if(native.permission==='denied'){
+     status.textContent='Blocked in device settings';
+     enable.disabled=true;disable.disabled=!native.registered;test.disabled=true;return;
+   }
+   status.textContent=native.registered?'Enabled on this device':(native.permission==='granted'?'Ready to enable':'Permission not requested');
+   enable.textContent=native.registered?'Save notification settings':'Enable notifications';
+   enable.disabled=false;disable.disabled=!native.registered;test.disabled=!native.registered;return;
+ }
+
  const supported=window.isSecureContext&&'Notification' in window&&'serviceWorker' in navigator&&'PushManager' in window;
  if(!supported){
    status.textContent=window.isSecureContext?'Push is not supported by this browser.':'HTTPS is required for push notifications.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
- if(!cfg.configured){
-   status.textContent='Server push keys are not configured.';
+ if(!cfg.webConfigured){
+   status.textContent='Server web-push keys are not configured.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
  let subscription=null;
@@ -2028,12 +2045,22 @@ async function saveNotificationPreferences(){
 async function enablePushNotifications(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Enabling notifications…';
  try{
+   if(window.QuestLogNative?.isNative){
+     const cfg=await api('/api/notifications/config');
+     const configured=window.QuestLogNative.platform==='android'?cfg.androidConfigured:cfg.iosConfigured;
+     if(!configured)throw Error(window.QuestLogNative.platform==='android'?'Android push is not configured on the server.':'iOS push is not configured on the server.');
+     await window.QuestLogNative.push.enable();
+     state.notifications=await saveNotificationPreferences();
+     note.textContent='Notifications enabled on this device.';
+     await renderNotificationSettings();
+     return;
+   }
    if(!window.isSecureContext)throw Error('HTTPS is required for push notifications.');
    if(Notification.permission==='denied')throw Error('Notifications are blocked in your browser settings.');
    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
    if(permission!=='granted')throw Error('Notification permission was not granted.');
    const cfg=await api('/api/notifications/config');
-   if(!cfg.configured||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
+   if(!cfg.webConfigured||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
    const registration=await navigator.serviceWorker.ready;
    let subscription=await registration.pushManager.getSubscription();
    if(!subscription){
@@ -2048,12 +2075,16 @@ async function enablePushNotifications(){
 async function disablePushNotifications(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Disabling notifications…';
  try{
-   const subscription=await currentPushSubscription();
-   if(subscription){
-     await api('/api/notifications/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
-     await subscription.unsubscribe();
+   if(window.QuestLogNative?.isNative){
+     await window.QuestLogNative.push.disable();
+   }else{
+     const subscription=await currentPushSubscription();
+     if(subscription){
+       await api('/api/notifications/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
+       await subscription.unsubscribe();
+     }
    }
-   state.notifications={...(state.notifications||{}),enabled:false};
+   state.notifications=await api('/api/notifications/config').catch(()=>({...state.notifications,enabled:false}));
    note.textContent='Notifications disabled on this device.';
    await renderNotificationSettings();
  }catch(error){note.textContent=error.message||'Could not disable notifications.'}
@@ -2061,6 +2092,12 @@ async function disablePushNotifications(){
 async function testPushNotification(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Sending test notification…';
  try{
+   if(window.QuestLogNative?.isNative){
+     const result=await window.QuestLogNative.push.test();
+     if(!result.ok)throw Error(result.results?.find(item=>item.error)?.error||'Native push service did not accept the test notification.');
+     note.textContent='Test sent. It should appear as a system notification.';
+     return;
+   }
    const subscription=await currentPushSubscription();if(!subscription)throw Error('Enable notifications on this device first.');
    const result=await api('/api/notifications/test',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})});
    if(!result.ok)throw Error(result.results?.find(item=>item.error)?.error||'Push service did not accept the test notification.');
