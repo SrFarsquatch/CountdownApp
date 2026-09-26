@@ -12,6 +12,7 @@ const PUSH_PLATFORM_KEY = 'questlog.native.push.platform';
 let nativePushToken = localStorage.getItem(PUSH_TOKEN_KEY) || '';
 let pushListenersReady = false;
 let registrationWaiter = null;
+let humanChallengeWaiter = null;
 
 function isNative() {
   return Capacitor.isNativePlatform();
@@ -50,6 +51,26 @@ async function openExternalUrl(url) {
   await Browser.open({ url: target });
 }
 
+async function verifyHuman() {
+  if (!isNative()) return '';
+  if (humanChallengeWaiter) return humanChallengeWaiter.promise;
+
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  const nonce = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  humanChallengeWaiter = { promise, resolve, reject, nonce };
+
+  try {
+    await Browser.open({ url: API_ORIGIN + '/native-auth?nonce=' + encodeURIComponent(nonce) });
+  } catch (error) {
+    humanChallengeWaiter = null;
+    reject(error);
+  }
+
+  return promise;
+}
+
 function safeLocalRoute(value) {
   try {
     const url = new URL(String(value || '/?view=today'), API_ORIGIN);
@@ -79,6 +100,7 @@ function parseCallback(rawUrl) {
       redirectUrl: url.searchParams.get('redirect') || '',
       loginId: url.searchParams.get('loginId') || '',
       institution: url.searchParams.get('institution') || '',
+      token: url.searchParams.get('token') || '',
       url: url.toString()
     };
   } catch {
@@ -99,6 +121,14 @@ async function handleNativeUrl(rawUrl) {
 
   const callback = parseCallback(value);
   if (!callback) return false;
+
+  if (callback.provider === 'auth' && callback.status === 'verified' && callback.token) {
+    const waiter = humanChallengeWaiter;
+    humanChallengeWaiter = null;
+    waiter?.resolve?.(callback.token);
+    try { await Browser.close(); } catch {}
+    return true;
+  }
 
   try { await Browser.close(); } catch {}
 
@@ -254,6 +284,13 @@ async function initializeNative() {
     handleNativeUrl(event.url).catch(() => {});
   });
 
+  await Browser.addListener('browserFinished', () => {
+    if (!humanChallengeWaiter) return;
+    const waiter = humanChallengeWaiter;
+    humanChallengeWaiter = null;
+    waiter.reject(new Error('Human verification was cancelled.'));
+  });
+
   try {
     const launch = await App.getLaunchUrl();
     if (launch?.url) await handleNativeUrl(launch.url);
@@ -271,6 +308,7 @@ window.QuestLogNative = {
   apiUrl,
   openAuthUrl,
   openExternalUrl,
+  verifyHuman,
   handleNativeUrl,
   syncStatusBar,
   push: {
