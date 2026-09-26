@@ -2383,8 +2383,9 @@ function setView(name,{historyMode='push'}={}){
  const previous=currentAppView();
  renderAppView(name);
  if(!appHistoryReady||historyMode==='none')return;
- if(historyMode==='replace')history.replaceState({questlog:true,type:'view',view:name},'',appViewUrl(name));
- else if(previous!==name)history.pushState({questlog:true,type:'view',view:name},'',appViewUrl(name));
+ const historyState={questlog:true,type:'view',view:name,...(name==='profile'&&activeProfileUserId?{userId:activeProfileUserId}:{})};
+ if(historyMode==='replace')history.replaceState(historyState,'',appViewUrl(name));
+ else if(previous!==name)history.pushState(historyState,'',appViewUrl(name));
 }
 function initAppHistory(initialView){
  const initial=APP_VIEWS.has(initialView)?initialView:'today';
@@ -2392,12 +2393,13 @@ function initAppHistory(initialView){
    appHistoryReady=true;
    return;
  }
- history.replaceState({questlog:true,type:'view',view:initial},'',appViewUrl(initial));
+ history.replaceState({questlog:true,type:'view',view:initial,...(initial==='profile'&&activeProfileUserId?{userId:activeProfileUserId}:{})},'',appViewUrl(initial));
  appHistoryReady=true;
 }
 window.addEventListener('popstate',event=>{
  const nav=event.state;
  if(nav?.questlog&&nav.type==='view'){
+   if(nav.view==='profile')activeProfileUserId=nav.userId||new URLSearchParams(location.search).get('user')||runtimeInfo?.profile?.userId||'';
    renderAppView(nav.view||'today');
    return;
  }
@@ -2468,6 +2470,117 @@ async function openManageAccountModal(){
    }catch(error){status.textContent=error.message||'Could not save profile.';status.className='profile-status error';save.disabled=false}
  };
 }
+
+function profileInitial(profile){
+ const source=String(profile?.displayName||'?').trim();
+ return(source[0]||'?').toUpperCase();
+}
+function socialProfileAvatar(profile){
+ const avatar=profileAvatarData(profile);
+ if(avatar)return '<img src="'+esc(avatar)+'" alt="">';
+ const inner=accountAvatarInner(profile);
+ return inner||esc(profileInitial(profile));
+}
+function socialProfileDate(value){
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return'';
+ return date.toLocaleDateString([],{month:'long',year:'numeric'});
+}
+function profileSharedCards(items,type){
+ const list=Array.isArray(items)?items:[];
+ if(!list.length)return'';
+ return list.map(item=>{
+   const title=type==='countdown'?(item.name||'Countdown'):(item.title||type);
+   let detail='';
+   if(type==='task')detail=item.status==='done'?'Completed':(item.due?'Due '+fmtDate(item.due,{year:'numeric'}):'Shared task');
+   if(type==='goal')detail=(Number.isFinite(Number(item.progress))?Math.round(Number(item.progress))+'% · ':'')+(item.deadline?'Target '+fmtDate(item.deadline,{year:'numeric'}):'Shared goal');
+   if(type==='countdown')detail=item.end?fmtDate(item.end,{year:'numeric'}):'Shared countdown';
+   return '<div class="social-profile-card"><div><div class="eyebrow">'+esc(type)+'</div><strong>'+esc(title)+'</strong></div><div class="meta">'+esc(detail)+'</div></div>';
+ }).join('');
+}
+function profileHighlightCards(data){
+ const highlights=data?.highlights||{},cards=[];
+ for(const goal of highlights.goals||[]){
+   const detail=goal.progress==null?(goal.deadline?'Target '+fmtDate(goal.deadline,{year:'numeric'}):'Active goal'):Math.round(goal.progress)+'% complete';
+   cards.push('<div class="social-profile-card"><div><div class="eyebrow">Goal</div><strong>'+esc(goal.title||'Goal')+'</strong></div><div class="meta">'+esc(detail)+'</div></div>');
+ }
+ for(const countdown of highlights.countdowns||[]){
+   cards.push('<div class="social-profile-card"><div><div class="eyebrow">Countdown</div><strong>'+esc(countdown.name||'Countdown')+'</strong></div><div class="meta">'+esc(countdown.end?fmtDate(countdown.end,{year:'numeric'}):'')+'</div></div>');
+ }
+ return cards.join('');
+}
+function profileStatsHtml(data){
+ const profile=data.profile||{},summary=data.summary||{};
+ if(profile.isSelf){
+   return[
+     [profile.friendCount||0,'Friends'],
+     [summary.openTasks||0,'Open tasks'],
+     [summary.activeGoals||0,'Active goals'],
+     [summary.countdowns||0,'Countdowns']
+   ].map(([value,label])=>'<div class="social-profile-stat"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span></div>').join('');
+ }
+ const shared=data.sharedItems||{};
+ return[
+   [profile.friendCount||0,'Friends'],
+   [(shared.tasks||[]).length,'Shared tasks'],
+   [(shared.goals||[]).length,'Shared goals'],
+   [(shared.countdowns||[]).length,'Countdowns']
+ ].map(([value,label])=>'<div class="social-profile-stat"><strong>'+esc(value)+'</strong><span>'+esc(label)+'</span></div>').join('');
+}
+function renderSocialProfileData(data){
+ const root=$('socialProfileShell');if(!root)return;
+ const profile=data?.profile||{},isSelf=Boolean(profile.isSelf),name=profile.displayName||'Quest Log user',bio=String(profile.bio||'').trim(),memberSince=socialProfileDate(profile.createdAt);
+ const actions=isSelf
+   ?'<button class="btn primary" id="profileEditButton" type="button">Edit profile</button><button class="btn" id="profileFriendsButton" type="button">Friends</button>'
+   :'<button class="btn" type="button" disabled>Friends</button>';
+ const privacy=isSelf?'<span class="social-profile-badge">'+(profile.profileVisibility==='private'?'Private':'Friends only')+'</span>':'<span class="social-profile-badge">Friend</span>';
+ const shared=data.sharedItems||{},sharedCards=profileSharedCards(shared.tasks,'task')+profileSharedCards(shared.goals,'goal')+profileSharedCards(shared.countdowns,'countdown');
+ const highlightCards=profileHighlightCards(data);
+ const sectionTitle=isSelf?'Highlights':'Shared with you';
+ const sectionBody=isSelf
+   ?(highlightCards||'<div class="social-profile-empty">Your active goals and countdowns will appear here.</div>')
+   :(sharedCards||'<div class="social-profile-empty">This friend has not shared any planner items with you yet.</div>');
+ root.innerHTML=
+  '<div class="social-profile-head">'+
+    '<div class="social-profile-avatar">'+socialProfileAvatar(profile)+'</div>'+
+    '<div class="social-profile-copy"><div class="social-profile-name-row"><div class="social-profile-name">'+esc(name)+'</div>'+privacy+'</div>'+
+      (bio?'<div class="social-profile-bio">'+esc(bio)+'</div>':'<div class="social-profile-bio meta">'+(isSelf?'Add a bio to tell friends a little about yourself.':'No bio yet.')+'</div>')+
+      (memberSince?'<div class="social-profile-meta">Quest Log member since '+esc(memberSince)+'</div>':'')+
+    '</div>'+
+    '<div class="social-profile-actions">'+actions+'</div>'+
+  '</div>'+
+  '<div class="social-profile-stats">'+profileStatsHtml(data)+'</div>'+
+  '<div class="social-profile-section"><div class="social-profile-section-head"><h3>'+sectionTitle+'</h3>'+(isSelf?'<span class="meta">Visible only as allowed by sharing and privacy settings</span>':'<span class="meta">Only items explicitly shared with you</span>')+'</div><div class="social-profile-grid">'+sectionBody+'</div></div>';
+ if($('profileEditButton'))$('profileEditButton').onclick=openManageAccountModal;
+ if($('profileFriendsButton'))$('profileFriendsButton').onclick=openFriendsModal;
+}
+async function renderSocialProfile(force=false){
+ const root=$('socialProfileShell');if(!root||runtimeInfo?.runtime!=='cloudflare')return;
+ const target=activeProfileUserId||runtimeInfo?.profile?.userId||'';
+ if(!target)return;
+ const seq=++profileViewRequestSeq;
+ if(!force&&profileViewData?.profile?.userId===target){renderSocialProfileData(profileViewData);return}
+ root.innerHTML='<div class="social-profile-loading">Loading profile…</div>';
+ try{
+   const data=await api('/api/profiles/'+encodeURIComponent(target));
+   if(seq!==profileViewRequestSeq)return;
+   profileViewData=data;renderSocialProfileData(data);
+ }catch(error){
+   if(seq!==profileViewRequestSeq)return;
+   root.innerHTML='<div class="social-profile-empty"><strong>Profile unavailable</strong><div class="meta" style="margin-top:6px">'+esc(error.message||'Could not load this profile.')+'</div></div>';
+ }
+}
+function openProfile(userId='',{historyMode='push'}={}){
+ const target=String(userId||runtimeInfo?.profile?.userId||'');
+ if(!target)return;
+ const previousView=currentAppView(),previousUser=activeProfileUserId;
+ activeProfileUserId=target;profileViewData=null;
+ renderAppView('profile');
+ if(!appHistoryReady||historyMode==='none')return;
+ const historyState={questlog:true,type:'view',view:'profile',userId:target};
+ if(historyMode==='replace')history.replaceState(historyState,'',appViewUrl('profile'));
+ else if(previousView!=='profile'||previousUser!==target)history.pushState(historyState,'',appViewUrl('profile'));
+}
+
 function friendInitial(person){
  const source=String(person?.displayName||person?.email||'?').trim();
  return (source[0]||'?').toUpperCase();
@@ -4748,7 +4861,7 @@ async function loadAll(force=false){
  await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets(),loadFinance()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderFinance();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
- if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets'){renderFinance();renderMarkets();}if(current==='settings')setSettingsSection(settingsSection,{render:true})
+ if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets'){renderFinance();renderMarkets();}if(current==='settings')setSettingsSection(settingsSection,{render:true});if(current==='profile')renderSocialProfile(true).catch(console.warn)
 }
 const initialRaw=new URLSearchParams(location.search).get('view')||'today',initial=initialRaw==='agent'?'today':(APP_VIEWS.has(initialRaw)?initialRaw:'today');
 
@@ -4800,6 +4913,7 @@ async function bootQuestLog(){
    }
 
    await withBootTimeout(loadAll(),30000,'Quest Log startup');
+   if(initial==='profile'&&!activeProfileUserId)activeProfileUserId=runtimeInfo?.profile?.userId||'';
    renderAppView(initial);
    initAppHistory(initial);
    if(initialRaw==='agent')openAgentDrawer();
