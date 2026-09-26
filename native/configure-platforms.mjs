@@ -59,7 +59,7 @@ async function configureAndroid() {
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="questlog.mattmoonie.ca" />
+                <data android:scheme="https" android:host="questlog.mattmoonie.ca" android:path="/" />
             </intent-filter>`;
     const activityEnd = xml.indexOf('</activity>');
     if (activityEnd < 0) throw new Error('Could not locate Android MainActivity in AndroidManifest.xml.');
