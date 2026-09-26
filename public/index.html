@@ -1427,6 +1427,19 @@ body.modal-open{overflow:hidden}
 .social-profile-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);min-height:112px;display:grid;align-content:space-between;gap:10px}.social-profile-card strong{font-size:13px}.social-profile-card .meta{line-height:1.35}
 .social-profile-empty{padding:24px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);text-align:center}
 .social-profile-loading{padding:50px 18px;text-align:center;color:var(--muted)}
+.social-profile-shell{--profile-accent:var(--accent)}
+.social-profile-shell[data-profile-accent="violet"]{--profile-accent:#7c5cff}.social-profile-shell[data-profile-accent="blue"]{--profile-accent:#2f80ed}.social-profile-shell[data-profile-accent="green"]{--profile-accent:#2d9d61}.social-profile-shell[data-profile-accent="orange"]{--profile-accent:#d97706}.social-profile-shell[data-profile-accent="rose"]{--profile-accent:#d9466f}
+.social-profile-avatar{box-shadow:0 0 0 3px color-mix(in srgb,var(--profile-accent) 18%,transparent);border-color:color-mix(in srgb,var(--profile-accent) 40%,var(--line));color:var(--profile-accent)}
+.social-profile-tabs{display:flex;border-bottom:1px solid var(--line);gap:20px;overflow:auto}.social-profile-tabs button{border:0;background:transparent;padding:12px 2px 10px;color:var(--muted);font-weight:800;font-size:12px;white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer}.social-profile-tabs button.on{color:var(--text);border-bottom-color:var(--profile-accent)}
+.social-profile-pane{display:none;gap:16px}.social-profile-pane.on{display:grid}
+.profile-streak-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.profile-streak-card{padding:16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--profile-accent) 10%,var(--panel)),var(--panel));}.profile-streak-card strong{display:block;font-size:26px}.profile-streak-card span{font-size:10px;color:var(--muted);font-weight:760}
+.profile-achievement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.profile-achievement{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:center;opacity:.58}.profile-achievement.unlocked{opacity:1;border-color:color-mix(in srgb,var(--profile-accent) 32%,var(--line))}.profile-achievement-icon{width:42px;height:42px;border-radius:12px;background:color-mix(in srgb,var(--profile-accent) 13%,var(--panel2));color:var(--profile-accent);display:grid;place-items:center;font-weight:900}.profile-achievement strong{font-size:12px}.profile-achievement .meta{margin-top:3px}
+.profile-progress{height:5px;background:var(--panel2);border-radius:999px;overflow:hidden;margin-top:7px}.profile-progress i{display:block;height:100%;background:var(--profile-accent)}
+.profile-activity-list{display:grid;gap:8px}.profile-activity-row{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.profile-activity-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--profile-accent) 12%,var(--panel2));color:var(--profile-accent);font-weight:900}.profile-activity-row strong{font-size:12px}.profile-activity-row time{font-size:9px;color:var(--muted)}
+.mutual-friends{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mutual-stack{display:flex}.mutual-avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--panel2);border:2px solid var(--panel);margin-left:-7px;font-size:10px;font-weight:900}.mutual-avatar:first-child{margin-left:0}.mutual-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-privacy-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}.profile-privacy-grid label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:750}.profile-privacy-grid input{width:16px;height:16px;min-height:0;padding:0}
+.profile-pin-list{display:grid;gap:7px;max-height:210px;overflow:auto}.profile-pin-option{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}.profile-pin-option input{width:16px;height:16px;min-height:0;padding:0}
+.profile-accent-preview{display:flex;gap:8px;flex-wrap:wrap}.profile-accent-dot{width:26px;height:26px;border-radius:50%;border:2px solid transparent}.profile-accent-dot[data-accent="quest"]{background:var(--accent)}.profile-accent-dot[data-accent="violet"]{background:#7c5cff}.profile-accent-dot[data-accent="blue"]{background:#2f80ed}.profile-accent-dot[data-accent="green"]{background:#2d9d61}.profile-accent-dot[data-accent="orange"]{background:#d97706}.profile-accent-dot[data-accent="rose"]{background:#d9466f}
 .friend-row[data-profile-user]{cursor:pointer}.friend-row[data-profile-user]:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
 @media(max-width:760px){
  .social-profile-shell{gap:16px}
@@ -1436,6 +1449,9 @@ body.modal-open{overflow:hidden}
  .social-profile-actions{grid-column:1/-1;width:100%;justify-content:stretch}.social-profile-actions .btn{flex:1}
  .social-profile-stats{grid-template-columns:repeat(2,1fr)}
  .social-profile-grid{grid-template-columns:1fr}
+ .profile-streak-grid{grid-template-columns:repeat(3,1fr)}
+ .profile-achievement-grid{grid-template-columns:1fr}
+ .profile-privacy-grid{grid-template-columns:1fr}
 }
 
 /* Friends */
@@ -2449,33 +2465,61 @@ async function prepareProfileAvatar(file){
  return canvas.toDataURL('image/jpeg',0.84);
 }
 async function openManageAccountModal(){
- const profile=runtimeInfo?.profile||{email:runtimeInfo?.user||'',displayName:'',avatarData:''};
+ const profile=runtimeInfo?.profile||{email:runtimeInfo?.user||'',displayName:'',avatarData:'',bio:'',profileVisibility:'friends',profileAccent:'quest',profileSettings:{}};
  let avatarDraft=profileAvatarData(profile);
- openModal('Edit profile','<div class="profile-editor"><div class="profile-photo-row"><span class="account-avatar profile-photo-preview" id="profileAvatarPreview">'+accountAvatarInner(profile)+'</span><div><div class="profile-photo-actions"><label class="btn tiny" for="profileAvatarFile">Choose photo</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn tiny ghost" id="profileAvatarRemove" type="button">Remove</button></div><div class="profile-status" id="profileStatus">Photos are resized to a small square profile image.</div></div></div><div class="field"><label>Display name</label><input id="profileDisplayName" maxlength="120" value="'+esc(profile.displayName||'')+'" placeholder="Your name"></div><div class="field"><label>Bio</label><textarea id="profileBio" maxlength="280" placeholder="A little about you…">'+esc(profile.bio||'')+'</textarea><div class="meta">Up to 280 characters.</div></div><div class="field"><label>Profile visibility</label><select id="profileVisibility"><option value="friends">Friends can view my profile</option><option value="private">Private</option></select></div><div class="field"><label>Email</label><input value="'+esc(profile.email||'')+'" disabled></div><div class="modal-actions"><button class="btn primary" id="profileSave" type="button">Save profile</button></div></div>');
- $('profileVisibility').value=profile.profileVisibility||'friends';
+ const settings={showMemberSince:true,showFriendCount:true,showAchievements:true,showStreaks:true,showPinnedGoals:true,showRecentActivity:false,showSharedItems:true,showMutualFriends:true,activityDetails:'summary',...(profile.profileSettings||{})};
+ const ownGoals=(state?.goals||[]).filter(goal=>!goal.shared);
+ const pinned=new Set((profile.pinnedGoalIds||[]).map(String));
+ const pinHtml=ownGoals.length?ownGoals.map(goal=>'<label class="profile-pin-option"><input type="checkbox" data-profile-pin-goal="'+esc(goal.id)+'" '+(pinned.has(String(goal.id))?'checked':'')+'><span><strong>'+esc(goal.title)+'</strong><div class="meta">'+esc(goal.status==='complete'?'Completed':goal.deadline?'Target '+fmtDate(goal.deadline,{year:'numeric'}):'Active goal')+'</div></span></label>').join(''):'<div class="meta">Create a goal first, then you can pin it to your profile.</div>';
+ openModal('Edit profile',
+  '<div class="profile-editor">'+
+  '<div class="profile-photo-row"><span class="account-avatar profile-photo-preview" id="profileAvatarPreview">'+accountAvatarInner(profile)+'</span><div><div class="profile-photo-actions"><label class="btn tiny" for="profileAvatarFile">Choose photo</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn tiny ghost" id="profileAvatarRemove" type="button">Remove</button></div><div class="profile-status" id="profileStatus">Photos are resized to a small square profile image.</div></div></div>'+
+  '<div class="field"><label>Display name</label><input id="profileDisplayName" maxlength="120" value="'+esc(profile.displayName||'')+'" placeholder="Your name"></div>'+
+  '<div class="field"><label>Bio</label><textarea id="profileBio" maxlength="280" placeholder="A little about you…">'+esc(profile.bio||'')+'</textarea><div class="meta">Up to 280 characters.</div></div>'+
+  '<div class="field"><label>Profile accent</label><select id="profileAccent"><option value="quest">Quest Log</option><option value="violet">Violet</option><option value="blue">Blue</option><option value="green">Green</option><option value="orange">Orange</option><option value="rose">Rose</option></select><div class="profile-accent-preview"><span class="profile-accent-dot" data-accent="quest"></span><span class="profile-accent-dot" data-accent="violet"></span><span class="profile-accent-dot" data-accent="blue"></span><span class="profile-accent-dot" data-accent="green"></span><span class="profile-accent-dot" data-accent="orange"></span><span class="profile-accent-dot" data-accent="rose"></span></div></div>'+
+  '<div class="field"><label>Profile visibility</label><select id="profileVisibility"><option value="friends">Friends can view my profile</option><option value="private">Private</option></select></div>'+
+  '<div class="field"><label>What friends can see</label><div class="profile-privacy-grid">'+
+   '<label><input type="checkbox" id="profileShowMemberSince">Member since</label>'+
+   '<label><input type="checkbox" id="profileShowFriendCount">Friend count</label>'+
+   '<label><input type="checkbox" id="profileShowAchievements">Achievements</label>'+
+   '<label><input type="checkbox" id="profileShowStreaks">Streaks</label>'+
+   '<label><input type="checkbox" id="profileShowPinnedGoals">Pinned goals</label>'+
+   '<label><input type="checkbox" id="profileShowRecentActivity">Recent activity</label>'+
+   '<label><input type="checkbox" id="profileShowSharedItems">Shared-with-you items</label>'+
+   '<label><input type="checkbox" id="profileShowMutualFriends">Mutual friends</label>'+
+  '</div></div>'+
+  '<div class="field"><label>Recent activity detail</label><select id="profileActivityDetails"><option value="summary">Generic activity only</option><option value="titles">Include task / goal titles</option></select><div class="meta">Only applies if Recent activity is visible.</div></div>'+
+  '<div class="field"><label>Pinned goals</label><div class="profile-pin-list">'+pinHtml+'</div><div class="meta">Choose up to 6. These can be shown on your profile depending on your privacy settings.</div></div>'+
+  '<div class="field"><label>Email</label><input value="'+esc(profile.email||'')+'" disabled></div>'+
+  '<div class="modal-actions"><button class="btn primary" id="profileSave" type="button">Save profile</button></div></div>');
+ $('profileVisibility').value=profile.profileVisibility||'friends';$('profileAccent').value=profile.profileAccent||'quest';$('profileActivityDetails').value=settings.activityDetails||'summary';
+ const settingMap={profileShowMemberSince:'showMemberSince',profileShowFriendCount:'showFriendCount',profileShowAchievements:'showAchievements',profileShowStreaks:'showStreaks',profileShowPinnedGoals:'showPinnedGoals',profileShowRecentActivity:'showRecentActivity',profileShowSharedItems:'showSharedItems',profileShowMutualFriends:'showMutualFriends'};
+ for(const [id,key] of Object.entries(settingMap))$(id).checked=settings[key]!==false;
+ $('profileShowRecentActivity').checked=settings.showRecentActivity===true;
  const preview=$('profileAvatarPreview'),fileInput=$('profileAvatarFile'),remove=$('profileAvatarRemove'),status=$('profileStatus'),save=$('profileSave');
  fileInput.onchange=async()=>{
    const file=fileInput.files?.[0];if(!file)return;
    status.textContent='Preparing photo…';status.className='profile-status';
-   try{
-     avatarDraft=await prepareProfileAvatar(file);
-     preview.innerHTML=accountAvatarInner({avatarData:avatarDraft});
-     status.textContent='Photo ready to save.';
-   }catch(error){status.textContent=error.message||'Could not prepare that photo.';status.className='profile-status error'}
+   try{avatarDraft=await prepareProfileAvatar(file);preview.innerHTML=accountAvatarInner({avatarData:avatarDraft});status.textContent='Photo ready to save.'}
+   catch(error){status.textContent=error.message||'Could not prepare that photo.';status.className='profile-status error'}
  };
  remove.onclick=()=>{avatarDraft='';preview.innerHTML=accountAvatarInner({avatarData:''});status.textContent='Profile photo will be removed.';status.className='profile-status'};
  save.onclick=async()=>{
    save.disabled=true;status.textContent='Saving profile…';status.className='profile-status';
    try{
-     const updated=await api('/api/profile',{method:'PUT',body:JSON.stringify({displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft,bio:$('profileBio').value.trim(),profileVisibility:$('profileVisibility').value})});
-     runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;
-     renderRuntimeSession();
-     if(activeAppRoute==='profile'){activeProfileUserId=updated.userId;renderSocialProfile(true).catch(console.warn)}
+     const profileSettings=Object.fromEntries(Object.entries(settingMap).map(([id,key])=>[key,$(id).checked]));
+     profileSettings.activityDetails=$('profileActivityDetails').value;
+     const pinnedGoalIds=[...document.querySelectorAll('[data-profile-pin-goal]:checked')].slice(0,6).map(input=>input.dataset.profilePinGoal);
+     const updated=await api('/api/profile',{method:'PUT',body:JSON.stringify({
+       displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft,bio:$('profileBio').value.trim(),
+       profileVisibility:$('profileVisibility').value,profileAccent:$('profileAccent').value,profileSettings,pinnedGoalIds
+     })});
+     runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;renderRuntimeSession();
+     if(activeAppRoute==='profile'){activeProfileUserId=updated.userId;profileViewData=null;renderSocialProfile(true).catch(console.warn)}
      closeModal();
    }catch(error){status.textContent=error.message||'Could not save profile.';status.className='profile-status error';save.disabled=false}
  };
 }
-
 function profileInitial(profile){
  const source=String(profile?.displayName||'?').trim();
  return(source[0]||'?').toUpperCase();
