@@ -1,4 +1,4 @@
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, mkdir } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -14,6 +14,31 @@ async function configureAndroid() {
   if (!await exists(file)) return { platform: 'android', status: 'not-created' };
 
   let xml = await readFile(file, 'utf8');
+  const drawableDir = resolve(root, 'android/app/src/main/res/drawable');
+  await mkdir(drawableDir, { recursive: true });
+  const pushIcon = resolve(drawableDir, 'ic_stat_questlog.xml');
+  await writeFile(pushIcon, `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M218,652Q356,614 500,720V844Q356,742 218,770Z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M806,652Q668,614 524,720V844Q668,742 806,770Z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M512,142C370,142 256,256 256,398C256,554 386,654 512,778C638,654 768,554 768,398C768,256 654,142 512,142ZM512,260L545,365L650,398L545,431L512,536L479,431L374,398L479,365Z"/>
+</vector>
+`);
+
+  if (!xml.includes('com.google.firebase.messaging.default_notification_icon')) {
+    const applicationEnd = xml.indexOf('</application>');
+    if (applicationEnd < 0) throw new Error('Could not locate Android application element.');
+    const pushMetadata = `
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_questlog" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="questlog-updates" />
+    `;
+    xml = xml.slice(0, applicationEnd) + pushMetadata + xml.slice(applicationEnd);
+  }
+
   if (!xml.includes('android:scheme="questlog"')) {
     const filter = `
             <intent-filter>
