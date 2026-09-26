@@ -9,12 +9,23 @@
     "dev:cloudflare": "wrangler dev",
     "deploy:cloudflare": "wrangler deploy",
     "cloudflare:types": "wrangler types",
-    "generate:vapid": "web-push generate-vapid-keys"
+    "generate:vapid": "web-push generate-vapid-keys",
+    "native:add:android": "npx cap add android",
+    "native:add:ios": "npx cap add ios",
+    "native:sync": "npx cap sync",
+    "native:open:android": "npx cap open android",
+    "native:open:ios": "npx cap open ios",
+    "native:run:android": "npx cap run android",
+    "native:run:ios": "npx cap run ios"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.0.0",
+    "@capacitor/cli": "^8.5.2"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "web-push": "^3.6.7",
     "yahoo-finance2": "^4.0.2",
     "pngjs": "^7.0.0",
