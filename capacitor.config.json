@@ -10,6 +10,14 @@
     },
     "CapacitorCookies": {
       "enabled": true
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "banner",
+        "list"
+      ]
     }
   },
   "ios": {
