@@ -250,4 +250,4 @@ window.QuestLogNative = {
   }
 };
 
-initializeNative().catch(() => {};
+initializeNative().catch(() => {});
