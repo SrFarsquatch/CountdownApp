@@ -60,6 +60,15 @@ jobs:
           grep -q 'data-profile-pin-goal' native-web/index.html
           grep -q 'profileAccent' native-web/index.html
 
+      - name: Verify Quest Log item detail-first interactions
+        run: |
+          grep -q 'function taskDetailModal' native-web/index.html
+          grep -q 'function goalDetailModal' native-web/index.html
+          grep -q 'function countdownDetailModal' native-web/index.html
+          grep -q "if(task)taskDetailModal(task)" native-web/index.html
+          grep -q "if(goal)goalDetailModal(goal)" native-web/index.html
+          grep -q "if(item)countdownDetailModal(item)" native-web/index.html
+
       - name: Compile Cloudflare Worker
         run: npx wrangler deploy --dry-run --outdir .wrangler/native-check
 
