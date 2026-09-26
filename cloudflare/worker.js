@@ -17,7 +17,7 @@ import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, 
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
-import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
+import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
@@ -761,6 +761,13 @@ export default{
       }catch(error){
         if(String(url.searchParams.get('state')||'').includes('.'))return text(error.message||'Google connection failed.',400);
       }
+    }
+    if(path==='/native-auth'&&request.method==='GET'){
+      return env.ASSETS.fetch(new Request(new URL('/native-auth.html',url),request));
+    }
+    if(path==='/api/auth/native-challenge'&&request.method==='POST'){
+      try{return json(await createNativeAuthChallenge(request,env,await body(request)))}
+      catch(error){return json({error:error.message||'Native verification failed.'},Number(error.status)||500)}
     }
     if(path==='/api/auth/config'&&request.method==='GET')return json(authPublicConfig(env));
     if(path==='/api/auth/session'&&request.method==='GET'){
