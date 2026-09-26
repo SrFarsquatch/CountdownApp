@@ -139,6 +139,37 @@ async function verifyTurnstile(request,env,token){
  if(!result.success){const e=new Error('Human verification failed. Please try again.');e.status=400;throw e}
  return true;
 }
+async function nativeChallengeSignature(env,issued,nonce){
+ if(!env.APP_SECRET)throw new Error('APP_SECRET is required for native authentication.');
+ return hmacHex(env.APP_SECRET,'native-auth|'+issued+'|'+nonce);
+}
+export async function createNativeAuthChallenge(request,env,payload={}){
+ await verifyHumanChallenge(request,env,payload);
+ const nonce=clean(payload.nonce,160);
+ if(!nonce){const e=new Error('Native challenge nonce is required.');e.status=400;throw e}
+ const issued=Date.now().toString(36),signature=await nativeChallengeSignature(env,issued,nonce);
+ return{token:['nat1',issued,nonce,signature].join('.'),expiresInSeconds:300};
+}
+async function verifyNativeAuthChallenge(env,value){
+ try{
+  const [version,issued,nonce,signature]=String(value||'').split('.');
+  if(version!=='nat1'||!issued||!nonce||!signature)return false;
+  const timestamp=parseInt(issued,36),age=Date.now()-timestamp;
+  if(!Number.isFinite(timestamp)||age<0||age>5*60*1000)return false;
+  const expected=await nativeChallengeSignature(env,issued,nonce);
+  if(expected.length!==signature.length)return false;
+  let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^signature.charCodeAt(i);
+  return diff===0;
+ }catch{return false}
+}
+async function verifyHumanChallenge(request,env,payload={}){
+ if(!env.TURNSTILE_SECRET_KEY)return true;
+ if(payload.nativeChallengeToken){
+  if(await verifyNativeAuthChallenge(env,payload.nativeChallengeToken))return true;
+  const e=new Error('Native human verification expired. Please try again.');e.status=400;throw e
+ }
+ return verifyTurnstile(request,env,payload.turnstileToken);
+}
 async function createSession(request,env,user){
  const token=randomToken(32),hash=await sha256Hex(token),expires=new Date(Date.now()+SESSION_DAYS*86400000).toISOString();
  const ip=request.headers.get('cf-connecting-ip')||'';
@@ -179,7 +210,7 @@ export async function signup(request,env,payload={}){
  assertAllowedEmail(env,email);
  const passwordError=validatePassword(password);if(passwordError){const e=new Error(passwordError);e.status=400;throw e}
  await checkRateLimit(request,env,email,'signup');
- await verifyTurnstile(request,env,payload.turnstileToken);
+ await verifyHumanChallenge(request,env,payload);
  let user=await env.DB.prepare('SELECT * FROM questlog_users WHERE lower(primary_email)=?').bind(email).first();
  if(user?.password_hash){const e=new Error('An account already exists for that email.');e.status=409;throw e}
  if(user&&!payload.legacyVerified){const e=new Error('This email is reserved for an existing Quest Log identity. Complete the owner migration before removing Cloudflare Access.');e.status=409;throw e}
