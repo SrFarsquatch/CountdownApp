@@ -16,7 +16,7 @@ import { financeSummary, financeProviders, startFinanceConnection, completeFinan
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
-import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
+import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
@@ -426,13 +426,31 @@ async function handleApi(request,env,identity){
   if(p==='/api/notifications/unsubscribe'&&method==='POST'){
     const incoming=await body(request);
     unregisterSubscription(state,incoming.endpoint||'');
-    if(!state.notifications.subscriptions.length)state.notifications.enabled=false;
+    if(!state.notifications.subscriptions.length&&!state.notifications.nativeDevices.length)state.notifications.enabled=false;
     await saveState(env,state);
     return json(notificationConfig(state,env));
   }
   if(p==='/api/notifications/test'&&method==='POST'){
     const incoming=await body(request);
     return json(await sendTestNotification(state,env,incoming.endpoint||''));
+  }
+  if(p==='/api/notifications/native/register'&&method==='POST'){
+    const incoming=await body(request);
+    registerNativeDevice(state,incoming);
+    state.notifications.enabled=true;
+    await saveState(env,state);
+    return json(notificationConfig(state,env),201);
+  }
+  if(p==='/api/notifications/native/unregister'&&method==='POST'){
+    const incoming=await body(request);
+    unregisterNativeDevice(state,incoming.token||'');
+    if(!state.notifications.subscriptions.length&&!state.notifications.nativeDevices.length)state.notifications.enabled=false;
+    await saveState(env,state);
+    return json(notificationConfig(state,env));
+  }
+  if(p==='/api/notifications/native/test'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await sendNativeTestNotification(state,env,incoming.token||''));
   }
 
   if(p==='/api/countdowns'&&method==='POST'){
