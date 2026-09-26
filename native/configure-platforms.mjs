@@ -27,6 +27,17 @@ async function configureAndroid() {
     xml = xml.slice(0, activityEnd) + filter + '\n        ' + xml.slice(activityEnd);
     await writeFile(file, xml);
   }
+  const gradle = resolve(root, 'android/app/build.gradle');
+  if (await exists(gradle)) {
+    const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+    const versionName = String(pkg.version || '0.1.0');
+    const versionCode = Math.max(1, Number.parseInt(process.env.NATIVE_BUILD_NUMBER || '1', 10) || 1);
+    let buildFile = await readFile(gradle, 'utf8');
+    buildFile = buildFile.replace(/versionCode\s+\d+/, 'versionCode ' + versionCode);
+    buildFile = buildFile.replace(/versionName\s+"[^"]+"/, 'versionName "' + versionName + '"');
+    await writeFile(gradle, buildFile);
+  }
+
   return { platform: 'android', status: 'configured' };
 }
 
