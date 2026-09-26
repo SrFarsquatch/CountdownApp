@@ -1,0 +1,30 @@
+{
+  "appId": "ca.mattmoonie.questlog",
+  "appName": "Quest Log",
+  "webDir": "native-web",
+  "loggingBehavior": "debug",
+  "appendUserAgent": " QuestLogNative/0.1",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorCookies": {
+      "enabled": true
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "banner",
+        "list"
+      ]
+    }
+  },
+  "ios": {
+    "preferredContentMode": "mobile",
+    "allowsLinkPreview": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

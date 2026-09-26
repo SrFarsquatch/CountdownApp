@@ -7,7 +7,7 @@ import {
   APPEARANCE_MODES, UI_THEMES, UI_DENSITIES, AGENT_PROVIDERS
 } from './state.js';
 import {
-  googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth,
+  googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth, readGoogleOauthState,
   calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
@@ -16,8 +16,8 @@ import { financeSummary, financeProviders, startFinanceConnection, completeFinan
 import { testAgent, listAgentModels, saveAgentCredential, clearAgentCredential, chat, applyActions } from './agent.js';
 import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
-import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, sendTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
-import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig } from './auth.js';
+import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
+import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
@@ -426,13 +426,31 @@ async function handleApi(request,env,identity){
   if(p==='/api/notifications/unsubscribe'&&method==='POST'){
     const incoming=await body(request);
     unregisterSubscription(state,incoming.endpoint||'');
-    if(!state.notifications.subscriptions.length)state.notifications.enabled=false;
+    if(!state.notifications.subscriptions.length&&!state.notifications.nativeDevices.length)state.notifications.enabled=false;
     await saveState(env,state);
     return json(notificationConfig(state,env));
   }
   if(p==='/api/notifications/test'&&method==='POST'){
     const incoming=await body(request);
     return json(await sendTestNotification(state,env,incoming.endpoint||''));
+  }
+  if(p==='/api/notifications/native/register'&&method==='POST'){
+    const incoming=await body(request);
+    registerNativeDevice(state,incoming);
+    state.notifications.enabled=true;
+    await saveState(env,state);
+    return json(notificationConfig(state,env),201);
+  }
+  if(p==='/api/notifications/native/unregister'&&method==='POST'){
+    const incoming=await body(request);
+    unregisterNativeDevice(state,incoming.token||'');
+    if(!state.notifications.subscriptions.length&&!state.notifications.nativeDevices.length)state.notifications.enabled=false;
+    await saveState(env,state);
+    return json(notificationConfig(state,env));
+  }
+  if(p==='/api/notifications/native/test'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await sendNativeTestNotification(state,env,incoming.token||''));
   }
 
   if(p==='/api/countdowns'&&method==='POST'){
@@ -573,7 +591,7 @@ async function handleApi(request,env,identity){
     catch(error){return json({ok:false,error:error.message||'Yahoo Finance connection failed.'},400)}
   }
 
-  if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env);
+  if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env,identity);
   if(p==='/api/google/callback'&&method==='GET')return finishGoogleAuth(request,state,env);
   if(p==='/api/google/disconnect'&&method==='POST'){state.google.accounts=[];state.tasks=state.tasks.map(t=>normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:''}));await saveState(env,state);return json({ok:true})}
   if(p.startsWith('/api/google/accounts/')&&p.endsWith('/disconnect')&&method==='POST'){
@@ -719,6 +737,38 @@ export default{
     const url=new URL(request.url),path=url.pathname;
     if(path==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
 
+    if(path==='/.well-known/assetlinks.json'&&request.method==='GET'){
+      const fingerprints=String(env.ANDROID_APP_CERT_SHA256||'').split(',').map(value=>value.trim()).filter(Boolean);
+      if(!fingerprints.length)return json([],200,{'cache-control':'public, max-age=300'});
+      return json([{
+        relation:['delegate_permission/common.handle_all_urls'],
+        target:{namespace:'android_app',package_name:'ca.mattmoonie.questlog',sha256_cert_fingerprints:fingerprints}
+      }],200,{'cache-control':'public, max-age=3600'});
+    }
+    if(path==='/.well-known/apple-app-site-association'&&request.method==='GET'){
+      const teamId=cleanText(env.APPLE_TEAM_ID,120);
+      const details=teamId?[{appID:teamId+'.ca.mattmoonie.questlog',paths:['/']}]:[];
+      return json({applinks:{apps:[],details}},200,{'cache-control':'public, max-age=3600'});
+    }
+
+    if(path==='/api/google/callback'&&request.method==='GET'){
+      try{
+        const oauthContext=await readGoogleOauthState(url.searchParams.get('state'),env);
+        if(oauthContext?.userId){
+          const scoped=scopedUserEnv(env,{userId:oauthContext.userId}),state=await loadState(scoped);
+          return await finishGoogleAuth(request,state,scoped,oauthContext);
+        }
+      }catch(error){
+        if(String(url.searchParams.get('state')||'').includes('.'))return text(error.message||'Google connection failed.',400);
+      }
+    }
+    if(path==='/native-auth'&&request.method==='GET'){
+      return env.ASSETS.fetch(new Request(new URL('/native-auth.html',url),request));
+    }
+    if(path==='/api/auth/native-challenge'&&request.method==='POST'){
+      try{return json(await createNativeAuthChallenge(request,env,await body(request)))}
+      catch(error){return json({error:error.message||'Native verification failed.'},Number(error.status)||500)}
+    }
     if(path==='/api/auth/config'&&request.method==='GET')return json(authPublicConfig(env));
     if(path==='/api/auth/session'&&request.method==='GET'){
       const identity=await nativeSession(request,env);
@@ -753,6 +803,11 @@ export default{
 
     if(path==='/plaid-oauth'){
       const assetUrl=new URL('/plaid-oauth.html',url);
+      assetUrl.search=url.search;
+      return env.ASSETS.fetch(new Request(assetUrl,request));
+    }
+    if(path==='/flinks-oauth.html'){
+      const assetUrl=new URL('/flinks-oauth.html',url);
       assetUrl.search=url.search;
       return env.ASSETS.fetch(new Request(assetUrl,request));
     }

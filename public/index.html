@@ -1875,10 +1875,24 @@ body.modal-open{overflow:hidden}
   <div class="modal-body" id="modalBody"></div>
 </div></div>
 
+<script src="/native-runtime.js"></script>
 <script>
 let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
-const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
+const api=async(path,options={})=>{const target=window.QuestLogNative?.apiUrl(path)||path;const r=await fetch(target,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(r.status===401&&window.QuestLogNative?.isNative){location.replace('/login?source=native');throw Error('Authentication required')}if(!r.ok)throw Error(d.error||'Request failed');return d};
+async function startGoogleConnection(){
+ if(window.QuestLogNative?.isNative){
+   try{
+     const result=await api('/api/google/auth?native=1&response=json');
+     if(!result?.url)throw Error('Google authentication URL was not returned.');
+     await window.QuestLogNative.openAuthUrl(result.url);
+   }catch(error){
+     alert(error.message||'Could not start Google sign-in.');
+   }
+   return;
+ }
+ location.href='/api/google/auth';
+}
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
 function defaultPlannerView(){return window.matchMedia('(max-width:760px)').matches?'day':'week'}
 function plannerViewStorageKey(){
@@ -1976,13 +1990,31 @@ async function renderNotificationSettings(){
  $('notifyEventLead').value=String(cfg.eventLeadMinutes||15);
  $('notifyGoalLead').value=String(cfg.goalLeadMinutes||1440);
  $('notifyCountdownLead').value=String(cfg.countdownLeadMinutes||1440);
+
+ if(window.QuestLogNative?.isNative){
+   const native=await window.QuestLogNative.push.status().catch(()=>({supported:false,permission:'denied',registered:false}));
+   const configured=window.QuestLogNative.platform==='android'?cfg.androidConfigured:cfg.iosConfigured;
+   if(!configured){
+     status.textContent=window.QuestLogNative.platform==='android'?'Android push is not configured on the server.':'iOS push is not configured on the server.';
+     enable.disabled=true;disable.disabled=!native.registered;test.disabled=true;return;
+   }
+   if(native.permission==='denied'){
+     status.textContent='Blocked in device settings';
+     enable.disabled=true;disable.disabled=!native.registered;test.disabled=true;return;
+   }
+   status.textContent=native.registered?'Enabled on this device':(native.permission==='granted'?'Ready to enable':'Permission not requested');
+   enable.textContent=native.registered?'Save notification settings':'Enable notifications';
+   enable.disabled=false;disable.disabled=!native.registered;test.disabled=!native.registered;return;
+ }
+
  const supported=window.isSecureContext&&'Notification' in window&&'serviceWorker' in navigator&&'PushManager' in window;
  if(!supported){
    status.textContent=window.isSecureContext?'Push is not supported by this browser.':'HTTPS is required for push notifications.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
- if(!cfg.configured){
-   status.textContent='Server push keys are not configured.';
+ const webConfigured=cfg.webConfigured??cfg.configured;
+ if(!webConfigured){
+   status.textContent='Server web-push keys are not configured.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
  let subscription=null;
@@ -2014,12 +2046,22 @@ async function saveNotificationPreferences(){
 async function enablePushNotifications(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Enabling notifications…';
  try{
+   if(window.QuestLogNative?.isNative){
+     const cfg=await api('/api/notifications/config');
+     const configured=window.QuestLogNative.platform==='android'?cfg.androidConfigured:cfg.iosConfigured;
+     if(!configured)throw Error(window.QuestLogNative.platform==='android'?'Android push is not configured on the server.':'iOS push is not configured on the server.');
+     await window.QuestLogNative.push.enable();
+     state.notifications=await saveNotificationPreferences();
+     note.textContent='Notifications enabled on this device.';
+     await renderNotificationSettings();
+     return;
+   }
    if(!window.isSecureContext)throw Error('HTTPS is required for push notifications.');
    if(Notification.permission==='denied')throw Error('Notifications are blocked in your browser settings.');
    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
    if(permission!=='granted')throw Error('Notification permission was not granted.');
    const cfg=await api('/api/notifications/config');
-   if(!cfg.configured||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
+   if(!(cfg.webConfigured??cfg.configured)||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
    const registration=await navigator.serviceWorker.ready;
    let subscription=await registration.pushManager.getSubscription();
    if(!subscription){
@@ -2034,12 +2076,16 @@ async function enablePushNotifications(){
 async function disablePushNotifications(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Disabling notifications…';
  try{
-   const subscription=await currentPushSubscription();
-   if(subscription){
-     await api('/api/notifications/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
-     await subscription.unsubscribe();
+   if(window.QuestLogNative?.isNative){
+     await window.QuestLogNative.push.disable();
+   }else{
+     const subscription=await currentPushSubscription();
+     if(subscription){
+       await api('/api/notifications/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
+       await subscription.unsubscribe();
+     }
    }
-   state.notifications={...(state.notifications||{}),enabled:false};
+   state.notifications=await api('/api/notifications/config').catch(()=>({...state.notifications,enabled:false}));
    note.textContent='Notifications disabled on this device.';
    await renderNotificationSettings();
  }catch(error){note.textContent=error.message||'Could not disable notifications.'}
@@ -2047,6 +2093,12 @@ async function disablePushNotifications(){
 async function testPushNotification(){
  const note=$('notificationStatus');note.style.display='block';note.textContent='Sending test notification…';
  try{
+   if(window.QuestLogNative?.isNative){
+     const result=await window.QuestLogNative.push.test();
+     if(!result.ok)throw Error(result.results?.find(item=>item.error)?.error||'Native push service did not accept the test notification.');
+     note.textContent='Test sent. It should appear as a system notification.';
+     return;
+   }
    const subscription=await currentPushSubscription();if(!subscription)throw Error('Enable notifications on this device first.');
    const result=await api('/api/notifications/test',{method:'POST',body:JSON.stringify({endpoint:subscription.endpoint})});
    if(!result.ok)throw Error(result.results?.find(item=>item.error)?.error||'Push service did not accept the test notification.');
@@ -2097,7 +2149,14 @@ function renderRuntimeSession(){
    if(menuName)menuName.textContent=name;
    if(menuAvatar)menuAvatar.innerHTML=accountAvatarInner(profile);
    if(navAvatar)navAvatar.innerHTML=accountAvatarInner(profile);
-   if(logoutLink)logoutLink.href=logout;
+   if(logoutLink){
+     logoutLink.href=logout;
+     logoutLink.onclick=window.QuestLogNative?.isNative?async event=>{
+       event.preventDefault();
+       try{await api('/api/auth/logout',{method:'POST'})}catch{}
+       location.replace('/login?source=native');
+     }:null;
+   }
    if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
    if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
     if(notificationsButton)notificationsButton.onclick=()=>{setAccountMenuOpen(false);openNotificationCenter()};
@@ -2582,7 +2641,7 @@ async function eventModal(item=null,preset={}){
  if(!item&&!writable.length){
    const connected=allAccounts.length>0;
    openModal('New event','<div class="notice">'+(connected?'Your Google account is still using the old read-only token. Reconnect it once to grant Quest Log event editing access.':'Connect a Google account before creating calendar events.')+'</div><div class="modal-actions"><button class="btn primary" id="eventConnectGoogle">'+(connected?'Reconnect Google':'Open Google settings')+'</button></div>');
-   $('eventConnectGoogle').onclick=()=>connected?location.href='/api/google/auth':setView('settings');
+   $('eventConnectGoogle').onclick=()=>connected?startGoogleConnection():setView('settings');
    return;
  }
  const editing=Boolean(item);
@@ -3469,7 +3528,7 @@ async function renderPlanner(){
    if(seq!==plannerRenderSeq)return;
    calEvents=events;
  }catch(e){if(seq!==plannerRenderSeq)return;console.warn(e);calEvents=[]}
- $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
+ $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>startGoogleConnection();
  const stage=$('calendarStage');stage?.classList.remove('planner-pager-active');
  if(isMobileUi())renderMobilePlannerPager(range,calEvents);
  else{
@@ -3869,6 +3928,7 @@ function renderFinance(){
 }
 const PLAID_OAUTH_STORAGE_KEY='questlog.plaid.oauth';
 function clearPlaidOauthState(){try{localStorage.removeItem(PLAID_OAUTH_STORAGE_KEY)}catch{}}
+function readPlaidOauthState(){try{return JSON.parse(localStorage.getItem(PLAID_OAUTH_STORAGE_KEY)||'null')}catch{return null}}
 function savePlaidOauthState(linkToken,redirectUri){
  try{localStorage.setItem(PLAID_OAUTH_STORAGE_KEY,JSON.stringify({linkToken,redirectUri,createdAt:Date.now(),returnUrl:'/?view=markets'}))}catch{}
 }
@@ -3887,6 +3947,28 @@ async function finishPlaidConnection(publicToken,metadata={}){
  financeError='';
  clearPlaidOauthState();
  renderFinance();
+}
+function launchPlaidLink(linkToken,redirectUri,receivedRedirectUri=''){
+ if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
+ const options={
+   token:linkToken,
+   onSuccess:async(publicToken,metadata)=>{
+     try{await completeFinanceProvider('plaid',{publicToken,metadata:{institution:metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null}})}
+     catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
+     finally{handler.destroy?.()}
+   },
+   onExit:(error,metadata)=>{
+     financeLinkLoading=false;plaidLinkLoading=false;
+     if(error){financeError=plaidErrorText(error,metadata);clearPlaidOauthState()}
+     renderFinance();handler.destroy?.();
+   },
+   onEvent:(eventName,metadata)=>{if(eventName==='ERROR')console.warn('Plaid Link error event',metadata)}
+ };
+ if(receivedRedirectUri)options.receivedRedirectUri=receivedRedirectUri;
+ const handler=window.Plaid.create(options);
+ savePlaidOauthState(linkToken,redirectUri);
+ handler.open();
+ return handler;
 }
 function configuredFinanceProviders(){
  return (financeData?.providers||[]).filter(provider=>provider?.configured);
@@ -3909,22 +3991,12 @@ async function connectFinanceProvider(provider,itemId=''){
  if(financeLinkLoading||plaidLinkLoading)return;
  financeLinkLoading=true;if(id==='plaid')plaidLinkLoading=true;renderFinance();
  try{
-   const redirectUri=id==='flinks'?location.origin+'/flinks-oauth.html':location.origin+'/plaid-oauth';
+   const financeRedirectOrigin=window.QuestLogNative?.isNative?window.QuestLogNative.apiOrigin:location.origin;
+   const redirectUri=id==='flinks'?financeRedirectOrigin+'/flinks-oauth.html':financeRedirectOrigin+'/plaid-oauth';
    const launch=await api('/api/finance/connect',{method:'POST',body:JSON.stringify({provider:id,itemId,redirectUri})});
    if(id==='plaid'){
-     if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
-     savePlaidOauthState(launch.linkToken,launch.redirectUri||redirectUri);
-     const handler=window.Plaid.create({
-       token:launch.linkToken,
-       onSuccess:async(publicToken,metadata)=>{
-         try{const institution=metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null;await completeFinanceProvider('plaid',{publicToken,metadata:{institution}})}
-         catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
-         finally{handler.destroy?.()}
-       },
-       onExit:(error,metadata)=>{financeLinkLoading=false;plaidLinkLoading=false;if(error){financeError=plaidErrorText(error,metadata);clearPlaidOauthState()}renderFinance();handler.destroy?.()},
-       onEvent:(eventName,metadata)=>{if(eventName==='ERROR')console.warn('Plaid Link error event',metadata)}
-     });
-     handler.open();return;
+     launchPlaidLink(launch.linkToken,launch.redirectUri||redirectUri);
+     return;
    }
    if(id==='yodlee'){
      if(!window.fastlink?.open)throw Error('Yodlee FastLink could not load.');
@@ -3938,7 +4010,12 @@ async function connectFinanceProvider(provider,itemId=''){
        onSuccess:async()=>{if(finished)return;finished=true;try{await completeFinanceProvider('yodlee',{})}catch(error){financeError=error.message;financeLinkLoading=false;renderFinance()}},
        onError:error=>{financeError=error?.message||error?.reason||'Yodlee could not connect this bank.';financeLinkLoading=false;renderFinance()},
        onClose:()=>{if(!finished){financeLinkLoading=false;renderFinance()}},
-       onEvent:(name,data)=>{if(name==='OPEN_EXTERNAL_URL'&&data?.url)window.open(data.url,'_blank','noopener')}
+       onEvent:(name,data)=>{
+         if(name==='OPEN_EXTERNAL_URL'&&data?.url){
+           if(window.QuestLogNative?.isNative)window.QuestLogNative.openExternalUrl(data.url).catch(error=>{financeError=error.message;renderFinance()});
+           else window.open(data.url,'_blank','noopener');
+         }
+       }
      },'financeProviderLaunch');
      return;
    }
@@ -3957,7 +4034,8 @@ async function finishFlinksMessage(data){
 }
 async function connectFinanceBank(){openFinanceProviderPicker()}
 window.addEventListener('message',async event=>{
- if(event.origin===location.origin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
+ const hostedQuestLogOrigin=window.QuestLogNative?.isNative?window.QuestLogNative.apiOrigin:location.origin;
+ if(event.origin===hostedQuestLogOrigin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
  if(financeFlinksOrigin&&event.origin===financeFlinksOrigin&&event.data?.step==='REDIRECT'&&(event.data?.loginId||event.data?.LoginId)){await finishFlinksMessage(event.data);return}
  if(event.origin===location.origin&&event.data?.type==='questlog-plaid-oauth-complete'){
    financeLinkLoading=false;plaidLinkLoading=false;
@@ -3965,6 +4043,21 @@ window.addEventListener('message',async event=>{
      try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
      catch(error){financeError=error.message;renderFinance()}
    }else{financeError=event.data.error||'Bank connection could not be completed.';renderFinance()}
+ }
+});
+window.addEventListener('questlog:native-oauth',async event=>{
+ const detail=event.detail||{};
+ if(detail.provider==='plaid'&&detail.status==='resume'){
+   const saved=readPlaidOauthState();
+   if(!saved?.linkToken){financeError='The Plaid session could not be restored. Start the bank connection again.';financeLinkLoading=false;plaidLinkLoading=false;renderFinance();return}
+   if(saved.createdAt&&Date.now()-Number(saved.createdAt)>4*60*60*1000){clearPlaidOauthState();financeError='The Plaid session expired. Start the bank connection again.';financeLinkLoading=false;plaidLinkLoading=false;renderFinance();return}
+   try{
+     financeLinkLoading=true;plaidLinkLoading=true;renderFinance();
+     launchPlaidLink(saved.linkToken,saved.redirectUri||window.QuestLogNative.apiOrigin+'/plaid-oauth',detail.redirectUrl||'');
+   }catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
+ }
+ if(detail.provider==='flinks'&&detail.status==='connected'&&detail.loginId){
+   await finishFlinksMessage({loginId:detail.loginId,institution:detail.institution||''});
  }
 });
 $('connectBankButton').onclick=connectFinanceBank;
@@ -4158,15 +4251,15 @@ async function renderSettings(){
  if(!accounts.length){
    html+='<div class="empty">No Google accounts connected yet.</div>';
    box.innerHTML=html;
-   if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
+   if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>startGoogleConnection();
    refreshUpdateStatus();return;
  }
  box.innerHTML=html+accounts.map(a=>{
    const needsReconnect=!a.canWrite||!a.canTasks;
    return '<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google account')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Calendar editing enabled':'Calendar reconnect needed')+'</span><span class="write-state '+(a.canTasks?'ok':'warn')+'">'+(a.canTasks?'Task sync enabled':'Task reconnect needed')+'</span></div></div><div class="account-actions">'+(needsReconnect?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="integration-section"><div class="integration-head"><strong>Calendars</strong><span class="meta">Shown in Quest Log</span></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div><div class="integration-section"><div class="integration-head"><strong>Google Tasks</strong><span class="meta">Two-way sync</span></div><div class="tasklist-list" data-tasklist-list="'+esc(a.id)+'"><div class="meta">'+(a.canTasks?'Loading task lists…':'Reconnect this account to grant Google Tasks access.')+'</div></div></div></div>';
  }).join('');
- $('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
- box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
+ $('addGoogleAccount').onclick=()=>startGoogleConnection();
+ box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>startGoogleConnection());
  box.querySelectorAll('[data-disconnect-account]').forEach(btn=>btn.onclick=async()=>{
    const account=accounts.find(a=>a.id===btn.dataset.disconnectAccount);
    if(!confirm('Disconnect '+(account?.label||'this Google account')+'? Linked Google Tasks will remain in Quest Log as local tasks.'))return;
@@ -4598,7 +4691,7 @@ loadAll().then(()=>{
 setInterval(()=>{if(!state)return;updateCountdownTimers()},1000);
 </script>
 <script>
-if('serviceWorker' in navigator){
+if(!window.QuestLogNative?.isNative&&'serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));
 }
 </script>

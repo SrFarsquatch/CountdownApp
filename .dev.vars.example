@@ -60,5 +60,21 @@
 # VAPID_PRIVATE_KEY
 # VAPID_SUBJECT=mailto:you@example.com
 #
+# Native Android push (Firebase Cloud Messaging HTTP v1)
+# FIREBASE_PROJECT_ID=
+# FIREBASE_CLIENT_EMAIL=
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+#
+# Native iOS push (Apple Push Notification service)
+# APNS_TEAM_ID=
+# APNS_KEY_ID=
+# APNS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+# APNS_BUNDLE_ID=ca.mattmoonie.questlog
+# APNS_SANDBOX=false
+#
+# Verified native web links
+# ANDROID_APP_CERT_SHA256=AA:BB:CC:...
+# APPLE_TEAM_ID=
+#
 # The standalone Cloudflare runtime does NOT use ORIGIN_BASE_URL,
 # Cloudflare Tunnel, CasaOS, or origin service tokens.

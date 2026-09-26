@@ -33,18 +33,39 @@ async function hmacKey(env){
   if(!env.APP_SECRET)throw new Error('APP_SECRET is not configured on the Worker.');
   return crypto.subtle.importKey('raw',enc.encode(String(env.APP_SECRET)),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
-async function oauthState(env){
-  const payload=Date.now().toString(36)+'.'+b64u(crypto.getRandomValues(new Uint8Array(18)));
-  const sig=await crypto.subtle.sign('HMAC',await hmacKey(env),enc.encode(payload));
-  return payload+'.'+b64u(new Uint8Array(sig));
+async function oauthState(env,context={}){
+  const payload={
+    v:2,
+    issuedAt:Date.now(),
+    nonce:b64u(crypto.getRandomValues(new Uint8Array(18))),
+    userId:cleanText(context.userId,160),
+    native:Boolean(context.native)
+  };
+  const encoded=b64u(enc.encode(JSON.stringify(payload)));
+  const signed='v2.'+encoded;
+  const sig=await crypto.subtle.sign('HMAC',await hmacKey(env),enc.encode(signed));
+  return signed+'.'+b64u(new Uint8Array(sig));
 }
-async function validOauthState(value,env){
+export async function readGoogleOauthState(value,env){
   try{
-    const parts=String(value||'').split('.');if(parts.length!==3)return false;
-    const [issued,nonce,sig]=parts,timestamp=parseInt(issued,36);
-    if(!nonce||!Number.isFinite(timestamp)||Date.now()-timestamp<0||Date.now()-timestamp>10*60*1000)return false;
-    return crypto.subtle.verify('HMAC',await hmacKey(env),fromB64u(sig),enc.encode(issued+'.'+nonce));
-  }catch{return false}
+    const raw=String(value||''),parts=raw.split('.');
+    if(parts.length===3&&parts[0]==='v2'){
+      const signed=parts[0]+'.'+parts[1];
+      const ok=await crypto.subtle.verify('HMAC',await hmacKey(env),fromB64u(parts[2]),enc.encode(signed));
+      if(!ok)return null;
+      const payload=JSON.parse(dec.decode(fromB64u(parts[1])));
+      const age=Date.now()-Number(payload.issuedAt||0);
+      if(payload.v!==2||!payload.nonce||!Number.isFinite(age)||age<0||age>10*60*1000)return null;
+      return{userId:cleanText(payload.userId,160),native:Boolean(payload.native),legacy:false};
+    }
+    if(parts.length===3){
+      const [issued,nonce,sig]=parts,timestamp=parseInt(issued,36);
+      if(!nonce||!Number.isFinite(timestamp)||Date.now()-timestamp<0||Date.now()-timestamp>10*60*1000)return null;
+      const ok=await crypto.subtle.verify('HMAC',await hmacKey(env),fromB64u(sig),enc.encode(issued+'.'+nonce));
+      return ok?{userId:'',native:false,legacy:true}:null;
+    }
+    return null;
+  }catch{return null}
 }
 export function googleConfigured(env){return Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.APP_SECRET)}
 function account(state,id){return(state.google?.accounts||[]).find(x=>x.id===id)||null}
@@ -101,16 +122,22 @@ async function calendarList(accountValue,state,env){
   if(identity.googleId)accountValue.googleId=identity.googleId;if(identity.label)accountValue.label=identity.label;if(changed)await saveGoogleAccounts(env,state.google.accounts);
   return out;
 }
-export async function startGoogleAuth(request,env){
+export async function startGoogleAuth(request,env,identity={}){
   if(!googleConfigured(env))throw new Error('Google OAuth is not configured on the Worker.');
+  const requestUrl=new URL(request.url),native=requestUrl.searchParams.get('native')==='1';
   const redirect=new URL('/api/google/callback',request.url).toString();
-  const q=new URLSearchParams({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:redirect,response_type:'code',scope:SCOPES,access_type:'offline',prompt:'select_account consent',include_granted_scopes:'true',state:await oauthState(env)});
-  return Response.redirect('https://accounts.google.com/o/oauth2/v2/auth?'+q,302);
+  const q=new URLSearchParams({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:redirect,response_type:'code',scope:SCOPES,access_type:'offline',prompt:'select_account consent',include_granted_scopes:'true',state:await oauthState(env,{userId:identity.userId||'',native})});
+  const authUrl='https://accounts.google.com/o/oauth2/v2/auth?'+q;
+  if(requestUrl.searchParams.get('response')==='json')return new Response(JSON.stringify({url:authUrl}),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+  return Response.redirect(authUrl,302);
 }
-export async function finishGoogleAuth(request,state,env){
-  const url=new URL(request.url);
-  if(!await validOauthState(url.searchParams.get('state'),env))throw new Error('Invalid or expired OAuth state. Start the Google connection again.');
-  if(url.searchParams.get('error'))throw new Error('Google authorization was cancelled.');
+export async function finishGoogleAuth(request,state,env,oauthContext=null){
+  const url=new URL(request.url),context=oauthContext||await readGoogleOauthState(url.searchParams.get('state'),env);
+  if(!context)throw new Error('Invalid or expired OAuth state. Start the Google connection again.');
+  if(url.searchParams.get('error')){
+    if(context.native)return Response.redirect('questlog://oauth/google?status=cancelled',302);
+    throw new Error('Google authorization was cancelled.');
+  }
   const redirect=new URL('/api/google/callback',request.url).toString();
   const payload=new URLSearchParams({code:url.searchParams.get('code')||'',client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,redirect_uri:redirect,grant_type:'authorization_code'});
   const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:payload});
@@ -135,6 +162,7 @@ export async function finishGoogleAuth(request,state,env){
   if(caps.canTasks&&!found.selectedTaskListIds.length){
     try{const lists=await taskLists(found.id,state,env);if(lists.length){found.selectedTaskListIds=[lists[0].id];found.defaultTaskListId=lists[0].id;await saveState(env,state)}}catch{}
   }
+  if(context.native)return Response.redirect('questlog://oauth/google?status=connected',302);
   return Response.redirect(new URL('/?view=settings&calendar=connected',request.url).toString(),302);
 }
 export async function calendars(accountId,state,env){
