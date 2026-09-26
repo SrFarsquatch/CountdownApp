@@ -4,6 +4,7 @@ import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
+const APP_VERSION = __QUESTLOG_VERSION__;
 const API_ORIGIN = 'https://questlog.mattmoonie.ca';
 const CALLBACK_SCHEME = 'questlog://';
 const PUSH_TOKEN_KEY = 'questlog.native.push.token';
@@ -402,6 +403,7 @@ async function initializeNative() {
 window.QuestLogNative = {
   get isNative() { return isNative(); },
   get platform() { return platform(); },
+  version: APP_VERSION,
   apiOrigin: API_ORIGIN,
   callbackScheme: CALLBACK_SCHEME,
   apiUrl,
