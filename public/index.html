@@ -2604,7 +2604,6 @@ function renderSocialProfileData(data){
  const pinnedHtml=(data.pinnedGoals||[]).length?profilePinnedGoalCards(data.pinnedGoals):'';
  const mutualHtml=!isSelf?mutualFriendsHtml(data):'';
  const overviewSections=[
-   mutualHtml?'<div class="social-profile-section"><div class="social-profile-section-head"><h3>Connections</h3></div>'+mutualHtml+'</div>':'',
    streakHtml?'<div class="social-profile-section"><div class="social-profile-section-head"><h3>Momentum</h3></div>'+streakHtml+'</div>':'',
    pinnedHtml?'<div class="social-profile-section"><div class="social-profile-section-head"><h3>Pinned goals</h3><span class="meta">'+(isSelf?'Choose these in Edit profile':'Goals they chose to feature')+'</span></div><div class="social-profile-grid">'+pinnedHtml+'</div></div>':'',
    !isSelf&&sharedCards?'<div class="social-profile-section"><div class="social-profile-section-head"><h3>Shared with you</h3><span class="meta">Only items explicitly shared with you</span></div><div class="social-profile-grid">'+sharedCards+'</div></div>':''
