@@ -7,7 +7,7 @@ import {
   APPEARANCE_MODES, UI_THEMES, UI_DENSITIES, AGENT_PROVIDERS
 } from './state.js';
 import {
-  googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth,
+  googleConfigured, accountCapabilities, startGoogleAuth, finishGoogleAuth, readGoogleOauthState,
   calendars, taskLists, eventsBetween, mutateEvent, syncGoogleTasks,
   disconnectAccount, createGoogleTaskLink, updateLinkedGoogleTask, deleteLinkedGoogleTask
 } from './google.js';
@@ -573,7 +573,7 @@ async function handleApi(request,env,identity){
     catch(error){return json({ok:false,error:error.message||'Yahoo Finance connection failed.'},400)}
   }
 
-  if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env);
+  if(p==='/api/google/auth'&&method==='GET')return startGoogleAuth(request,env,identity);
   if(p==='/api/google/callback'&&method==='GET')return finishGoogleAuth(request,state,env);
   if(p==='/api/google/disconnect'&&method==='POST'){state.google.accounts=[];state.tasks=state.tasks.map(t=>normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:''}));await saveState(env,state);return json({ok:true})}
   if(p.startsWith('/api/google/accounts/')&&p.endsWith('/disconnect')&&method==='POST'){
@@ -719,6 +719,17 @@ export default{
     const url=new URL(request.url),path=url.pathname;
     if(path==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
 
+    if(path==='/api/google/callback'&&request.method==='GET'){
+      try{
+        const oauthContext=await readGoogleOauthState(url.searchParams.get('state'),env);
+        if(oauthContext?.userId){
+          const scoped=scopedUserEnv(env,{userId:oauthContext.userId}),state=await loadState(scoped);
+          return await finishGoogleAuth(request,state,scoped,oauthContext);
+        }
+      }catch(error){
+        if(String(url.searchParams.get('state')||'').includes('.'))return text(error.message||'Google connection failed.',400);
+      }
+    }
     if(path==='/api/auth/config'&&request.method==='GET')return json(authPublicConfig(env));
     if(path==='/api/auth/session'&&request.method==='GET'){
       const identity=await nativeSession(request,env);
