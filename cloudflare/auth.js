@@ -87,6 +87,9 @@ export async function ensureAuthSchema(env){
  await ensureColumn(env.DB,'questlog_users','avatar_data','TEXT');
  await ensureColumn(env.DB,'questlog_users','bio','TEXT');
  await ensureColumn(env.DB,'questlog_users','profile_visibility',"TEXT NOT NULL DEFAULT 'friends'");
+ await ensureColumn(env.DB,'questlog_users','profile_accent',"TEXT NOT NULL DEFAULT 'quest'");
+ await ensureColumn(env.DB,'questlog_users','profile_settings_json','TEXT');
+ await ensureColumn(env.DB,'questlog_users','pinned_goal_ids_json','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_hash','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_salt','TEXT');
  await ensureColumn(env.DB,'questlog_users','password_iterations','INTEGER');
@@ -182,13 +185,44 @@ async function createSession(request,env,user){
  `).bind(hash,user.user_id,expires,clean(request.headers.get('user-agent'),500),ipHash).run();
  return{token,expires};
 }
-function publicUser(row){return{userId:row.user_id,email:row.primary_email||'',displayName:row.display_name||'',avatarData:row.avatar_data||'',bio:row.bio||'',profileVisibility:['friends','private'].includes(row.profile_visibility)?row.profile_visibility:'friends',createdAt:row.created_at||null}}
+const PROFILE_ACCENTS=new Set(['quest','violet','blue','green','orange','rose']);
+const PROFILE_SECTION_KEYS=['showMemberSince','showFriendCount','showAchievements','showStreaks','showPinnedGoals','showRecentActivity','showSharedItems','showMutualFriends'];
+function normalizeProfileSettings(value){
+ let input=value;
+ if(typeof input==='string'){try{input=JSON.parse(input)}catch{input={}}}
+ input=input&&typeof input==='object'?input:{};
+ const defaults={showMemberSince:true,showFriendCount:true,showAchievements:true,showStreaks:true,showPinnedGoals:true,showRecentActivity:false,showSharedItems:true,showMutualFriends:true,activityDetails:'summary'};
+ const out={...defaults};
+ for(const key of PROFILE_SECTION_KEYS)if(typeof input[key]==='boolean')out[key]=input[key];
+ out.activityDetails=input.activityDetails==='titles'?'titles':'summary';
+ return out;
+}
+function normalizePinnedGoalIds(value){
+ let input=value;
+ if(typeof input==='string'){try{input=JSON.parse(input)}catch{input=[]}}
+ const seen=new Set(),out=[];
+ for(const raw of Array.isArray(input)?input:[]){
+  const id=clean(raw,240);if(!id||seen.has(id))continue;seen.add(id);out.push(id);if(out.length>=6)break;
+ }
+ return out;
+}
+function publicUser(row){
+ const accent=clean(row.profile_accent,30);
+ return{
+  userId:row.user_id,email:row.primary_email||'',displayName:row.display_name||'',avatarData:row.avatar_data||'',bio:row.bio||'',
+  profileVisibility:['friends','private'].includes(row.profile_visibility)?row.profile_visibility:'friends',
+  profileAccent:PROFILE_ACCENTS.has(accent)?accent:'quest',
+  profileSettings:normalizeProfileSettings(row.profile_settings_json),
+  pinnedGoalIds:normalizePinnedGoalIds(row.pinned_goal_ids_json),
+  createdAt:row.created_at||null
+ };
+}
 export async function nativeSession(request,env){
  await ensureAuthSchema(env);
  const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;
  const hash=await sha256Hex(token);
  const row=await env.DB.prepare(`
-  SELECT u.user_id,u.primary_email,u.display_name,u.avatar_data,u.bio,u.profile_visibility,u.created_at,u.status,s.expires_at
+  SELECT u.user_id,u.primary_email,u.display_name,u.avatar_data,u.bio,u.profile_visibility,u.profile_accent,u.profile_settings_json,u.pinned_goal_ids_json,u.created_at,u.status,s.expires_at
   FROM questlog_sessions s JOIN questlog_users u ON u.user_id=s.user_id
   WHERE s.session_hash=?
  `).bind(hash).first();
@@ -278,8 +312,11 @@ export async function updateProfile(env,identity,payload={}){
  const avatarData=normalizeAvatarData(payload.avatarData);
  const bio=clean(payload.bio,280);
  const profileVisibility=['friends','private'].includes(clean(payload.profileVisibility,30))?clean(payload.profileVisibility,30):'friends';
- await env.DB.prepare("UPDATE questlog_users SET display_name=?,avatar_data=?,bio=?,profile_visibility=?,updated_at=datetime('now') WHERE user_id=?")
-  .bind(displayName,avatarData||null,bio,profileVisibility,userId).run();
+ const requestedAccent=clean(payload.profileAccent,30),profileAccent=PROFILE_ACCENTS.has(requestedAccent)?requestedAccent:'quest';
+ const profileSettings=normalizeProfileSettings(payload.profileSettings);
+ const pinnedGoalIds=normalizePinnedGoalIds(payload.pinnedGoalIds);
+ await env.DB.prepare("UPDATE questlog_users SET display_name=?,avatar_data=?,bio=?,profile_visibility=?,profile_accent=?,profile_settings_json=?,pinned_goal_ids_json=?,updated_at=datetime('now') WHERE user_id=?")
+  .bind(displayName,avatarData||null,bio,profileVisibility,profileAccent,JSON.stringify(profileSettings),JSON.stringify(pinnedGoalIds),userId).run();
  const user=await env.DB.prepare('SELECT * FROM questlog_users WHERE user_id=?').bind(userId).first();
  if(!user){const e=new Error('Account was not found.');e.status=404;throw e}
  return publicUser(user);
