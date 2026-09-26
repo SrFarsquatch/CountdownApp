@@ -116,11 +116,14 @@ export async function getSocialProfile(env,identity,targetUserId=''){
   if(!relation||relation.status!=='accepted'){const e=new Error('This profile is only available to friends.');e.status=403;throw e}
   friendshipId=String(relation.friendship_id||'');isFriend=true;
  }
- const row=await env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
+ const row=await env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,profile_accent,profile_settings_json,pinned_goal_ids_json,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
  if(!row||String(row.status||'active')!=='active'){const e=new Error('Profile not found.');e.status=404;throw e}
  const visibility=['friends','private'].includes(String(row.profile_visibility||''))?String(row.profile_visibility):'friends';
  if(!isSelf&&visibility==='private'){const e=new Error('This profile is private.');e.status=403;throw e}
  const countRow=await env.DB.prepare("SELECT COUNT(*) AS count FROM questlog_friendships WHERE status='accepted' AND (user_low=? OR user_high=?)").bind(target,target).first();
+ let profileSettings={};try{profileSettings=JSON.parse(row.profile_settings_json||'{}')}catch{}
+ let pinnedGoalIds=[];try{pinnedGoalIds=JSON.parse(row.pinned_goal_ids_json||'[]')}catch{}
+ const accent=['quest','violet','blue','green','orange','rose'].includes(String(row.profile_accent||''))?String(row.profile_accent):'quest';
  return{
   userId:String(row.user_id||''),
   displayName:String(row.display_name||''),
@@ -128,9 +131,52 @@ export async function getSocialProfile(env,identity,targetUserId=''){
   bio:String(row.bio||''),
   createdAt:row.created_at||null,
   profileVisibility:visibility,
+  profileAccent:accent,
+  profileSettings:profileSettings&&typeof profileSettings==='object'?profileSettings:{},
+  pinnedGoalIds:Array.isArray(pinnedGoalIds)?pinnedGoalIds.map(String).slice(0,6):[],
   friendCount:Number(countRow?.count)||0,
   isSelf,
   isFriend,
   friendshipId
  };
+}
+
+export async function mutualFriends(env,identity,targetUserId=''){
+ await ensureFriendsSchema(env);
+ const current=userId(identity),target=clean(targetUserId,120);
+ if(!target||target===current)return{count:0,friends:[]};
+ const result=await env.DB.prepare(`
+  WITH current_friends AS (
+   SELECT CASE WHEN user_low=? THEN user_high ELSE user_low END AS friend_id
+   FROM questlog_friendships
+   WHERE status='accepted' AND (user_low=? OR user_high=?)
+  ),
+  target_friends AS (
+   SELECT CASE WHEN user_low=? THEN user_high ELSE user_low END AS friend_id
+   FROM questlog_friendships
+   WHERE status='accepted' AND (user_low=? OR user_high=?)
+  )
+  SELECT u.user_id,u.display_name,u.avatar_data
+  FROM current_friends c
+  JOIN target_friends t ON t.friend_id=c.friend_id
+  JOIN questlog_users u ON u.user_id=c.friend_id
+  WHERE u.status='active'
+  ORDER BY lower(COALESCE(u.display_name,'')),u.user_id
+  LIMIT 12
+ `).bind(current,current,current,target,target,target).all();
+ const friends=(result.results||[]).map(row=>({userId:String(row.user_id||''),displayName:String(row.display_name||''),avatarData:String(row.avatar_data||'')}));
+ const countRow=await env.DB.prepare(`
+  WITH current_friends AS (
+   SELECT CASE WHEN user_low=? THEN user_high ELSE user_low END AS friend_id
+   FROM questlog_friendships
+   WHERE status='accepted' AND (user_low=? OR user_high=?)
+  ),
+  target_friends AS (
+   SELECT CASE WHEN user_low=? THEN user_high ELSE user_low END AS friend_id
+   FROM questlog_friendships
+   WHERE status='accepted' AND (user_low=? OR user_high=?)
+  )
+  SELECT COUNT(*) AS count FROM current_friends c JOIN target_friends t ON t.friend_id=c.friend_id
+ `).bind(current,current,current,target,target,target).first();
+ return{count:Number(countRow?.count)||0,friends};
 }
