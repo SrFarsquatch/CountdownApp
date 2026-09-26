@@ -232,6 +232,10 @@ $('authForm').onsubmit=async event=>{
   const button=$('submitButton');button.disabled=true;button.textContent=mode==='create'?'Creating account…':'Signing in…';
   try{
     await api(mode==='create'?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify({email,password,displayName,turnstileToken})});
+    if(window.QuestLogNative?.isNative){
+      const session=await api('/api/auth/session');
+      if(!session.authenticated)throw Error('Quest Log signed in, but the native session did not persist. Reopen the app and try again.');
+    }
     location.replace(nextPath||'/');
   }catch(error){status(error.message,true);resetTurnstile()}
   finally{button.disabled=false;button.textContent=mode==='create'?'Create account':'Sign in'}
