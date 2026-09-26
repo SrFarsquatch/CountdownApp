@@ -242,14 +242,14 @@ $('authForm').onsubmit=async event=>{
       const session=await api('/api/auth/session');
       if(!session.authenticated)throw Error('Quest Log signed in, but the native session did not persist. Reopen the app and try again.');
     }
-    location.replace(nextPath||'/');
+    if(window.QuestLogNative?.isNative)window.QuestLogNative.navigate(nextPath||'/');else location.replace(nextPath||'/');
   }catch(error){status(error.message,true);resetTurnstile()}
   finally{button.disabled=false;button.textContent=mode==='create'?'Create account':'Sign in'}
 };
 (async()=>{
   try{
     const session=await api('/api/auth/session');
-    if(session.authenticated){location.replace(nextPath||'/');return}
+    if(session.authenticated){if(window.QuestLogNative?.isNative)window.QuestLogNative.navigate(nextPath||'/');else location.replace(nextPath||'/');return}
     config=await api('/api/auth/config');
     if(!config.signupsEnabled)$('createTab').style.display='none';
     if(config.turnstileEnabled&&!window.QuestLogNative?.isNative){
@@ -261,7 +261,7 @@ $('authForm').onsubmit=async event=>{
 })();
 </script>
 <script>
-if('serviceWorker' in navigator){
+if(!window.QuestLogNative?.isNative&&'serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));
 }
 </script>

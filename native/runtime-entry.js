@@ -28,6 +28,58 @@ function apiUrl(path) {
   return API_ORIGIN + value;
 }
 
+function localRoute(value = '/') {
+  if (!isNative()) return String(value || '/');
+  try {
+    const url = new URL(String(value || '/'), API_ORIGIN);
+    let pathname = url.pathname || '/';
+    if (pathname === '/') pathname = '/index.html';
+    else if (pathname === '/login') pathname = '/login.html';
+    else if (pathname === '/plaid-oauth') pathname = '/plaid-oauth.html';
+    return pathname + url.search + url.hash;
+  } catch {
+    return '/index.html';
+  }
+}
+
+function navigate(value = '/', options = {}) {
+  const target = localRoute(value);
+  if (options.replace === false) location.assign(target);
+  else location.replace(target);
+}
+
+async function diagnostics() {
+  const result = {
+    native: isNative(),
+    platform: platform(),
+    apiOrigin: API_ORIGIN,
+    route: location.pathname + location.search,
+    apiReachable: false,
+    authenticated: false,
+    runtime: ''
+  };
+  if (!isNative()) return result;
+  try {
+    const health = await fetch(API_ORIGIN + '/healthz', { cache: 'no-store' });
+    result.apiReachable = health.ok;
+    if (health.ok) {
+      const healthData = await health.json().catch(() => ({}));
+      result.runtime = String(healthData.runtime || '');
+    }
+  } catch {}
+  if (result.apiReachable) {
+    try {
+      const session = await fetch(API_ORIGIN + '/api/auth/session', {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const data = await session.json().catch(() => ({}));
+      result.authenticated = Boolean(data.authenticated);
+    } catch {}
+  }
+  return result;
+}
+
 async function nativeApi(path, options = {}) {
   const response = await fetch(apiUrl(path), {
     credentials: 'include',
@@ -83,7 +135,7 @@ function safeLocalRoute(value) {
 
 function openPushRoute(value) {
   const route = safeLocalRoute(value);
-  location.replace(route);
+  navigate(route);
 }
 
 function parseCallback(rawUrl) {
@@ -114,7 +166,7 @@ async function handleNativeUrl(rawUrl) {
   try {
     const hosted = new URL(value);
     if (hosted.origin === API_ORIGIN && !hosted.pathname.startsWith('/api/')) {
-      location.replace(hosted.pathname + hosted.search + hosted.hash);
+      navigate(hosted.pathname + hosted.search + hosted.hash);
       return true;
     }
   } catch {}
@@ -135,7 +187,7 @@ async function handleNativeUrl(rawUrl) {
   window.dispatchEvent(new CustomEvent('questlog:native-oauth', { detail: callback }));
 
   if (callback.provider === 'google' && callback.status === 'connected') {
-    location.replace('/?view=settings&calendar=connected&source=native');
+    navigate('/?view=settings&calendar=connected&source=native');
   }
 
   return true;
@@ -309,6 +361,9 @@ window.QuestLogNative = {
   apiOrigin: API_ORIGIN,
   callbackScheme: CALLBACK_SCHEME,
   apiUrl,
+  localRoute,
+  navigate,
+  diagnostics,
   openAuthUrl,
   openExternalUrl,
   verifyHuman,
