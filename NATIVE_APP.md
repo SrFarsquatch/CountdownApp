@@ -48,8 +48,8 @@ iOS development requires macOS and Xcode. Capacitor 8 currently requires Xcode 2
 
 ## Next implementation steps
 
-1. Add a native runtime/API base helper so packaged pages send `/api/*` requests to the hosted Quest Log backend.
-2. Verify HTTP-only session cookie behavior through CapacitorHttp/CapacitorCookies and update backend CORS/cookie handling only where required.
+1. ✅ Native runtime/API base helper added. Packaged pages route `/api/*` to the hosted Quest Log backend while the web/PWA keeps same-origin requests.
+2. Verify HTTP-only session cookie behavior through CapacitorHttp/CapacitorCookies on physical Android/iOS devices and update backend handling only if required.
 3. Replace Google and finance-provider browser redirects with native browser/deep-link flows.
 4. Add App/Universal Links for `questlog.mattmoonie.ca` and a custom callback scheme as a fallback.
 5. Move notification delivery from web-push-only behavior to native push notifications for Android/iOS while keeping web push for the PWA.
