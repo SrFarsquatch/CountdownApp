@@ -1466,6 +1466,14 @@ body.modal-open{overflow:hidden}
 </style>
 </head>
 <body>
+<div id="nativeBootOverlay" hidden style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:grid;place-items:center;padding:24px">
+  <div style="width:min(520px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:var(--shadow)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><img src="/branding/icon-classic.svg" alt="" style="width:42px;height:42px;border-radius:12px"><div><div style="font-size:18px;font-weight:850">Quest Log</div><div id="nativeBootTitle" style="color:var(--muted);font-size:12px">Starting app…</div></div></div>
+    <div id="nativeBootMessage" style="color:var(--muted);line-height:1.55">Connecting to Quest Log…</div>
+    <div id="nativeBootDetails" style="display:none;margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:11px;white-space:pre-wrap"></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="nativeBootRetry">Retry</button><button class="btn" id="nativeBootSignIn">Sign in</button></div>
+  </div>
+</div>
 <div class="app">
 <aside class="side">
   <div class="brand"><div class="logo"><img id="appBrandIcon" src="/branding/icon-quest.svg" alt="" aria-hidden="true"></div><span>Quest Log</span></div>
@@ -1879,7 +1887,7 @@ body.modal-open{overflow:hidden}
 <script>
 let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
-const api=async(path,options={})=>{const target=window.QuestLogNative?.apiUrl(path)||path;const r=await fetch(target,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(r.status===401&&window.QuestLogNative?.isNative){location.replace('/login?source=native');throw Error('Authentication required')}if(!r.ok)throw Error(d.error||'Request failed');return d};
+const api=async(path,options={})=>{const target=window.QuestLogNative?.apiUrl(path)||path;const r=await fetch(target,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(r.status===401&&window.QuestLogNative?.isNative){window.QuestLogNative.navigate('/login?source=native');throw Error('Authentication required')}if(!r.ok)throw Error(d.error||'Request failed');return d};
 async function startGoogleConnection(){
  if(window.QuestLogNative?.isNative){
    try{
@@ -2154,7 +2162,7 @@ function renderRuntimeSession(){
      logoutLink.onclick=window.QuestLogNative?.isNative?async event=>{
        event.preventDefault();
        try{await api('/api/auth/logout',{method:'POST'})}catch{}
-       location.replace('/login?source=native');
+       window.QuestLogNative.navigate('/login?source=native');
      }:null;
    }
    if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
@@ -4682,12 +4690,47 @@ async function loadAll(force=false){
  if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets'){renderFinance();renderMarkets();}if(current==='settings')setSettingsSection(settingsSection,{render:true})
 }
 const initialRaw=new URLSearchParams(location.search).get('view')||'today',initial=initialRaw==='agent'?'today':(APP_VIEWS.has(initialRaw)?initialRaw:'today');
-loadAll().then(()=>{
- renderAppView(initial);
- initAppHistory(initial);
- if(initialRaw==='agent')openAgentDrawer();
- refreshUpdateStatus();
-});
+
+function setNativeBootState({show=true,title='Starting app…',message='Connecting to Quest Log…',details=''}={}){
+ const overlay=$('nativeBootOverlay');if(!overlay)return;
+ overlay.hidden=!show;
+ $('nativeBootTitle').textContent=title;
+ $('nativeBootMessage').textContent=message;
+ const detailEl=$('nativeBootDetails');
+ detailEl.textContent=details||'';
+ detailEl.style.display=details?'block':'none';
+}
+if($('nativeBootRetry'))$('nativeBootRetry').onclick=()=>location.reload();
+if($('nativeBootSignIn'))$('nativeBootSignIn').onclick=()=>window.QuestLogNative?.isNative?window.QuestLogNative.navigate('/login?source=native'):location.replace('/login');
+
+async function bootQuestLog(){
+ if(window.QuestLogNative?.isNative){
+   setNativeBootState({show:true,title:'Checking session…',message:'Connecting securely to Quest Log…'});
+   const diag=await window.QuestLogNative.diagnostics();
+   if(!diag.apiReachable){
+     setNativeBootState({show:true,title:'Cannot reach Quest Log',message:'The installed app could not connect to questlog.mattmoonie.ca. Check your internet connection and try again.',details:JSON.stringify(diag,null,2)});
+     return;
+   }
+   if(!diag.authenticated){
+     window.QuestLogNative.navigate('/login?source=native');
+     return;
+   }
+ }
+ try{
+   await loadAll();
+   renderAppView(initial);
+   initAppHistory(initial);
+   if(initialRaw==='agent')openAgentDrawer();
+   refreshUpdateStatus();
+   setNativeBootState({show:false});
+ }catch(error){
+   if(window.QuestLogNative?.isNative){
+     const diag=await window.QuestLogNative.diagnostics().catch(()=>({}));
+     setNativeBootState({show:true,title:'Quest Log could not start',message:error?.message||'The app failed during startup.',details:JSON.stringify(diag,null,2)});
+   }else throw error;
+ }
+}
+bootQuestLog();
 setInterval(()=>{if(!state)return;updateCountdownTimers()},1000);
 </script>
 <script>
