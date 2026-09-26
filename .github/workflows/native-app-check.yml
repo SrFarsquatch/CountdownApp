@@ -95,5 +95,10 @@ jobs:
       - name: Verify iOS Quest Log API domain
         run: grep -q '<string>questlog.mattmoonie.ca</string>' ios/App/App/Info.plist
 
+      - name: Verify iOS Universal Links entitlement
+        run: |
+          grep -q 'applinks:questlog.mattmoonie.ca' ios/App/App/App.entitlements
+          grep -q 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;' ios/App/App.xcodeproj/project.pbxproj
+
       - name: Verify iOS push registration hooks
         run: grep -q 'capacitorDidRegisterForRemoteNotifications' ios/App/App/AppDelegate.swift
