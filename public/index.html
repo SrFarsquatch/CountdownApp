@@ -1524,6 +1524,10 @@ body.modal-open{overflow:hidden}
       <div class="account-menu-email" id="accountMenuEmail"></div>
     </div>
   </div>
+  <button class="account-menu-action" id="accountViewProfile" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg>
+    <span>View profile</span>
+  </button>
   <button class="account-menu-action" id="accountManage" type="button">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg>
     <span>Manage account</span>
@@ -2196,7 +2200,7 @@ function toggleAccountMenu(source,event){
  if(isOpen===false&&runtimeInfo?.runtime==='cloudflare'){refreshFriendBadge().catch(()=>{});refreshActivityBadge().catch(()=>{})}refreshActivityBadge().catch(()=>{});
 }
 function renderRuntimeSession(){
- const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),notificationsButton=$('accountNotifications'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
+ const foot=$('sideFoot'),mobile=$('mobileAccountNav'),menuEmail=$('accountMenuEmail'),menuName=$('accountMenuName'),menuAvatar=$('accountMenuAvatar'),navAvatar=$('mobileNavAvatar'),logoutLink=$('accountLogout'),friendsButton=$('accountFriends'),notificationsButton=$('accountNotifications'),viewProfileButton=$('accountViewProfile'),manageButton=$('accountManage'),settingsButton=$('accountSettings');
  if(!foot)return;
  if(runtimeInfo?.runtime==='cloudflare'){
    const profile=runtimeInfo.profile||{email:runtimeInfo.user||'',displayName:'',avatarData:''};
@@ -2216,6 +2220,7 @@ function renderRuntimeSession(){
        window.QuestLogNative.navigate('/login?source=native');
      }:null;
    }
+   if(viewProfileButton)viewProfileButton.onclick=()=>{setAccountMenuOpen(false);openProfile(profile.userId)};
    if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
    if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
     if(notificationsButton)notificationsButton.onclick=()=>{setAccountMenuOpen(false);openNotificationCenter()};
@@ -2530,7 +2535,7 @@ function renderSocialProfileData(data){
  const root=$('socialProfileShell');if(!root)return;
  const profile=data?.profile||{},isSelf=Boolean(profile.isSelf),name=profile.displayName||'Quest Log user',bio=String(profile.bio||'').trim(),memberSince=socialProfileDate(profile.createdAt);
  const actions=isSelf
-   ?'<button class="btn primary" id="profileEditButton" type="button">Edit profile</button><button class="btn" id="profileFriendsButton" type="button">Friends</button>'
+   ?'<button class="btn primary" id="profileEditButton" type="button">Edit profile</button><button class="btn" id="profileFriendsButton" type="button">Friends</button><button class="btn" id="profileNotificationsButton" type="button">Activity</button><button class="btn" id="profileSettingsButton" type="button">Settings</button>'
    :'<button class="btn" type="button" disabled>Friends</button>';
  const privacy=isSelf?'<span class="social-profile-badge">'+(profile.profileVisibility==='private'?'Private':'Friends only')+'</span>':'<span class="social-profile-badge">Friend</span>';
  const shared=data.sharedItems||{},sharedCards=profileSharedCards(shared.tasks,'task')+profileSharedCards(shared.goals,'goal')+profileSharedCards(shared.countdowns,'countdown');
@@ -2552,6 +2557,8 @@ function renderSocialProfileData(data){
   '<div class="social-profile-section"><div class="social-profile-section-head"><h3>'+sectionTitle+'</h3>'+(isSelf?'<span class="meta">Visible only as allowed by sharing and privacy settings</span>':'<span class="meta">Only items explicitly shared with you</span>')+'</div><div class="social-profile-grid">'+sectionBody+'</div></div>';
  if($('profileEditButton'))$('profileEditButton').onclick=openManageAccountModal;
  if($('profileFriendsButton'))$('profileFriendsButton').onclick=openFriendsModal;
+ if($('profileNotificationsButton'))$('profileNotificationsButton').onclick=openNotificationCenter;
+ if($('profileSettingsButton'))$('profileSettingsButton').onclick=()=>setView('settings');
 }
 async function renderSocialProfile(force=false){
  const root=$('socialProfileShell');if(!root||runtimeInfo?.runtime!=='cloudflare')return;
