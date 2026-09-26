@@ -3927,6 +3927,7 @@ function renderFinance(){
 }
 const PLAID_OAUTH_STORAGE_KEY='questlog.plaid.oauth';
 function clearPlaidOauthState(){try{localStorage.removeItem(PLAID_OAUTH_STORAGE_KEY)}catch{}}
+function readPlaidOauthState(){try{return JSON.parse(localStorage.getItem(PLAID_OAUTH_STORAGE_KEY)||'null')}catch{return null}}
 function savePlaidOauthState(linkToken,redirectUri){
  try{localStorage.setItem(PLAID_OAUTH_STORAGE_KEY,JSON.stringify({linkToken,redirectUri,createdAt:Date.now(),returnUrl:'/?view=markets'}))}catch{}
 }
@@ -3945,6 +3946,28 @@ async function finishPlaidConnection(publicToken,metadata={}){
  financeError='';
  clearPlaidOauthState();
  renderFinance();
+}
+function launchPlaidLink(linkToken,redirectUri,receivedRedirectUri=''){
+ if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
+ const options={
+   token:linkToken,
+   onSuccess:async(publicToken,metadata)=>{
+     try{await completeFinanceProvider('plaid',{publicToken,metadata:{institution:metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null}})}
+     catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
+     finally{handler.destroy?.()}
+   },
+   onExit:(error,metadata)=>{
+     financeLinkLoading=false;plaidLinkLoading=false;
+     if(error){financeError=plaidErrorText(error,metadata);clearPlaidOauthState()}
+     renderFinance();handler.destroy?.();
+   },
+   onEvent:(eventName,metadata)=>{if(eventName==='ERROR')console.warn('Plaid Link error event',metadata)}
+ };
+ if(receivedRedirectUri)options.receivedRedirectUri=receivedRedirectUri;
+ const handler=window.Plaid.create(options);
+ savePlaidOauthState(linkToken,redirectUri);
+ handler.open();
+ return handler;
 }
 function configuredFinanceProviders(){
  return (financeData?.providers||[]).filter(provider=>provider?.configured);
@@ -3967,22 +3990,12 @@ async function connectFinanceProvider(provider,itemId=''){
  if(financeLinkLoading||plaidLinkLoading)return;
  financeLinkLoading=true;if(id==='plaid')plaidLinkLoading=true;renderFinance();
  try{
-   const redirectUri=id==='flinks'?location.origin+'/flinks-oauth.html':location.origin+'/plaid-oauth';
+   const financeRedirectOrigin=window.QuestLogNative?.isNative?window.QuestLogNative.apiOrigin:location.origin;
+   const redirectUri=id==='flinks'?financeRedirectOrigin+'/flinks-oauth.html':financeRedirectOrigin+'/plaid-oauth';
    const launch=await api('/api/finance/connect',{method:'POST',body:JSON.stringify({provider:id,itemId,redirectUri})});
    if(id==='plaid'){
-     if(!window.Plaid)throw Error('Plaid Link could not load. Check your network or content-security settings.');
-     savePlaidOauthState(launch.linkToken,launch.redirectUri||redirectUri);
-     const handler=window.Plaid.create({
-       token:launch.linkToken,
-       onSuccess:async(publicToken,metadata)=>{
-         try{const institution=metadata?.institution?{name:metadata.institution.name,institution_id:metadata.institution.institution_id}:null;await completeFinanceProvider('plaid',{publicToken,metadata:{institution}})}
-         catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
-         finally{handler.destroy?.()}
-       },
-       onExit:(error,metadata)=>{financeLinkLoading=false;plaidLinkLoading=false;if(error){financeError=plaidErrorText(error,metadata);clearPlaidOauthState()}renderFinance();handler.destroy?.()},
-       onEvent:(eventName,metadata)=>{if(eventName==='ERROR')console.warn('Plaid Link error event',metadata)}
-     });
-     handler.open();return;
+     launchPlaidLink(launch.linkToken,launch.redirectUri||redirectUri);
+     return;
    }
    if(id==='yodlee'){
      if(!window.fastlink?.open)throw Error('Yodlee FastLink could not load.');
@@ -3996,7 +4009,12 @@ async function connectFinanceProvider(provider,itemId=''){
        onSuccess:async()=>{if(finished)return;finished=true;try{await completeFinanceProvider('yodlee',{})}catch(error){financeError=error.message;financeLinkLoading=false;renderFinance()}},
        onError:error=>{financeError=error?.message||error?.reason||'Yodlee could not connect this bank.';financeLinkLoading=false;renderFinance()},
        onClose:()=>{if(!finished){financeLinkLoading=false;renderFinance()}},
-       onEvent:(name,data)=>{if(name==='OPEN_EXTERNAL_URL'&&data?.url)window.open(data.url,'_blank','noopener')}
+       onEvent:(name,data)=>{
+         if(name==='OPEN_EXTERNAL_URL'&&data?.url){
+           if(window.QuestLogNative?.isNative)window.QuestLogNative.openExternalUrl(data.url).catch(error=>{financeError=error.message;renderFinance()});
+           else window.open(data.url,'_blank','noopener');
+         }
+       }
      },'financeProviderLaunch');
      return;
    }
@@ -4015,7 +4033,8 @@ async function finishFlinksMessage(data){
 }
 async function connectFinanceBank(){openFinanceProviderPicker()}
 window.addEventListener('message',async event=>{
- if(event.origin===location.origin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
+ const hostedQuestLogOrigin=window.QuestLogNative?.isNative?window.QuestLogNative.apiOrigin:location.origin;
+ if(event.origin===hostedQuestLogOrigin&&event.data?.type==='questlog-flinks-complete'){await finishFlinksMessage(event.data);return}
  if(financeFlinksOrigin&&event.origin===financeFlinksOrigin&&event.data?.step==='REDIRECT'&&(event.data?.loginId||event.data?.LoginId)){await finishFlinksMessage(event.data);return}
  if(event.origin===location.origin&&event.data?.type==='questlog-plaid-oauth-complete'){
    financeLinkLoading=false;plaidLinkLoading=false;
@@ -4023,6 +4042,21 @@ window.addEventListener('message',async event=>{
      try{financeData=await api('/api/finance');financeError='';clearPlaidOauthState();renderFinance()}
      catch(error){financeError=error.message;renderFinance()}
    }else{financeError=event.data.error||'Bank connection could not be completed.';renderFinance()}
+ }
+});
+window.addEventListener('questlog:native-oauth',async event=>{
+ const detail=event.detail||{};
+ if(detail.provider==='plaid'&&detail.status==='resume'){
+   const saved=readPlaidOauthState();
+   if(!saved?.linkToken){financeError='The Plaid session could not be restored. Start the bank connection again.';financeLinkLoading=false;plaidLinkLoading=false;renderFinance();return}
+   if(saved.createdAt&&Date.now()-Number(saved.createdAt)>4*60*60*1000){clearPlaidOauthState();financeError='The Plaid session expired. Start the bank connection again.';financeLinkLoading=false;plaidLinkLoading=false;renderFinance();return}
+   try{
+     financeLinkLoading=true;plaidLinkLoading=true;renderFinance();
+     launchPlaidLink(saved.linkToken,saved.redirectUri||window.QuestLogNative.apiOrigin+'/plaid-oauth',detail.redirectUrl||'');
+   }catch(error){financeError=error.message;financeLinkLoading=false;plaidLinkLoading=false;renderFinance()}
+ }
+ if(detail.provider==='flinks'&&detail.status==='connected'&&detail.loginId){
+   await finishFlinksMessage({loginId:detail.loginId,institution:detail.institution||''});
  }
 });
 $('connectBankButton').onclick=connectFinanceBank;
