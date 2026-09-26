@@ -50,8 +50,10 @@ jobs:
           ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
         run: echo "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
 
-      - name: Verify Android OAuth callback
-        run: grep -q 'android:scheme="questlog"' android/app/src/main/AndroidManifest.xml
+      - name: Verify Android native callback scheme
+        run: |
+          grep -q '<data android:scheme="questlog" />' android/app/src/main/AndroidManifest.xml
+          ! grep -q 'android:scheme="questlog" android:host="oauth"' android/app/src/main/AndroidManifest.xml
 
       - name: Verify Android Quest Log app link
         run: grep -q 'android:host="questlog.mattmoonie.ca"' android/app/src/main/AndroidManifest.xml
