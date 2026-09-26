@@ -50,6 +50,12 @@ jobs:
           grep -q 'padding-top:calc(18px + env(safe-area-inset-top, 0px))' native-web/index.html
           grep -q 'setOverlaysWebView({ overlay: false })' native-web/native-runtime.js
 
+      - name: Verify social profile bundle
+        run: |
+          grep -q 'id="view-profile"' native-web/index.html
+          grep -q "APP_VIEWS=new Set(\['today','profile'" native-web/index.html
+          grep -q 'data-profile-user' native-web/index.html
+
       - name: Compile Cloudflare Worker
         run: npx wrangler deploy --dry-run --outdir .wrangler/native-check
 
