@@ -18,7 +18,7 @@ import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
-import { listFriends, requestFriend, respondFriend, removeFriend } from './friends.js';
+import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
@@ -254,8 +254,38 @@ async function emitShareActivity(env,identity,itemType,itemId,subject,share={}){
 async function handleApi(request,env,identity){
   env=scopedUserEnv(env,identity);
   const url=new URL(request.url),p=url.pathname,method=request.method;
-  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,profile:identity.user||{userId:identity.userId||'',email:identity.email||'',displayName:'',avatarData:''},database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
+  if(p==='/api/runtime')return json({runtime:'cloudflare',standalone:true,authenticated:true,user:identity.email||null,profile:identity.user||{userId:identity.userId||'',email:identity.email||'',displayName:'',avatarData:'',bio:'',profileVisibility:'friends'},database:'d1',databaseBound:Boolean(env.DB),logoutPath:'/logout',workerVersion:env.CF_VERSION_METADATA?.id||null,workerTag:env.CF_VERSION_METADATA?.tag||null,workerTimestamp:env.CF_VERSION_METADATA?.timestamp||null});
   if(p==='/api/profile'&&method==='PUT')return json(await updateProfile(env,identity,await body(request)));
+  const socialProfileMatch=p.match(/^\/api\/profiles(?:\/([^/]+))?$/);
+  if(socialProfileMatch&&method==='GET'){
+    const targetUserId=socialProfileMatch[1]?decodeURIComponent(socialProfileMatch[1]):identity.userId;
+    const profile=await getSocialProfile(env,identity,targetUserId);
+    if(profile.isSelf){
+      const ownState=await loadState(env);
+      const openTasks=(ownState.tasks||[]).filter(item=>item.status!=='done').length;
+      const activeGoals=(ownState.goals||[]).filter(item=>item.status!=='complete').length;
+      const countdowns=(ownState.countdowns||[]).length;
+      const completedTasks=(ownState.tasks||[]).filter(item=>item.status==='done').length;
+      return json({
+        profile,
+        summary:{openTasks,activeGoals,countdowns,completedTasks},
+        highlights:{
+          goals:(ownState.goals||[]).filter(item=>item.status!=='complete').slice(0,6).map(item=>({id:item.id,title:item.title,progress:item.type==='number'&&item.target>0?Math.max(0,Math.min(100,(Number(item.current)||0)/(Number(item.target)||1)*100)):null,deadline:item.deadline||null})),
+          countdowns:(ownState.countdowns||[]).slice().sort((a,b)=>new Date(a.end)-new Date(b.end)).slice(0,6).map(item=>({id:item.id,name:item.name,end:item.end}))
+        },
+        sharedItems:{tasks:[],goals:[],countdowns:[]}
+      });
+    }
+    const shared=await sharedPlannerItems(env,identity);
+    const byOwner=list=>(list||[]).filter(item=>String(item.ownerUserId||'')===String(profile.userId));
+    const sharedItems={tasks:byOwner(shared.tasks),goals:byOwner(shared.goals),countdowns:byOwner(shared.countdowns)};
+    return json({
+      profile,
+      summary:{sharedItems:sharedItems.tasks.length+sharedItems.goals.length+sharedItems.countdowns.length},
+      highlights:{goals:[],countdowns:[]},
+      sharedItems
+    });
+  }
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
     const incoming=await body(request),before=await listFriends(env,identity),result=await requestFriend(env,identity,incoming.email),after=await listFriends(env,identity);

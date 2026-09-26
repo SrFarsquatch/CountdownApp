@@ -103,3 +103,34 @@ export async function removeFriend(env,identity,friendshipId){
  await env.DB.prepare('DELETE FROM questlog_friendships WHERE friendship_id=?').bind(id).run();
  return{ok:true};
 }
+
+
+export async function getSocialProfile(env,identity,targetUserId=''){
+ await ensureFriendsSchema(env);
+ const current=userId(identity),target=clean(targetUserId||current,120),isSelf=target===current;
+ if(!target){const e=new Error('Profile user is required.');e.status=400;throw e}
+ let friendshipId='',isFriend=false;
+ if(!isSelf){
+  const [low,high]=pair(current,target);
+  const relation=await env.DB.prepare("SELECT friendship_id,status FROM questlog_friendships WHERE user_low=? AND user_high=? LIMIT 1").bind(low,high).first();
+  if(!relation||relation.status!=='accepted'){const e=new Error('This profile is only available to friends.');e.status=403;throw e}
+  friendshipId=String(relation.friendship_id||'');isFriend=true;
+ }
+ const row=await env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
+ if(!row||String(row.status||'active')!=='active'){const e=new Error('Profile not found.');e.status=404;throw e}
+ const visibility=['friends','private'].includes(String(row.profile_visibility||''))?String(row.profile_visibility):'friends';
+ if(!isSelf&&visibility==='private'){const e=new Error('This profile is private.');e.status=403;throw e}
+ const countRow=await env.DB.prepare("SELECT COUNT(*) AS count FROM questlog_friendships WHERE status='accepted' AND (user_low=? OR user_high=?)").bind(target,target).first();
+ return{
+  userId:String(row.user_id||''),
+  displayName:String(row.display_name||''),
+  avatarData:String(row.avatar_data||''),
+  bio:String(row.bio||''),
+  createdAt:row.created_at||null,
+  profileVisibility:visibility,
+  friendCount:Number(countRow?.count)||0,
+  isSelf,
+  isFriend,
+  friendshipId
+ };
+}
