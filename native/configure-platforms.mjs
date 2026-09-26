@@ -117,6 +117,28 @@ async function configureIos() {
     plist = plist.slice(0, dictEnd) + domains + '\n' + plist.slice(dictEnd);
   }
 
+  const entitlements = resolve(root, 'ios/App/App/App.entitlements');
+  await writeFile(entitlements, `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:questlog.mattmoonie.ca</string>
+	</array>
+</dict>
+</plist>
+`);
+
+  const projectFile = resolve(root, 'ios/App/App.xcodeproj/project.pbxproj');
+  if (await exists(projectFile)) {
+    let project = await readFile(projectFile, 'utf8');
+    if (!project.includes('CODE_SIGN_ENTITLEMENTS = App/App.entitlements;')) {
+      project = project.replace(/(PRODUCT_BUNDLE_IDENTIFIER = ca\.mattmoonie\.questlog;)/g, 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n\t\t\t\t$1');
+      await writeFile(projectFile, project);
+    }
+  }
+
   const appDelegate = resolve(root, 'ios/App/App/AppDelegate.swift');
   if (await exists(appDelegate)) {
     let swift = await readFile(appDelegate, 'utf8');
