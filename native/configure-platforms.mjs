@@ -55,6 +55,28 @@ async function configureIos() {
     plist = plist.slice(0, dictEnd) + block + '\n' + plist.slice(dictEnd);
     await writeFile(file, plist);
   }
+
+  const appDelegate = resolve(root, 'ios/App/App/AppDelegate.swift');
+  if (await exists(appDelegate)) {
+    let swift = await readFile(appDelegate, 'utf8');
+    if (!swift.includes('capacitorDidRegisterForRemoteNotifications')) {
+      const methods = `
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+`;
+      const classEnd = swift.lastIndexOf('}');
+      if (classEnd < 0) throw new Error('Could not locate AppDelegate class end.');
+      swift = swift.slice(0, classEnd) + methods + swift.slice(classEnd);
+      await writeFile(appDelegate, swift);
+    }
+  }
+
   return { platform: 'ios', status: 'configured' };
 }
 
