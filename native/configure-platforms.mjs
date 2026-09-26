@@ -52,6 +52,20 @@ async function configureAndroid() {
     xml = xml.slice(0, activityEnd) + filter + '\n        ' + xml.slice(activityEnd);
     await writeFile(file, xml);
   }
+
+  if (!xml.includes('android:host="questlog.mattmoonie.ca"')) {
+    const filter = `
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="questlog.mattmoonie.ca" />
+            </intent-filter>`;
+    const activityEnd = xml.indexOf('</activity>');
+    if (activityEnd < 0) throw new Error('Could not locate Android MainActivity in AndroidManifest.xml.');
+    xml = xml.slice(0, activityEnd) + filter + '\n        ' + xml.slice(activityEnd);
+    await writeFile(file, xml);
+  }
   const gradle = resolve(root, 'android/app/build.gradle');
   if (await exists(gradle)) {
     const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
