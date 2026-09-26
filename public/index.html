@@ -2012,7 +2012,8 @@ async function renderNotificationSettings(){
    status.textContent=window.isSecureContext?'Push is not supported by this browser.':'HTTPS is required for push notifications.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
- if(!cfg.webConfigured){
+ const webConfigured=cfg.webConfigured??cfg.configured;
+ if(!webConfigured){
    status.textContent='Server web-push keys are not configured.';
    enable.disabled=true;disable.disabled=true;test.disabled=true;return;
  }
@@ -2060,7 +2061,7 @@ async function enablePushNotifications(){
    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
    if(permission!=='granted')throw Error('Notification permission was not granted.');
    const cfg=await api('/api/notifications/config');
-   if(!cfg.webConfigured||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
+   if(!(cfg.webConfigured??cfg.configured)||!cfg.publicKey)throw Error('Push notification VAPID keys are not configured on the server.');
    const registration=await navigator.serviceWorker.ready;
    let subscription=await registration.pushManager.getSubscription();
    if(!subscription){
