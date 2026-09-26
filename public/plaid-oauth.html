@@ -45,7 +45,17 @@ button,a{margin-top:18px;display:inline-flex;min-height:42px;align-items:center;
  let saved=null;
  try{saved=JSON.parse(localStorage.getItem(KEY)||'null')}catch{}
  if(!saved?.linkToken){
-   finish(false,'The Plaid session could not be restored. Return to Finance and start the connection again.');
+   // Native Quest Log stores the Plaid session inside the app WebView, not the
+   // external browser. Hand the exact HTTPS OAuth return URL back to the app
+   // so Link can resume there with receivedRedirectUri.
+   const deepLink='questlog://oauth/plaid?status=resume&redirect='+encodeURIComponent(location.href);
+   title.textContent='Returning to Quest Log';
+   status.textContent='Opening the Quest Log app to finish your bank connection…';
+   retry.textContent='Open Quest Log';
+   retry.href=deepLink;
+   retry.style.display='inline-flex';
+   setTimeout(()=>{location.href=deepLink},100);
+   setTimeout(()=>{status.textContent='If Quest Log did not open automatically, tap the button below.'},1600);
    return;
  }
  if(saved.createdAt&&Date.now()-Number(saved.createdAt)>4*60*60*1000){
