@@ -228,10 +228,16 @@ $('authForm').onsubmit=async event=>{
   const email=$('email').value.trim(),password=$('password').value,displayName=$('displayName').value.trim();
   if(mode==='create'&&password!==$('confirmPassword').value){status('Passwords do not match.',true);return}
   if(mode==='create'&&password.length<10){status('Use at least 10 characters for your password.',true);return}
-  if(config.turnstileEnabled&&!turnstileToken){status('Complete the verification challenge.',true);return}
+  if(config.turnstileEnabled&&!window.QuestLogNative?.isNative&&!turnstileToken){status('Complete the verification challenge.',true);return}
   const button=$('submitButton');button.disabled=true;button.textContent=mode==='create'?'Creating account…':'Signing in…';
   try{
-    await api(mode==='create'?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify({email,password,displayName,turnstileToken})});
+    let nativeChallengeToken='';
+    if(config.turnstileEnabled&&window.QuestLogNative?.isNative){
+      button.textContent='Verifying…';
+      nativeChallengeToken=await window.QuestLogNative.verifyHuman();
+      button.textContent=mode==='create'?'Creating account…':'Signing in…';
+    }
+    await api(mode==='create'?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify({email,password,displayName,turnstileToken,nativeChallengeToken})});
     if(window.QuestLogNative?.isNative){
       const session=await api('/api/auth/session');
       if(!session.authenticated)throw Error('Quest Log signed in, but the native session did not persist. Reopen the app and try again.');
@@ -246,7 +252,7 @@ $('authForm').onsubmit=async event=>{
     if(session.authenticated){location.replace(nextPath||'/');return}
     config=await api('/api/auth/config');
     if(!config.signupsEnabled)$('createTab').style.display='none';
-    if(config.turnstileEnabled){
+    if(config.turnstileEnabled&&!window.QuestLogNative?.isNative){
       const script=document.createElement('script');
       script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async=true;script.defer=true;script.onload=renderTurnstile;document.head.appendChild(script);
