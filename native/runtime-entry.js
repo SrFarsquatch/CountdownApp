@@ -287,8 +287,11 @@ async function initializeNative() {
   await Browser.addListener('browserFinished', () => {
     if (!humanChallengeWaiter) return;
     const waiter = humanChallengeWaiter;
-    humanChallengeWaiter = null;
-    waiter.reject(new Error('Human verification was cancelled.'));
+    setTimeout(() => {
+      if (humanChallengeWaiter !== waiter) return;
+      humanChallengeWaiter = null;
+      waiter.reject(new Error('Human verification was cancelled.'));
+    }, 750);
   });
 
   try {
