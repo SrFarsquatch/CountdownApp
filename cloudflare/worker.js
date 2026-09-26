@@ -747,7 +747,7 @@ export default{
     }
     if(path==='/.well-known/apple-app-site-association'&&request.method==='GET'){
       const teamId=cleanText(env.APPLE_TEAM_ID,120);
-      const details=teamId?[{appID:teamId+'.ca.mattmoonie.questlog',paths:['/*']}]:[];
+      const details=teamId?[{appID:teamId+'.ca.mattmoonie.questlog',paths:['/']}]:[];
       return json({applinks:{apps:[],details}},200,{'cache-control':'public, max-age=3600'});
     }
 
