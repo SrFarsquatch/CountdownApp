@@ -105,3 +105,7 @@ jobs:
 
       - name: Verify iOS push registration hooks
         run: grep -q 'capacitorDidRegisterForRemoteNotifications' ios/App/App/AppDelegate.swift
+
+      - name: Compile iOS Simulator app
+        run: |
+          xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             -derivedDataPath "$RUNNER_TEMP/QuestLogDerivedData"             CODE_SIGNING_ALLOWED=NO             build
