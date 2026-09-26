@@ -38,6 +38,12 @@ jobs:
       - name: Build native web assets
         run: npm run native:prepare
 
+      - name: Verify native boot overlay is initially hidden
+        run: |
+          grep -q 'id="nativeBootOverlay" hidden' native-web/index.html
+          grep -q 'display:none;place-items:center' native-web/index.html
+          ! grep -q 'id="nativeBootOverlay" hidden style="[^"]*display:grid' native-web/index.html
+
       - name: Compile Cloudflare Worker
         run: npx wrangler deploy --dry-run --outdir .wrangler/native-check
 

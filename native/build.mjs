@@ -5,6 +5,7 @@ import { build, transform } from 'esbuild';
 const root = resolve(import.meta.dirname, '..');
 const source = resolve(root, 'public');
 const output = resolve(root, 'native-web');
+const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 
 async function validatePublicScripts() {
   const entries = await readdir(source, { withFileTypes: true });
@@ -50,6 +51,9 @@ await build({
   format: 'iife',
   platform: 'browser',
   target: ['es2022'],
+  define: {
+    __QUESTLOG_VERSION__: JSON.stringify(String(packageJson.version || 'dev'))
+  },
   sourcemap: false,
   minify: false
 });

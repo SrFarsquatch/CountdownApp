@@ -1466,10 +1466,11 @@ body.modal-open{overflow:hidden}
 </style>
 </head>
 <body>
-<div id="nativeBootOverlay" hidden style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:grid;place-items:center;padding:24px">
+<div id="nativeBootOverlay" hidden style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;place-items:center;padding:24px">
   <div style="width:min(520px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:var(--shadow)">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><img src="/branding/icon-classic.svg" alt="" style="width:42px;height:42px;border-radius:12px"><div><div style="font-size:18px;font-weight:850">Quest Log</div><div id="nativeBootTitle" style="color:var(--muted);font-size:12px">Starting app…</div></div></div>
     <div id="nativeBootMessage" style="color:var(--muted);line-height:1.55">Connecting to Quest Log…</div>
+    <div id="nativeBootVersion" style="margin-top:8px;color:var(--muted);font-size:11px"></div>
     <div id="nativeBootDetails" style="display:none;margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:11px;white-space:pre-wrap"></div>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" id="nativeBootRetry">Retry</button><button class="btn" id="nativeBootSignIn">Sign in</button></div>
   </div>
@@ -4707,39 +4708,68 @@ const initialRaw=new URLSearchParams(location.search).get('view')||'today',initi
 function setNativeBootState({show=true,title='Starting app…',message='Connecting to Quest Log…',details=''}={}){
  const overlay=$('nativeBootOverlay');if(!overlay)return;
  overlay.hidden=!show;
+ overlay.style.display=show?'grid':'none';
  $('nativeBootTitle').textContent=title;
  $('nativeBootMessage').textContent=message;
+ const versionEl=$('nativeBootVersion');
+ if(versionEl)versionEl.textContent=window.QuestLogNative?.isNative?'Native build '+(window.QuestLogNative.version||'unknown'):'';
  const detailEl=$('nativeBootDetails');
  detailEl.textContent=details||'';
  detailEl.style.display=details?'block':'none';
+}
+
+function withBootTimeout(promise,ms,label){
+ let timer;
+ const timeout=new Promise((_,reject)=>{
+   timer=setTimeout(()=>reject(new Error((label||'Startup request')+' timed out after '+Math.round(ms/1000)+' seconds.')),ms);
+ });
+ return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+}
+
+function removeNativeBootOverlay(){
+ const overlay=$('nativeBootOverlay');
+ if(!overlay)return;
+ overlay.hidden=true;
+ overlay.style.display='none';
+ overlay.remove();
 }
 if($('nativeBootRetry'))$('nativeBootRetry').onclick=()=>location.reload();
 if($('nativeBootSignIn'))$('nativeBootSignIn').onclick=()=>window.QuestLogNative?.isNative?window.QuestLogNative.navigate('/login?source=native'):location.replace('/login');
 
 async function bootQuestLog(){
- if(window.QuestLogNative?.isNative){
-   setNativeBootState({show:true,title:'Checking session…',message:'Connecting securely to Quest Log…'});
-   const diag=await window.QuestLogNative.diagnostics();
-   if(!diag.apiReachable){
-     setNativeBootState({show:true,title:'Cannot reach Quest Log',message:'The installed app could not connect to questlog.mattmoonie.ca. Check your internet connection and try again.',details:JSON.stringify(diag,null,2)});
-     return;
-   }
-   if(!diag.authenticated){
-     window.QuestLogNative.navigate('/login?source=native');
-     return;
-   }
- }
  try{
-   await loadAll();
+   if(window.QuestLogNative?.isNative){
+     setNativeBootState({show:true,title:'Checking session…',message:'Connecting securely to Quest Log…'});
+     const diag=await withBootTimeout(window.QuestLogNative.diagnostics(),15000,'Session check');
+     if(!diag.apiReachable){
+       setNativeBootState({show:true,title:'Cannot reach Quest Log',message:diag.lastError||'The installed app could not connect to questlog.mattmoonie.ca. Check your internet connection and try again.',details:JSON.stringify(diag,null,2)});
+       return;
+     }
+     if(!diag.authenticated){
+       window.QuestLogNative.navigate('/login?source=native');
+       return;
+     }
+     setNativeBootState({show:true,title:'Loading Quest Log…',message:'Session verified. Loading your planner…'});
+   }
+
+   await withBootTimeout(loadAll(),30000,'Quest Log startup');
    renderAppView(initial);
    initAppHistory(initial);
    if(initialRaw==='agent')openAgentDrawer();
    refreshUpdateStatus();
-   setNativeBootState({show:false});
+   removeNativeBootOverlay();
  }catch(error){
    if(window.QuestLogNative?.isNative){
-     const diag=await window.QuestLogNative.diagnostics().catch(()=>({}));
-     setNativeBootState({show:true,title:'Quest Log could not start',message:error?.message||'The app failed during startup.',details:JSON.stringify(diag,null,2)});
+     const diag=await Promise.race([
+       window.QuestLogNative.diagnostics().catch(()=>({})),
+       new Promise(resolve=>setTimeout(()=>resolve({native:true,lastError:'Diagnostic request timed out.'}),5000))
+     ]);
+     setNativeBootState({
+       show:true,
+       title:'Quest Log could not start',
+       message:error?.message||'The app failed during startup.',
+       details:JSON.stringify(diag,null,2)
+     });
    }else throw error;
  }
 }
