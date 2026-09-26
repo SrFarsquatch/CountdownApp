@@ -117,6 +117,15 @@ async function configureIos() {
     plist = plist.slice(0, dictEnd) + domains + '\n' + plist.slice(dictEnd);
   }
 
+  if (!plist.includes('<key>UIViewControllerBasedStatusBarAppearance</key>')) {
+    const statusBar = `
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>`;
+    const dictEnd = plist.lastIndexOf('</dict>');
+    if (dictEnd < 0) throw new Error('Could not locate root dictionary in iOS Info.plist.');
+    plist = plist.slice(0, dictEnd) + statusBar + '\n' + plist.slice(dictEnd);
+  }
+
   const entitlements = resolve(root, 'ios/App/App/App.entitlements');
   await writeFile(entitlements, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
