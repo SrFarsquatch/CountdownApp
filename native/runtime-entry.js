@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 const API_ORIGIN = 'https://questlog.mattmoonie.ca';
 const CALLBACK_SCHEME = 'questlog://';
@@ -225,9 +226,19 @@ async function testPush() {
   });
 }
 
+async function syncStatusBar() {
+  if (!isNative()) return;
+  const dark = document.documentElement.dataset.colorMode === 'dark';
+  await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
+}
+
 async function initializeNative() {
   if (!isNative()) return;
   document.documentElement.dataset.nativeApp = '1';
+  await syncStatusBar();
+
+  const appearanceObserver = new MutationObserver(() => { syncStatusBar().catch(() => {}); });
+  appearanceObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-color-mode'] });
 
   await App.addListener('appUrlOpen', event => {
     handleNativeUrl(event.url).catch(() => {});
@@ -251,6 +262,7 @@ window.QuestLogNative = {
   openAuthUrl,
   openExternalUrl,
   handleNativeUrl,
+  syncStatusBar,
   push: {
     status: pushStatus,
     enable: enablePush,
