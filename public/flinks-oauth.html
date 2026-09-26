@@ -11,8 +11,14 @@
     requestId:p.get('requestId')||p.get('RequestId')||'',
     institution:p.get('institution')||p.get('Institution')||''
   };
-  if(window.parent&&window.parent!==window)window.parent.postMessage(payload,location.origin);
-  if(window.opener)window.opener.postMessage(payload,location.origin);
+  if(window.parent&&window.parent!==window)window.parent.postMessage(payload,'*');
+  if(window.opener)window.opener.postMessage(payload,'*');
+  if(window.parent===window&&!window.opener&&payload.loginId){
+    const deepLink='questlog://oauth/flinks?status=connected&loginId='+encodeURIComponent(payload.loginId)+'&institution='+encodeURIComponent(payload.institution||'');
+    document.body.innerHTML='<p>Bank connected. Returning to Quest Log…</p><p><a href="'+deepLink+'">Open Quest Log</a></p>';
+    setTimeout(()=>{location.href=deepLink},100);
+    return;
+  }
   document.body.textContent=payload.loginId?'Bank connected. You can close this window.':'Returning to Quest Log…';
 })();
 </script>
