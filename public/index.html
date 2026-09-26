@@ -1413,6 +1413,31 @@ body.modal-open{overflow:hidden}
   .mobile-nav .mobile-account-nav svg{width:17px;height:17px}
 }
 
+/* Social profiles */
+.social-profile-shell{display:grid;gap:18px;max-width:980px;margin:0 auto}
+.social-profile-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:24px;align-items:center;padding:8px 0 4px}
+.social-profile-avatar{width:116px;height:116px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 24%,var(--line));font-size:34px;font-weight:900}
+.social-profile-avatar img{width:100%;height:100%;object-fit:cover;display:block}.social-profile-avatar svg{width:48px;height:48px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.social-profile-copy{min-width:0}.social-profile-name-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.social-profile-name{font-size:28px;font-weight:900;letter-spacing:-.035em;line-height:1.05}.social-profile-badge{font-size:10px;font-weight:850;padding:4px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.social-profile-bio{margin-top:10px;max-width:620px;white-space:pre-wrap;color:var(--text);font-size:13px;line-height:1.5}.social-profile-meta{margin-top:7px;color:var(--muted);font-size:11px}
+.social-profile-actions{display:flex;gap:8px;align-self:start;flex-wrap:wrap;justify-content:flex-end}
+.social-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.social-profile-stat{padding:16px 12px;text-align:center}.social-profile-stat strong{display:block;font-size:20px;font-weight:900}.social-profile-stat span{font-size:10px;color:var(--muted);font-weight:760}
+.social-profile-section{display:grid;gap:10px}.social-profile-section-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.social-profile-section-head h3{margin:0;font-size:14px}.social-profile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.social-profile-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);min-height:112px;display:grid;align-content:space-between;gap:10px}.social-profile-card strong{font-size:13px}.social-profile-card .meta{line-height:1.35}
+.social-profile-empty{padding:24px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);text-align:center}
+.social-profile-loading{padding:50px 18px;text-align:center;color:var(--muted)}
+.friend-row[data-profile-user]{cursor:pointer}.friend-row[data-profile-user]:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+@media(max-width:760px){
+ .social-profile-shell{gap:16px}
+ .social-profile-head{grid-template-columns:86px minmax(0,1fr);gap:16px;align-items:start}
+ .social-profile-avatar{width:86px;height:86px;font-size:26px}
+ .social-profile-name{font-size:22px}
+ .social-profile-actions{grid-column:1/-1;width:100%;justify-content:stretch}.social-profile-actions .btn{flex:1}
+ .social-profile-stats{grid-template-columns:repeat(2,1fr)}
+ .social-profile-grid{grid-template-columns:1fr}
+}
+
 /* Friends */
 .account-menu-action{font:inherit;text-align:left;cursor:pointer}
 .account-menu-badge{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-contrast);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:850}
@@ -1549,6 +1574,12 @@ body.modal-open{overflow:hidden}
     <div class="card span-6"><div class="section-title"><h3>Tasks</h3><button class="btn tiny ghost" data-jump="tasks">View all</button></div><div id="todayTasks" class="list"></div></div>
     <div class="card span-6"><div class="section-title"><h3>Goals</h3><button class="btn tiny ghost" data-jump="goals">View all</button></div><div id="todayGoals" class="list"></div></div>
     <div class="card span-12"><div class="section-title"><h3>Market movers</h3><button class="btn tiny ghost" data-jump="markets">Open finance</button></div><div id="todayMarkets" class="market-home-list"></div></div>
+  </div>
+</section>
+
+<section class="view" id="view-profile">
+  <div class="social-profile-shell" id="socialProfileShell">
+    <div class="social-profile-loading">Loading profile…</div>
   </div>
 </section>
 
@@ -1892,7 +1923,7 @@ body.modal-open{overflow:hidden}
 
 <script src="/native-runtime.js"></script>
 <script>
-let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{
  if(window.QuestLogNative?.isNative){
@@ -2193,9 +2224,9 @@ function renderRuntimeSession(){
    const desktop=$('desktopAccountButton');
    if(desktop)desktop.onclick=event=>toggleAccountMenu('desktop',event);
    if(mobile){
-     mobile.title=name;
-     mobile.setAttribute('aria-label','Open account menu for '+email);
-     mobile.onclick=event=>toggleAccountMenu('mobile',event);
+     mobile.title=name+' profile';
+     mobile.setAttribute('aria-label','Open profile for '+name);
+     mobile.onclick=()=>openProfile(profile.userId);
    }
  }else{
    foot.innerHTML='<button class="account-trigger" id="selfHostedSettings" type="button">'+accountIconMarkup({})+'<span class="account-trigger-copy"><span class="account-trigger-label">Settings</span><span class="account-trigger-email">Self-hosted Quest Log</span></span></button>';
@@ -2276,7 +2307,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-const APP_VIEWS=new Set(['today','planner','tasks','goals','markets','countdowns','displays','settings']);
+const APP_VIEWS=new Set(['today','profile','planner','tasks','goals','markets','countdowns','displays','settings']);
 const SETTINGS_SECTIONS=new Set(['general','displays']);
 let settingsSection='general';
 const PLANNER_ROUTE_SECTIONS=Object.freeze({tasks:'tasks',goals:'goals',countdowns:'countdowns'});
@@ -2289,7 +2320,9 @@ function syncBrowserChromeTheme(){
  themeMeta.content=rootStyles.getPropertyValue(surface).trim()||(surface==='--panel'?'#ffffff':'#faf9f7');
 }
 function appViewUrl(name){
- const url=new URL(location.href);url.searchParams.set('view',name);return url.pathname+url.search+url.hash;
+ const url=new URL(location.href);url.searchParams.set('view',name);
+ if(name==='profile'&&activeProfileUserId)url.searchParams.set('user',activeProfileUserId);else url.searchParams.delete('user');
+ return url.pathname+url.search+url.hash;
 }
 function currentAppView(){return activeAppRoute||'today'}
 function setPlannerSection(section,{render=true}={}){
@@ -2337,11 +2370,12 @@ function renderAppView(name){
  if(visibleView!=='planner')closePlannerDrawer();
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+visibleView));
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===visibleView));
- const mobileAccountNav=$('mobileAccountNav');if(mobileAccountNav)mobileAccountNav.classList.toggle('on',visibleView==='settings');
+ const mobileAccountNav=$('mobileAccountNav');if(mobileAccountNav)mobileAccountNav.classList.toggle('on',visibleView==='profile');
  document.body.classList.toggle('planner-mode',visibleView==='planner');
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
  if(visibleView==='settings')setSettingsSection(requestedSettingsSection||'general',{render:true});
+ if(visibleView==='profile')renderSocialProfile().catch(console.warn);
  if(name==='markets'){renderFinance();renderMarkets();loadMarketHistory().catch(console.warn);}
 }
 function setView(name,{historyMode='push'}={}){
@@ -2367,7 +2401,8 @@ window.addEventListener('popstate',event=>{
    renderAppView(nav.view||'today');
    return;
  }
- const urlView=new URLSearchParams(location.search).get('view');
+ const params=new URLSearchParams(location.search),urlView=params.get('view');
+ if(urlView==='profile')activeProfileUserId=params.get('user')||runtimeInfo?.profile?.userId||'';
  if(APP_VIEWS.has(urlView))renderAppView(urlView);
 });
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -2409,7 +2444,8 @@ async function prepareProfileAvatar(file){
 async function openManageAccountModal(){
  const profile=runtimeInfo?.profile||{email:runtimeInfo?.user||'',displayName:'',avatarData:''};
  let avatarDraft=profileAvatarData(profile);
- openModal('Manage account','<div class="profile-editor"><div class="profile-photo-row"><span class="account-avatar profile-photo-preview" id="profileAvatarPreview">'+accountAvatarInner(profile)+'</span><div><div class="profile-photo-actions"><label class="btn tiny" for="profileAvatarFile">Choose photo</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn tiny ghost" id="profileAvatarRemove" type="button">Remove</button></div><div class="profile-status" id="profileStatus">Photos are resized to a small square profile image.</div></div></div><div class="field"><label>Display name</label><input id="profileDisplayName" maxlength="120" value="'+esc(profile.displayName||'')+'" placeholder="Your name"></div><div class="field"><label>Email</label><input value="'+esc(profile.email||'')+'" disabled></div><div class="modal-actions"><button class="btn primary" id="profileSave" type="button">Save profile</button></div></div>');
+ openModal('Edit profile','<div class="profile-editor"><div class="profile-photo-row"><span class="account-avatar profile-photo-preview" id="profileAvatarPreview">'+accountAvatarInner(profile)+'</span><div><div class="profile-photo-actions"><label class="btn tiny" for="profileAvatarFile">Choose photo</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn tiny ghost" id="profileAvatarRemove" type="button">Remove</button></div><div class="profile-status" id="profileStatus">Photos are resized to a small square profile image.</div></div></div><div class="field"><label>Display name</label><input id="profileDisplayName" maxlength="120" value="'+esc(profile.displayName||'')+'" placeholder="Your name"></div><div class="field"><label>Bio</label><textarea id="profileBio" maxlength="280" placeholder="A little about you…">'+esc(profile.bio||'')+'</textarea><div class="meta">Up to 280 characters.</div></div><div class="field"><label>Profile visibility</label><select id="profileVisibility"><option value="friends">Friends can view my profile</option><option value="private">Private</option></select></div><div class="field"><label>Email</label><input value="'+esc(profile.email||'')+'" disabled></div><div class="modal-actions"><button class="btn primary" id="profileSave" type="button">Save profile</button></div></div>');
+ $('profileVisibility').value=profile.profileVisibility||'friends';
  const preview=$('profileAvatarPreview'),fileInput=$('profileAvatarFile'),remove=$('profileAvatarRemove'),status=$('profileStatus'),save=$('profileSave');
  fileInput.onchange=async()=>{
    const file=fileInput.files?.[0];if(!file)return;
@@ -2424,9 +2460,10 @@ async function openManageAccountModal(){
  save.onclick=async()=>{
    save.disabled=true;status.textContent='Saving profile…';status.className='profile-status';
    try{
-     const updated=await api('/api/profile',{method:'PUT',body:JSON.stringify({displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft})});
+     const updated=await api('/api/profile',{method:'PUT',body:JSON.stringify({displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft,bio:$('profileBio').value.trim(),profileVisibility:$('profileVisibility').value})});
      runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;
      renderRuntimeSession();
+     if(activeAppRoute==='profile'){activeProfileUserId=updated.userId;renderSocialProfile(true).catch(console.warn)}
      closeModal();
    }catch(error){status.textContent=error.message||'Could not save profile.';status.className='profile-status error';save.disabled=false}
  };
@@ -2585,11 +2622,15 @@ function friendRowHtml(person,kind){
  if(kind==='incoming')actions='<div class="friend-actions"><button class="btn tiny primary" data-friend-action="accept" data-friendship-id="'+esc(person.friendshipId)+'">Accept</button><button class="btn tiny ghost" data-friend-action="decline" data-friendship-id="'+esc(person.friendshipId)+'">Decline</button></div>';
  else if(kind==='outgoing')actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Cancel</button></div>';
  else actions='<div class="friend-actions"><button class="btn tiny ghost" data-friend-action="remove" data-friendship-id="'+esc(person.friendshipId)+'">Remove</button></div>';
- return '<div class="friend-row"><div class="friend-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(person)))+'</div><div class="friend-copy"><div class="friend-name">'+esc(label)+'</div><div class="friend-email">'+esc(email)+'</div></div>'+actions+'</div>';
+ const profileAttr=kind==='friend'?' data-profile-user="'+esc(person.userId)+'" role="button" tabindex="0"':'';return '<div class="friend-row"'+profileAttr+'><div class="friend-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(person)))+'</div><div class="friend-copy"><div class="friend-name">'+esc(label)+'</div><div class="friend-email">'+esc(email)+'</div></div>'+actions+'</div>';
 }
 function renderFriendCollection(id,items,kind,emptyText){
  const el=$(id);if(!el)return;
  el.innerHTML=items?.length?items.map(item=>friendRowHtml(item,kind)).join(''):'<div class="friend-empty">'+esc(emptyText)+'</div>';
+ el.querySelectorAll('[data-profile-user]').forEach(row=>{
+   const open=event=>{if(event?.target?.closest('.friend-actions'))return;closeModal();openProfile(row.dataset.profileUser)};
+   row.onclick=open;row.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open(event)}};
+ });
 }
 async function refreshFriendsModal(){
  const data=await refreshFriendBadge();
