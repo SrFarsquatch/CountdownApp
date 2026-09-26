@@ -18,7 +18,7 @@ import { buildDisplayFeed, displayRange, renderDisplaySvg } from './display.js';
 import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
-import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile } from './friends.js';
+import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile, mutualFriends } from './friends.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
@@ -260,31 +260,98 @@ async function handleApi(request,env,identity){
   if(socialProfileMatch&&method==='GET'){
     const targetUserId=socialProfileMatch[1]?decodeURIComponent(socialProfileMatch[1]):identity.userId;
     const profile=await getSocialProfile(env,identity,targetUserId);
-    if(profile.isSelf){
-      const ownState=await loadState(env);
-      const openTasks=(ownState.tasks||[]).filter(item=>item.status!=='done').length;
-      const activeGoals=(ownState.goals||[]).filter(item=>item.status!=='complete').length;
-      const countdowns=(ownState.countdowns||[]).length;
-      const completedTasks=(ownState.tasks||[]).filter(item=>item.status==='done').length;
-      return json({
-        profile,
-        summary:{openTasks,activeGoals,countdowns,completedTasks},
-        highlights:{
-          goals:(ownState.goals||[]).filter(item=>item.status!=='complete').slice(0,6).map(item=>({id:item.id,title:item.title,progress:item.type==='number'&&item.target>0?Math.max(0,Math.min(100,(Number(item.current)||0)/(Number(item.target)||1)*100)):null,deadline:item.deadline||null})),
-          countdowns:(ownState.countdowns||[]).slice().sort((a,b)=>new Date(a.end)-new Date(b.end)).slice(0,6).map(item=>({id:item.id,name:item.name,end:item.end}))
-        },
-        sharedItems:{tasks:[],goals:[],countdowns:[]}
-      });
+    const settings={
+      showMemberSince:profile.profileSettings?.showMemberSince!==false,
+      showFriendCount:profile.profileSettings?.showFriendCount!==false,
+      showAchievements:profile.profileSettings?.showAchievements!==false,
+      showStreaks:profile.profileSettings?.showStreaks!==false,
+      showPinnedGoals:profile.profileSettings?.showPinnedGoals!==false,
+      showRecentActivity:profile.profileSettings?.showRecentActivity===true,
+      showSharedItems:profile.profileSettings?.showSharedItems!==false,
+      showMutualFriends:profile.profileSettings?.showMutualFriends!==false,
+      activityDetails:profile.profileSettings?.activityDetails==='titles'?'titles':'summary'
+    };
+    profile.profileSettings=settings;
+    const targetEnv=profile.isSelf?env:scopedUserEnv(env,{userId:profile.userId});
+    const targetState=await loadState(targetEnv);
+    const tasks=targetState.tasks||[],goals=targetState.goals||[],countdowns=targetState.countdowns||[];
+    const completedTasks=tasks.filter(item=>item.status==='done');
+    const completedGoals=goals.filter(item=>item.status==='complete');
+
+    const dateKey=value=>{
+      const d=new Date(value);if(!Number.isFinite(d.getTime()))return'';
+      return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+    };
+    const activityDates=[...completedTasks.map(item=>item.completedAt||item.updated),...completedGoals.map(item=>item.updated)].filter(Boolean).map(dateKey).filter(Boolean);
+    const uniqueDays=[...new Set(activityDates)].sort();
+    let currentStreak=0,longestStreak=0,running=0,last=null;
+    for(const key of uniqueDays){
+      const day=new Date(key+'T12:00:00');
+      if(last){
+        const diff=Math.round((day-last)/86400000);
+        running=diff===1?running+1:1;
+      }else running=1;
+      if(running>longestStreak)longestStreak=running;
+      last=day;
     }
-    const shared=await sharedPlannerItems(env,identity);
-    const byOwner=list=>(list||[]).filter(item=>String(item.ownerUserId||'')===String(profile.userId));
-    const sharedItems={tasks:byOwner(shared.tasks),goals:byOwner(shared.goals),countdowns:byOwner(shared.countdowns)};
-    return json({
-      profile,
-      summary:{sharedItems:sharedItems.tasks.length+sharedItems.goals.length+sharedItems.countdowns.length},
-      highlights:{goals:[],countdowns:[]},
+    const today=new Date(),todayKey=dateKey(today),yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);const yesterdayKey=dateKey(yesterday);
+    const daySet=new Set(uniqueDays);
+    if(daySet.has(todayKey)||daySet.has(yesterdayKey)){
+      let cursor=new Date(daySet.has(todayKey)?today:yesterday);
+      while(daySet.has(dateKey(cursor))){currentStreak++;cursor.setDate(cursor.getDate()-1)}
+    }
+
+    const achievements=[
+      {id:'first-quest',icon:'✓',title:'First Quest',description:'Complete your first task.',unlocked:completedTasks.length>=1,progress:Math.min(1,completedTasks.length),target:1},
+      {id:'task-slayer',icon:'⚔',title:'Task Slayer',description:'Complete 25 tasks.',unlocked:completedTasks.length>=25,progress:Math.min(25,completedTasks.length),target:25},
+      {id:'centurion',icon:'100',title:'Centurion',description:'Complete 100 tasks.',unlocked:completedTasks.length>=100,progress:Math.min(100,completedTasks.length),target:100},
+      {id:'goal-getter',icon:'◎',title:'Goal Getter',description:'Complete your first goal.',unlocked:completedGoals.length>=1,progress:Math.min(1,completedGoals.length),target:1},
+      {id:'goal-hunter',icon:'◆',title:'Goal Hunter',description:'Complete 10 goals.',unlocked:completedGoals.length>=10,progress:Math.min(10,completedGoals.length),target:10},
+      {id:'seven-day',icon:'🔥',title:'Seven Day Streak',description:'Stay active for 7 consecutive days.',unlocked:longestStreak>=7,progress:Math.min(7,longestStreak),target:7}
+    ];
+
+    const pinnedSet=new Set((profile.pinnedGoalIds||[]).map(String));
+    const pinnedGoals=goals.filter(item=>pinnedSet.has(String(item.id))).slice(0,6).map(item=>({
+      id:item.id,title:item.title,status:item.status,deadline:item.deadline||null,
+      progress:item.type==='number'&&Number(item.target)>0?Math.max(0,Math.min(100,(Number(item.current)||0)/Number(item.target)*100)):null
+    }));
+
+    const recentActivity=[
+      ...completedTasks.map(item=>({kind:'task',title:item.title||'Task completed',at:item.completedAt||item.updated||item.created})),
+      ...completedGoals.map(item=>({kind:'goal',title:item.title||'Goal completed',at:item.updated||item.created}))
+    ].filter(item=>item.at).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,12);
+
+    const mutual=profile.isSelf?{count:0,friends:[]}:await mutualFriends(env,identity,profile.userId);
+    const openTasks=tasks.filter(item=>item.status!=='done').length;
+    const activeGoals=goals.filter(item=>item.status!=='complete').length;
+
+    let sharedItems={tasks:[],goals:[],countdowns:[]};
+    if(!profile.isSelf&&settings.showSharedItems){
+      const shared=await sharedPlannerItems(env,identity);
+      const byOwner=list=>(list||[]).filter(item=>String(item.ownerUserId||'')===String(profile.userId));
+      sharedItems={tasks:byOwner(shared.tasks),goals:byOwner(shared.goals),countdowns:byOwner(shared.countdowns)};
+    }
+
+    const response={
+      profile:{
+        ...profile,
+        createdAt:(profile.isSelf||settings.showMemberSince)?profile.createdAt:null,
+        friendCount:(profile.isSelf||settings.showFriendCount)?profile.friendCount:null
+      },
+      summary:profile.isSelf
+        ?{openTasks,activeGoals,countdowns:countdowns.length,completedTasks:completedTasks.length,completedGoals:completedGoals.length}
+        :{sharedItems:sharedItems.tasks.length+sharedItems.goals.length+sharedItems.countdowns.length},
+      streaks:(profile.isSelf||settings.showStreaks)?{current:currentStreak,longest:longestStreak,activeDays:uniqueDays.length}:null,
+      achievements:(profile.isSelf||settings.showAchievements)?achievements:[],
+      pinnedGoals:(profile.isSelf||settings.showPinnedGoals)?pinnedGoals:[],
+      recentActivity:(profile.isSelf||settings.showRecentActivity)?recentActivity.map(item=>({
+        ...item,
+        title:profile.isSelf||settings.activityDetails==='titles'?item.title:(item.kind==='goal'?'Completed a goal':'Completed a task')
+      })):[],
+      mutualFriends:(!profile.isSelf&&settings.showMutualFriends)?mutual:{count:0,friends:[]},
       sharedItems
-    });
+    };
+    return json(response);
   }
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
