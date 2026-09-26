@@ -10,14 +10,15 @@
     "deploy:cloudflare": "wrangler deploy",
     "cloudflare:types": "wrangler types",
     "generate:vapid": "web-push generate-vapid-keys",
-    "native:add:android": "npm run native:prepare && npx cap add android",
-    "native:add:ios": "npm run native:prepare && npx cap add ios",
-    "native:sync": "npm run native:prepare && npx cap sync",
+    "native:add:android": "npm run native:prepare && npx cap add android && npm run native:configure",
+    "native:add:ios": "npm run native:prepare && npx cap add ios && npm run native:configure",
+    "native:sync": "npm run native:prepare && npx cap sync && npm run native:configure",
     "native:open:android": "npx cap open android",
     "native:open:ios": "npx cap open ios",
     "native:run:android": "npx cap run android",
     "native:run:ios": "npx cap run ios",
-    "native:prepare": "node native/build.mjs"
+    "native:prepare": "node native/build.mjs",
+    "native:configure": "node native/configure-platforms.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0",
