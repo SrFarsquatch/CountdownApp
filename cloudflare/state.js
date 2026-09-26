@@ -36,6 +36,12 @@ export function normalizeNotifications(x={}){
     createdAt:iso(item?.createdAt)||new Date().toISOString(),
     lastSeen:iso(item?.lastSeen)||new Date().toISOString()
   })).filter(item=>item.endpoint&&item.keys.p256dh&&item.keys.auth).slice(0,20):[];
+  const nativeDevices=Array.isArray(x.nativeDevices)?x.nativeDevices.map(item=>({
+    token:cleanText(item?.token,4096),
+    platform:['android','ios'].includes(item?.platform)?item.platform:'',
+    createdAt:iso(item?.createdAt)||new Date().toISOString(),
+    lastSeen:iso(item?.lastSeen)||new Date().toISOString()
+  })).filter(item=>item.token&&item.platform).slice(0,20):[];
   return{
     enabled:Boolean(x.enabled),
     taskReminders:x.taskReminders!==false,
@@ -48,6 +54,7 @@ export function normalizeNotifications(x={}){
     goalLeadMinutes:clamp(Math.round(num(x.goalLeadMinutes,1440)),15,43200),
     countdownLeadMinutes:clamp(Math.round(num(x.countdownLeadMinutes,1440)),15,43200),
     subscriptions:subs,
+    nativeDevices,
     sent:x.sent&&typeof x.sent==='object'?x.sent:{}
   };
 }
