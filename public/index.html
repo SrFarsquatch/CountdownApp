@@ -1875,10 +1875,11 @@ body.modal-open{overflow:hidden}
   <div class="modal-body" id="modalBody"></div>
 </div></div>
 
+<script src="/native-runtime.js"></script>
 <script>
 let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
-const api=async(path,options={})=>{const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
+const api=async(path,options={})=>{const target=window.QuestLogNative?.apiUrl(path)||path;const r=await fetch(target,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(r.status===401&&window.QuestLogNative?.isNative){location.replace('/login?source=native');throw Error('Authentication required')}if(!r.ok)throw Error(d.error||'Request failed');return d};
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
 function defaultPlannerView(){return window.matchMedia('(max-width:760px)').matches?'day':'week'}
 function plannerViewStorageKey(){
@@ -4598,7 +4599,7 @@ loadAll().then(()=>{
 setInterval(()=>{if(!state)return;updateCountdownTimers()},1000);
 </script>
 <script>
-if('serviceWorker' in navigator){
+if(!window.QuestLogNative?.isNative&&'serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));
 }
 </script>
