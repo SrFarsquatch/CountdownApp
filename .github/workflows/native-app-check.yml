@@ -1,0 +1,36 @@
+name: Native app check
+
+on:
+  push:
+    branches:
+      - native-capacitor
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build native web assets
+        run: npm run native:prepare
+
+      - name: Compile Cloudflare Worker
+        run: npx wrangler deploy --dry-run --outdir .wrangler/native-check
+
+      - name: Generate Android project
+        run: npm run native:add:android
+
+      - name: Verify Android OAuth callback
+        run: grep -q 'android:scheme="questlog"' android/app/src/main/AndroidManifest.xml
