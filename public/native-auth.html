@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f2ef">
+<title>Quest Log · Verify</title>
+<style>
+:root{color-scheme:light dark;font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f3f2ef;color:#171717}
+.card{width:min(440px,100%);background:#fff;border:1px solid #dfddd7;border-radius:20px;padding:26px;box-shadow:0 18px 50px rgba(20,20,20,.08);text-align:center}
+.logo{width:54px;height:54px;border-radius:15px;margin:0 auto 16px}
+h1{font-size:24px;margin:0 0 8px}p{margin:0 0 18px;color:#77756f}
+#turnstile{display:grid;place-items:center;min-height:70px}.status{font-size:13px;margin-top:14px}
+a{display:none;margin-top:14px;color:#6c5ce7;font-weight:750}
+@media(prefers-color-scheme:dark){body{background:#121212;color:#f5f3ef}.card{background:#1b1b1b;border-color:#353535}.card p{color:#aaa69d}}
+</style>
+</head>
+<body>
+<main class="card">
+<img class="logo" src="/branding/icon-classic.svg" alt="">
+<h1>Verify sign-in</h1>
+<p>Complete the check below, then Quest Log will return to the app automatically.</p>
+<div id="turnstile"></div>
+<div class="status" id="status">Preparing verification…</div>
+<a id="returnLink" href="#">Return to Quest Log</a>
+</main>
+<script>
+const statusEl=document.getElementById('status'),returnLink=document.getElementById('returnLink');
+const nonce=new URLSearchParams(location.search).get('nonce')||'';
+function fail(message){statusEl.textContent=message||'Verification failed. Return to Quest Log and try again.'}
+async function finish(turnstileToken=''){
+ try{
+  if(!nonce)throw Error('Missing native verification nonce.');
+  statusEl.textContent='Finishing verification…';
+  const response=await fetch('/api/auth/native-challenge',{
+   method:'POST',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({nonce,turnstileToken})
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.token)throw Error(data.error||'Verification could not be completed.');
+  const target='questlog://auth/verified?status=verified&token='+encodeURIComponent(data.token);
+  returnLink.href=target;returnLink.style.display='inline-block';
+  statusEl.textContent='Verified. Returning to Quest Log…';
+  location.href=target;
+  setTimeout(()=>{statusEl.textContent='Verified. Tap “Return to Quest Log” if the app did not open automatically.'},1500);
+ }catch(error){fail(error.message)}
+}
+(async()=>{
+ try{
+  const configResponse=await fetch('/api/auth/config',{cache:'no-store'});
+  const config=await configResponse.json();
+  if(!config.turnstileEnabled){await finish('');return}
+  const script=document.createElement('script');
+  script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  script.async=true;script.defer=true;
+  script.onload=()=>{
+   statusEl.textContent='Complete the verification.';
+   turnstile.render('#turnstile',{
+    sitekey:config.turnstileSiteKey,
+    theme:'auto',
+    callback:token=>finish(token),
+    'expired-callback':()=>{statusEl.textContent='Verification expired. Complete it again.'},
+    'error-callback':()=>fail('Verification could not load. Return to Quest Log and try again.')
+   });
+  };
+  script.onerror=()=>fail('Verification could not load. Check your connection and try again.');
+  document.head.appendChild(script);
+ }catch(error){fail(error.message)}
+})();
+</script>
+</body>
+</html>
