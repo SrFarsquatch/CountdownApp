@@ -366,6 +366,9 @@ async function testPush() {
 async function syncStatusBar() {
   if (!isNative()) return;
   const dark = document.documentElement.dataset.colorMode === 'dark';
+  if (platform() === 'android') {
+    await StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+  }
   await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
 }
 

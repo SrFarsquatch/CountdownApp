@@ -1,7 +1,7 @@
 {
   "name": "quest-log",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Quest Log planner - shared self-hosted and Cloudflare deployment",
   "scripts": {
     "start": "node server.js",

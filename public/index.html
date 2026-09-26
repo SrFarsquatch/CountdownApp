@@ -202,6 +202,12 @@
 
 @media(max-width:760px){
   .content{padding:18px 14px calc(104px + env(safe-area-inset-bottom))}
+  html[data-native-app="1"] body:not(.planner-mode) .content{
+    padding-top:calc(18px + env(safe-area-inset-top, 0px));
+  }
+  html[data-native-app="1"] body:not(.planner-mode) #view-today.on{
+    scroll-margin-top:env(safe-area-inset-top, 0px);
+  }
   .today-hero{display:grid;grid-template-columns:1fr;align-items:start;gap:12px}
   .today-agent-bar{grid-column:1;grid-row:auto;max-width:none;width:100%}
   .today-hero-side{margin-left:0;width:100%;min-width:0;justify-items:start}
