@@ -2,3 +2,6 @@ node_modules/
 .dev.vars
 .wrangler/
 native-web/
+android/app/google-services.json
+*.jks
+*.keystore
