@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -26,6 +26,51 @@ function apiUrl(path) {
   const value = String(path || '');
   if (!isNative() || !value.startsWith('/api/')) return value;
   return API_ORIGIN + value;
+}
+
+function remoteUrl(path) {
+  const value = String(path || '');
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/')) return API_ORIGIN + value;
+  return API_ORIGIN + '/' + value;
+}
+
+function normalizeNativeBody(body, headers = {}) {
+  if (body === undefined || body === null) return undefined;
+  if (typeof body !== 'string') return body;
+  const contentType = Object.entries(headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1] || '';
+  if (String(contentType).toLowerCase().includes('application/json')) {
+    try { return JSON.parse(body); } catch {}
+  }
+  return body;
+}
+
+function normalizeNativeData(data) {
+  if (typeof data !== 'string') return data ?? {};
+  try { return JSON.parse(data); } catch { return data; }
+}
+
+async function request(path, options = {}) {
+  if (!isNative()) throw new Error('Native HTTP is only available inside the installed app.');
+  const method = String(options.method || 'GET').toUpperCase();
+  const headers = { accept: 'application/json', ...(options.headers || {}) };
+  const response = await CapacitorHttp.request({
+    url: remoteUrl(path),
+    method,
+    headers,
+    data: normalizeNativeBody(options.body, headers),
+    connectTimeout: Number(options.connectTimeout || 8000),
+    readTimeout: Number(options.readTimeout || 12000),
+    disableRedirects: false
+  });
+  const data = normalizeNativeData(response.data);
+  return {
+    ok: response.status >= 200 && response.status < 300,
+    status: response.status,
+    data,
+    headers: response.headers || {},
+    url: response.url || remoteUrl(path)
+  };
 }
 
 function localRoute(value = '/') {
@@ -56,39 +101,38 @@ async function diagnostics() {
     route: location.pathname + location.search,
     apiReachable: false,
     authenticated: false,
-    runtime: ''
+    runtime: '',
+    lastError: ''
   };
   if (!isNative()) return result;
   try {
-    const health = await fetch(API_ORIGIN + '/healthz', { cache: 'no-store' });
+    const health = await request('/healthz', { method: 'GET', connectTimeout: 6000, readTimeout: 8000 });
     result.apiReachable = health.ok;
-    if (health.ok) {
-      const healthData = await health.json().catch(() => ({}));
-      result.runtime = String(healthData.runtime || '');
-    }
-  } catch {}
+    if (health.ok && health.data && typeof health.data === 'object') result.runtime = String(health.data.runtime || '');
+    if (!health.ok) result.lastError = 'Health check returned HTTP ' + health.status;
+  } catch (error) {
+    result.lastError = error?.message || String(error);
+  }
   if (result.apiReachable) {
     try {
-      const session = await fetch(API_ORIGIN + '/api/auth/session', {
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      const data = await session.json().catch(() => ({}));
-      result.authenticated = Boolean(data.authenticated);
-    } catch {}
+      const session = await request('/api/auth/session', { method: 'GET', connectTimeout: 6000, readTimeout: 8000 });
+      result.authenticated = Boolean(session.ok && session.data?.authenticated);
+      if (!session.ok) result.lastError = 'Session check returned HTTP ' + session.status;
+    } catch (error) {
+      result.lastError = error?.message || String(error);
+    }
   }
   return result;
 }
 
 async function nativeApi(path, options = {}) {
-  const response = await fetch(apiUrl(path), {
-    credentials: 'include',
-    headers: { 'content-type': 'application/json', ...(options.headers || {}) },
-    ...options
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Native request failed.');
-  return data;
+  const headers = { 'content-type': 'application/json', ...(options.headers || {}) };
+  const response = await request(path, { ...options, headers });
+  if (!response.ok) {
+    const message = response.data && typeof response.data === 'object' ? response.data.error : '';
+    throw new Error(message || ('Native request failed (' + response.status + ').'));
+  }
+  return response.data;
 }
 
 async function openAuthUrl(url) {
@@ -364,6 +408,7 @@ window.QuestLogNative = {
   localRoute,
   navigate,
   diagnostics,
+  request,
   openAuthUrl,
   openExternalUrl,
   verifyHuman,
