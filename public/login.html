@@ -171,6 +171,7 @@ input:focus{background:var(--panel);border-color:var(--accent);box-shadow:0 0 0 
   </div>
 </main>
 
+<script src="/native-runtime.js"></script>
 <script>
 let mode='login',config={signupsEnabled:true,turnstileEnabled:false,turnstileSiteKey:''},turnstileWidget=null,turnstileToken='';
 const $=id=>document.getElementById(id);
@@ -204,7 +205,7 @@ document.querySelectorAll('[data-password-toggle]').forEach(button=>button.oncli
 });
 
 async function api(path,options={}){
-  const response=await fetch(path,{headers:{'content-type':'application/json',...(options.headers||{})},...options});
+  const response=await fetch(window.QuestLogNative?.apiUrl(path)||path,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'content-type':'application/json',...(options.headers||{})},...options});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw Error(data.error||'Request failed');
   return data;
