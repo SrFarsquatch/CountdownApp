@@ -737,6 +737,20 @@ export default{
     const url=new URL(request.url),path=url.pathname;
     if(path==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
 
+    if(path==='/.well-known/assetlinks.json'&&request.method==='GET'){
+      const fingerprints=String(env.ANDROID_APP_CERT_SHA256||'').split(',').map(value=>value.trim()).filter(Boolean);
+      if(!fingerprints.length)return json([],200,{'cache-control':'public, max-age=300'});
+      return json([{
+        relation:['delegate_permission/common.handle_all_urls'],
+        target:{namespace:'android_app',package_name:'ca.mattmoonie.questlog',sha256_cert_fingerprints:fingerprints}
+      }],200,{'cache-control':'public, max-age=3600'});
+    }
+    if(path==='/.well-known/apple-app-site-association'&&request.method==='GET'){
+      const teamId=cleanText(env.APPLE_TEAM_ID,120);
+      const details=teamId?[{appID:teamId+'.ca.mattmoonie.questlog',paths:['/*']}]:[];
+      return json({applinks:{apps:[],details}},200,{'cache-control':'public, max-age=3600'});
+    }
+
     if(path==='/api/google/callback'&&request.method==='GET'){
       try{
         const oauthContext=await readGoogleOauthState(url.searchParams.get('state'),env);
