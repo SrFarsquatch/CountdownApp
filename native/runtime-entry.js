@@ -87,7 +87,17 @@ function parseCallback(rawUrl) {
 }
 
 async function handleNativeUrl(rawUrl) {
-  const callback = parseCallback(rawUrl);
+  const value = String(rawUrl || '');
+
+  try {
+    const hosted = new URL(value);
+    if (hosted.origin === API_ORIGIN && !hosted.pathname.startsWith('/api/')) {
+      location.replace(hosted.pathname + hosted.search + hosted.hash);
+      return true;
+    }
+  } catch {}
+
+  const callback = parseCallback(value);
   if (!callback) return false;
 
   try { await Browser.close(); } catch {}
