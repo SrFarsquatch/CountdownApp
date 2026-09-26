@@ -72,5 +72,9 @@
 # APNS_BUNDLE_ID=ca.mattmoonie.questlog
 # APNS_SANDBOX=false
 #
+# Verified native web links
+# ANDROID_APP_CERT_SHA256=AA:BB:CC:...
+# APPLE_TEAM_ID=
+#
 # The standalone Cloudflare runtime does NOT use ORIGIN_BASE_URL,
 # Cloudflare Tunnel, CasaOS, or origin service tokens.
