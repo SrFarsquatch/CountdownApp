@@ -41,10 +41,16 @@ async function finish(turnstileToken=''){
   });
   const data=await response.json().catch(()=>({}));
   if(!response.ok||!data.token)throw Error(data.error||'Verification could not be completed.');
-  const target='questlog://auth/verified?status=verified&token='+encodeURIComponent(data.token);
-  returnLink.href=target;returnLink.style.display='inline-block';
+  const callbackPath='auth/verified?status=verified&token='+encodeURIComponent(data.token);
+  const schemeTarget='questlog://'+callbackPath;
+  const isAndroid=/Android/i.test(navigator.userAgent);
+  const target=isAndroid
+    ? 'intent://'+callbackPath+'#Intent;scheme=questlog;package=ca.mattmoonie.questlog;end'
+    : schemeTarget;
+  returnLink.href=target;returnLink.style.display='inline-flex';
+  returnLink.dataset.fallback=schemeTarget;
   statusEl.textContent='Verified. Returning to Quest Log…';
-  location.href=target;
+  try{location.href=target}catch{}
   setTimeout(()=>{statusEl.textContent='Verified. Tap “Return to Quest Log” if the app did not open automatically.'},1500);
  }catch(error){fail(error.message)}
 }
