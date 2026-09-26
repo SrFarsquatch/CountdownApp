@@ -144,7 +144,7 @@ async function nativeChallengeSignature(env,issued,nonce){
  return hmacHex(env.APP_SECRET,'native-auth|'+issued+'|'+nonce);
 }
 export async function createNativeAuthChallenge(request,env,payload={}){
- await verifyHumanChallenge(request,env,payload);
+ await verifyTurnstile(request,env,payload.turnstileToken);
  const nonce=clean(payload.nonce,160);
  if(!nonce){const e=new Error('Native challenge nonce is required.');e.status=400;throw e}
  const issued=Date.now().toString(36),signature=await nativeChallengeSignature(env,issued,nonce);
@@ -246,7 +246,7 @@ export async function login(request,env,payload={}){
  if(!validEmail(email)||!password){const e=new Error('Email and password are required.');e.status=400;throw e}
  assertAllowedEmail(env,email);
  await checkRateLimit(request,env,email,'login');
- await verifyTurnstile(request,env,payload.turnstileToken);
+ await verifyHumanChallenge(request,env,payload);
  const user=await env.DB.prepare('SELECT * FROM questlog_users WHERE lower(primary_email)=?').bind(email).first();
  let valid=false;
  if(user?.password_hash&&user?.password_salt&&user.status!=='disabled'){
