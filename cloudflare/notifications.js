@@ -39,6 +39,109 @@ function vapidConfig(env){
     subject:cleanText(env.VAPID_SUBJECT||'mailto:questlog@localhost',320)
   };
 }
+function firebaseConfig(env){
+  const projectId=cleanText(env.FIREBASE_PROJECT_ID,200),clientEmail=cleanText(env.FIREBASE_CLIENT_EMAIL,320),privateKey=String(env.FIREBASE_PRIVATE_KEY||'').trim();
+  return{configured:Boolean(projectId&&clientEmail&&privateKey),projectId,clientEmail,privateKey};
+}
+function apnsConfig(env){
+  const teamId=cleanText(env.APNS_TEAM_ID,120),keyId=cleanText(env.APNS_KEY_ID,120),privateKey=String(env.APNS_PRIVATE_KEY||'').trim(),bundleId=cleanText(env.APNS_BUNDLE_ID||'ca.mattmoonie.questlog',240);
+  return{configured:Boolean(teamId&&keyId&&privateKey&&bundleId),teamId,keyId,privateKey,bundleId,sandbox:String(env.APNS_SANDBOX||'').toLowerCase()==='true'};
+}
+function pemBytes(value){
+  const raw=String(value||'').replace(/\\n/g,'\n').replace(/-----BEGIN [^-]+-----/g,'').replace(/-----END [^-]+-----/g,'').replace(/\s+/g,'');
+  if(!raw)throw new Error('Push private key is empty.');
+  const binary=atob(raw);
+  return Uint8Array.from(binary,char=>char.charCodeAt(0));
+}
+function jsonB64u(value){return b64u(enc.encode(JSON.stringify(value)))}
+let firebaseTokenCache={token:'',expiresAt:0};
+async function firebaseAccessToken(env){
+  const config=firebaseConfig(env);if(!config.configured)throw new Error('Firebase push is not configured.');
+  if(firebaseTokenCache.token&&Date.now()<firebaseTokenCache.expiresAt-60000)return firebaseTokenCache.token;
+  const now=Math.floor(Date.now()/1000),header=jsonB64u({alg:'RS256',typ:'JWT'}),payload=jsonB64u({
+    iss:config.clientEmail,
+    scope:'https://www.googleapis.com/auth/firebase.messaging',
+    aud:'https://oauth2.googleapis.com/token',
+    iat:now,
+    exp:now+3600
+  });
+  const key=await crypto.subtle.importKey('pkcs8',pemBytes(config.privateKey),{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
+  const input=header+'.'+payload,signature=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,enc.encode(input));
+  const assertion=input+'.'+b64u(new Uint8Array(signature));
+  const response=await fetch('https://oauth2.googleapis.com/token',{
+    method:'POST',
+    headers:{'content-type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion})
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.access_token)throw new Error('Firebase OAuth failed: '+(data.error_description||data.error||response.status));
+  firebaseTokenCache={token:data.access_token,expiresAt:Date.now()+num(data.expires_in,3600)*1000};
+  return firebaseTokenCache.token;
+}
+let apnsTokenCache={token:'',expiresAt:0,key:''};
+async function apnsProviderToken(env){
+  const config=apnsConfig(env);if(!config.configured)throw new Error('Apple push is not configured.');
+  const cacheKey=config.teamId+'|'+config.keyId;
+  if(apnsTokenCache.token&&apnsTokenCache.key===cacheKey&&Date.now()<apnsTokenCache.expiresAt)return apnsTokenCache.token;
+  const now=Math.floor(Date.now()/1000),header=jsonB64u({alg:'ES256',kid:config.keyId}),payload=jsonB64u({iss:config.teamId,iat:now}),input=header+'.'+payload;
+  const key=await crypto.subtle.importKey('pkcs8',pemBytes(config.privateKey),{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  const signature=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,enc.encode(input));
+  const token=input+'.'+b64u(new Uint8Array(signature));
+  apnsTokenCache={token,expiresAt:Date.now()+50*60*1000,key:cacheKey};
+  return token;
+}
+async function sendFirebasePush(device,payload,env){
+  const config=firebaseConfig(env),access=await firebaseAccessToken(env);
+  const response=await fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(config.projectId)+'/messages:send',{
+    method:'POST',
+    headers:{authorization:'Bearer '+access,'content-type':'application/json'},
+    body:JSON.stringify({message:{
+      token:device.token,
+      notification:{title:payload.title,body:payload.body},
+      data:{url:payload.url||'/?view=today',kind:payload.kind||'activity',tag:payload.tag||''},
+      android:{priority:'HIGH',notification:{channel_id:'questlog-updates',sound:'default'}}
+    }})
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){
+    const error=new Error('FCM returned '+response.status+': '+(data?.error?.message||'push failed'));
+    error.status=response.status;
+    error.code=data?.error?.details?.[0]?.errorCode||'';
+    throw error;
+  }
+  return true;
+}
+async function sendApnsPush(device,payload,env){
+  const config=apnsConfig(env),provider=await apnsProviderToken(env),host=config.sandbox?'https://api.sandbox.push.apple.com':'https://api.push.apple.com';
+  const response=await fetch(host+'/3/device/'+encodeURIComponent(device.token),{
+    method:'POST',
+    headers:{
+      authorization:'bearer '+provider,
+      'apns-topic':config.bundleId,
+      'apns-push-type':'alert',
+      'apns-priority':'10'
+    },
+    body:JSON.stringify({
+      aps:{alert:{title:payload.title,body:payload.body},sound:'default'},
+      url:payload.url||'/?view=today',
+      kind:payload.kind||'activity',
+      tag:payload.tag||''
+    })
+  });
+  if(!response.ok){
+    const data=await response.json().catch(()=>({}));
+    const error=new Error('APNs returned '+response.status+': '+(data.reason||'push failed'));
+    error.status=response.status;
+    error.code=data.reason||'';
+    throw error;
+  }
+  return true;
+}
+async function sendNativePush(device,payload,env){
+  if(device.platform==='android')return sendFirebasePush(device,payload,env);
+  if(device.platform==='ios')return sendApnsPush(device,payload,env);
+  throw new Error('Unsupported native push platform.');
+}
 async function vapidJwt(endpoint,config){
   const publicBytes=fromB64u(config.publicKey),privateBytes=fromB64u(config.privateKey);
   if(publicBytes.length!==65||publicBytes[0]!==4||privateBytes.length!==32)throw new Error('Invalid VAPID key pair.');
@@ -100,9 +203,12 @@ export async function sendWebPush(subscription,payload,env){
   return true;
 }
 export function notificationConfig(state,env){
-  const cfg=normalizeNotifications(state.notifications),vapid=vapidConfig(env);
+  const cfg=normalizeNotifications(state.notifications),vapid=vapidConfig(env),firebase=firebaseConfig(env),apns=apnsConfig(env);
   return{
-    configured:vapid.configured,
+    configured:vapid.configured||firebase.configured||apns.configured,
+    webConfigured:vapid.configured,
+    androidConfigured:firebase.configured,
+    iosConfigured:apns.configured,
     publicKey:vapid.configured?vapid.publicKey:'',
     enabled:cfg.enabled,
     taskReminders:cfg.taskReminders,
@@ -115,6 +221,7 @@ export function notificationConfig(state,env){
     goalLeadMinutes:cfg.goalLeadMinutes,
     countdownLeadMinutes:cfg.countdownLeadMinutes,
     subscriptionCount:cfg.subscriptions.length,
+    nativeDeviceCount:cfg.nativeDevices.length,
     scheduler:'cloudflare-cron'
   };
 }
@@ -151,6 +258,42 @@ export function unregisterSubscription(state,endpoint){
   state.notifications=normalizeNotifications(cfg);
   return before!==state.notifications.subscriptions.length;
 }
+export function registerNativeDevice(state,raw={}){
+  const cfg=normalizeNotifications(state.notifications),token=cleanText(raw.token,4096),platform=['android','ios'].includes(raw.platform)?raw.platform:'';
+  if(!token||!platform)throw new Error('Invalid native push registration.');
+  const now=new Date().toISOString(),existing=cfg.nativeDevices.find(item=>item.token===token);
+  const next={token,platform,createdAt:existing?.createdAt||now,lastSeen:now};
+  cfg.nativeDevices=cfg.nativeDevices.filter(item=>item.token!==token);
+  cfg.nativeDevices.push(next);
+  state.notifications=normalizeNotifications(cfg);
+  return next;
+}
+export function unregisterNativeDevice(state,token){
+  const cfg=normalizeNotifications(state.notifications),target=cleanText(token,4096),before=cfg.nativeDevices.length;
+  cfg.nativeDevices=cfg.nativeDevices.filter(item=>item.token!==target);
+  state.notifications=normalizeNotifications(cfg);
+  return before!==state.notifications.nativeDevices.length;
+}
+async function sendToNativeDevices(state,payload,env,onlyToken=''){
+  const cfg=normalizeNotifications(state.notifications),keep=[],results=[];
+  for(const device of cfg.nativeDevices){
+    if(onlyToken&&device.token!==onlyToken){keep.push(device);continue}
+    try{
+      await sendNativePush(device,payload,env);
+      keep.push(device);results.push({token:device.token,platform:device.platform,ok:true});
+    }catch(error){
+      const gone=(device.platform==='android'&&(error.code==='UNREGISTERED'||error.status===404))||(device.platform==='ios'&&['BadDeviceToken','Unregistered','DeviceTokenNotForTopic'].includes(error.code));
+      if(!gone)keep.push(device);
+      results.push({token:device.token,platform:device.platform,ok:false,gone,error:error.message});
+    }
+  }
+  if(onlyToken){
+    const untouched=cfg.nativeDevices.filter(item=>item.token!==onlyToken);
+    cfg.nativeDevices=[...untouched,...keep.filter(item=>item.token===onlyToken)];
+  }else cfg.nativeDevices=keep;
+  state.notifications=normalizeNotifications(cfg);
+  return results;
+}
 async function sendToSubscriptions(state,payload,env,onlyEndpoint=''){
   const cfg=normalizeNotifications(state.notifications),keep=[],results=[];
   for(const subscription of cfg.subscriptions){
@@ -173,7 +316,7 @@ async function sendToSubscriptions(state,payload,env,onlyEndpoint=''){
 }
 export async function sendInstantNotification(state,env,payload={}){
   const cfg=normalizeNotifications(state.notifications);state.notifications=cfg;
-  if(!cfg.enabled||!cfg.socialUpdates||!cfg.subscriptions.length||!vapidConfig(env).configured)return{sent:0,skipped:true};
+  if(!cfg.enabled||!cfg.socialUpdates)return{sent:0,skipped:true};
   const safePayload={
     title:cleanText(payload.title||'Quest Log',180),
     body:cleanText(payload.body||'',360),
@@ -182,7 +325,9 @@ export async function sendInstantNotification(state,env,payload={}){
     kind:cleanText(payload.kind||'activity',80),
     timestamp:new Date().toISOString()
   };
-  const results=await sendToSubscriptions(state,safePayload,env);
+  const webResults=cfg.subscriptions.length&&vapidConfig(env).configured?await sendToSubscriptions(state,safePayload,env):[];
+  const nativeResults=cfg.nativeDevices.length?await sendToNativeDevices(state,safePayload,env):[];
+  const results=[...webResults,...nativeResults];
   await saveState(env,state);
   return{sent:results.filter(item=>item.ok).length,results};
 }
@@ -198,6 +343,19 @@ export async function sendTestNotification(state,env,endpoint=''){
   const results=await sendToSubscriptions(state,payload,env,cleanText(endpoint,2000));
   await saveState(env,state);
   return{ok:results.some(item=>item.ok),results:results.map(item=>({ok:item.ok,gone:item.gone||false,error:item.error||''}))};
+}
+export async function sendNativeTestNotification(state,env,token=''){
+  const payload={
+    title:'Quest Log notifications are on',
+    body:'Native push notifications are working on this device.',
+    tag:'questlog-native-test',
+    url:'/?view=today',
+    kind:'test',
+    timestamp:new Date().toISOString()
+  };
+  const results=await sendToNativeDevices(state,payload,env,cleanText(token,4096));
+  await saveState(env,state);
+  return{ok:results.some(item=>item.ok),results:results.map(item=>({ok:item.ok,platform:item.platform,gone:item.gone||false,error:item.error||''}))};
 }
 function relativeMinutes(target,now){
   const minutes=Math.max(0,Math.round((target-now)/60000));
@@ -239,7 +397,8 @@ function reminderItems(state,events,now){
 export async function runNotificationSweep(state,env,nowMs=Date.now()){
   let cfg=normalizeNotifications(state.notifications);
   state.notifications=cfg;
-  if(!cfg.enabled||!cfg.subscriptions.length||!vapidConfig(env).configured)return{sent:0,skipped:true};
+  const canWeb=cfg.subscriptions.length&&vapidConfig(env).configured,canNative=cfg.nativeDevices.length;
+  if(!cfg.enabled||(!canWeb&&!canNative))return{sent:0,skipped:true};
   let events=[];
   if(cfg.eventReminders&&state.google?.accounts?.length){
     const end=new Date(nowMs+Math.max(cfg.eventLeadMinutes,5)*60000);
@@ -247,11 +406,13 @@ export async function runNotificationSweep(state,env,nowMs=Date.now()){
   }
   const items=reminderItems(state,events,nowMs);let sent=0;
   for(const item of items){
-    const results=await sendToSubscriptions(state,item.payload,env);
+    const webResults=canWeb?await sendToSubscriptions(state,item.payload,env):[];
+    const nativeResults=canNative?await sendToNativeDevices(state,item.payload,env):[];
+    const results=[...webResults,...nativeResults];
     if(results.some(result=>result.ok)){state.notifications.sent[item.key]=new Date(nowMs).toISOString();sent++}
   }
   const cutoff=nowMs-45*DAY,entries=Object.entries(state.notifications.sent||{}).filter(([,value])=>new Date(value).getTime()>=cutoff).slice(-600);
   state.notifications.sent=Object.fromEntries(entries);
   await saveState(env,state);
-  return{sent,checked:items.length,subscriptions:state.notifications.subscriptions.length};
+  return{sent,checked:items.length,subscriptions:state.notifications.subscriptions.length,nativeDevices:state.notifications.nativeDevices.length};
 }
