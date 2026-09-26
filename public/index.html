@@ -3000,6 +3000,78 @@ async function eventModal(item=null,preset={}){
  };
 }
 
+function questDetailRow(label,value,options={}){
+ if(value===undefined||value===null||value==='')return'';
+ const html=options.html?String(value):esc(String(value)).replace(/\n/g,'<br>');
+ return '<div class="event-detail-row"><strong>'+esc(label)+'</strong><div>'+html+'</div></div>';
+}
+function collaboratorDetail(item){
+ const members=Array.isArray(item?.sharedMembers)?item.sharedMembers:[];
+ if(!members.length)return'';
+ const accepted=members.filter(member=>member?.status==='accepted').length,pending=members.filter(member=>member?.status==='pending').length;
+ return [accepted?accepted+' collaborator'+(accepted===1?'':'s'):'',pending?pending+' pending':''].filter(Boolean).join(' · ');
+}
+function taskDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'task');
+ const goal=(state.goals||[]).find(goal=>String(goal.id)===String(item.goalId||'')),linked=Boolean(item.googleTaskId);
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('Due',item.due?fmtDate(item.due,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.due):'No due date');
+ body+=questDetailRow('Status',item.status==='done'?'Complete':item.status==='progress'?'In progress':'To do');
+ body+=questDetailRow('Priority',(item.priority||'medium').replace(/^./,x=>x.toUpperCase()));
+ if(item.project)body+=questDetailRow('Project',item.project);
+ if(goal)body+=questDetailRow('Goal',goal.title);
+ if(linked)body+=questDetailRow('Google Tasks',item.googleTaskListTitle||'Linked task');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ if(item.description)body+=questDetailRow('Notes',item.description);
+ body+='<div class="modal-actions"><button class="btn" id="toggleTaskDetail" type="button">'+(item.status==='done'?'Reopen':'Complete')+'</button><button class="btn primary" id="editTaskDetail" type="button">Edit</button></div></div>';
+ openModal(item.title||'Task',body);
+ $('editTaskDetail').onclick=()=>taskModal(item);
+ $('toggleTaskDetail').onclick=async()=>{
+   $('toggleTaskDetail').disabled=true;
+   try{closeModal();await toggleTaskWithUndo(item)}
+   catch(error){console.warn(error)}
+ };
+}
+function goalDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'goal');
+ const progress=Math.max(0,Math.min(100,Math.round(Number(item.progress)||0))),unit=item.unit?' '+item.unit:'';
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('Progress',item.type==='number'?String(item.current??0)+' / '+String(item.target??0)+unit:progress+'%');
+ if(item.deadline)body+=questDetailRow('Target',fmtDate(item.deadline,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.deadline));
+ if(item.project)body+=questDetailRow('Project',item.project);
+ body+=questDetailRow('Type',item.type==='deadline'?'Deadline':'Number');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ if(item.description)body+=questDetailRow('Notes',item.description);
+ body+='<div class="event-detail-row"><strong>Progress</strong><div><div class="progress"><i style="width:'+progress+'%"></i></div></div></div>';
+ body+='<div class="modal-actions"><button class="btn primary" id="editGoalDetail" type="button">Edit</button></div></div>';
+ openModal(item.title||'Goal',body);
+ $('editGoalDetail').onclick=()=>goalModal(item);
+}
+function countdownDisplayName(value){
+ return({days:'Days only',compact:'Days + hours',full:'Days + hours + minutes',precise:'Precise',weeks:'Weeks + days',date:'Target date'})[value]||'Days only';
+}
+function countdownProgressName(value){
+ return({time:'Time elapsed',manual:'Manual',none:'None'})[value]||'Time elapsed';
+}
+function countdownDetailModal(item){
+ if(!item)return;
+ if(item.shared)return sharedItemModal(item,'countdown');
+ const display=countdownLabel(item);
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('When',fmtDate(item.end,{weekday:'long',year:'numeric'})+' · '+fmtTime(item.end));
+ body+=questDetailRow('Remaining',display.label);
+ body+=questDetailRow('Display',countdownDisplayName(item.timeDisplayStyle));
+ body+=questDetailRow('Progress',countdownProgressName(item.progressMode));
+ if(item.pinned)body+=questDetailRow('Pinned','Yes');
+ body+=questDetailRow('E-ink',item.displayEnabled===false?'Hidden':'Shown');
+ const collaborators=collaboratorDetail(item);if(collaborators)body+=questDetailRow('Shared',collaborators);
+ body+='<div class="modal-actions"><button class="btn primary" id="editCountdownDetail" type="button">Edit</button></div></div>';
+ openModal(item.name||'Countdown',body);
+ $('editCountdownDetail').onclick=()=>countdownModal(item);
+}
+
 async function taskModal(item){
  if(item?.shared)return sharedItemModal(item,'task');
  await acceptedFriends();
