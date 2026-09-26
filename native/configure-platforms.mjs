@@ -126,6 +126,8 @@ async function configureIos() {
     plist = plist.slice(0, dictEnd) + statusBar + '\n' + plist.slice(dictEnd);
   }
 
+  await writeFile(file, plist);
+
   const entitlements = resolve(root, 'ios/App/App/App.entitlements');
   await writeFile(entitlements, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
