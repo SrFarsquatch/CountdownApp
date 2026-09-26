@@ -49,6 +49,9 @@ jobs:
       - name: Verify Android OAuth callback
         run: grep -q 'android:scheme="questlog"' android/app/src/main/AndroidManifest.xml
 
+      - name: Verify Android Quest Log app link
+        run: grep -q 'android:host="questlog.mattmoonie.ca"' android/app/src/main/AndroidManifest.xml
+
       - name: Verify Android push metadata
         run: |
           grep -q 'default_notification_icon' android/app/src/main/AndroidManifest.xml
