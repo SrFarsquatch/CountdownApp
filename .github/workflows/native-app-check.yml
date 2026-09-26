@@ -49,6 +49,12 @@ jobs:
       - name: Verify Android OAuth callback
         run: grep -q 'android:scheme="questlog"' android/app/src/main/AndroidManifest.xml
 
+      - name: Verify Android push metadata
+        run: |
+          grep -q 'default_notification_icon' android/app/src/main/AndroidManifest.xml
+          grep -q 'questlog-updates' android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/res/drawable/ic_stat_questlog.xml
+
       - name: Build Android debug APK
         run: |
           chmod +x android/gradlew
