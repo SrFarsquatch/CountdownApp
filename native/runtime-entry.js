@@ -43,6 +43,12 @@ async function openAuthUrl(url) {
   await Browser.open({ url: target });
 }
 
+async function openExternalUrl(url) {
+  const target = String(url || '');
+  if (!/^https?:\/\//i.test(target)) throw new Error('External URL must use HTTP or HTTPS.');
+  await Browser.open({ url: target });
+}
+
 function safeLocalRoute(value) {
   try {
     const url = new URL(String(value || '/?view=today'), API_ORIGIN);
@@ -69,6 +75,9 @@ function parseCallback(rawUrl) {
     return {
       provider: actualProvider,
       status: url.searchParams.get('status') || '',
+      redirectUrl: url.searchParams.get('redirect') || '',
+      loginId: url.searchParams.get('loginId') || '',
+      institution: url.searchParams.get('institution') || '',
       url: url.toString()
     };
   } catch {
@@ -240,6 +249,7 @@ window.QuestLogNative = {
   callbackScheme: CALLBACK_SCHEME,
   apiUrl,
   openAuthUrl,
+  openExternalUrl,
   handleNativeUrl,
   push: {
     status: pushStatus,
