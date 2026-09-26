@@ -95,6 +95,9 @@ jobs:
       - name: Verify iOS Quest Log API domain
         run: grep -q '<string>questlog.mattmoonie.ca</string>' ios/App/App/Info.plist
 
+      - name: Verify iOS status bar configuration
+        run: grep -q '<key>UIViewControllerBasedStatusBarAppearance</key>' ios/App/App/Info.plist
+
       - name: Verify iOS Universal Links entitlement
         run: |
           grep -q 'applinks:questlog.mattmoonie.ca' ios/App/App/App.entitlements
