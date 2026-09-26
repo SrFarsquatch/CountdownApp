@@ -1880,6 +1880,19 @@ body.modal-open{overflow:hidden}
 let state=null,runtimeInfo=null,friendDirectory=null,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{const target=window.QuestLogNative?.apiUrl(path)||path;const r=await fetch(target,{credentials:window.QuestLogNative?.isNative?'include':'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(r.status===401&&window.QuestLogNative?.isNative){location.replace('/login?source=native');throw Error('Authentication required')}if(!r.ok)throw Error(d.error||'Request failed');return d};
+async function startGoogleConnection(){
+ if(window.QuestLogNative?.isNative){
+   try{
+     const result=await api('/api/google/auth?native=1&response=json');
+     if(!result?.url)throw Error('Google authentication URL was not returned.');
+     await window.QuestLogNative.openAuthUrl(result.url);
+   }catch(error){
+     alert(error.message||'Could not start Google sign-in.');
+   }
+   return;
+ }
+ location.href='/api/google/auth';
+}
 const PLANNER_VIEW_VALUES=new Set(['day','week','month']);
 function defaultPlannerView(){return window.matchMedia('(max-width:760px)').matches?'day':'week'}
 function plannerViewStorageKey(){
@@ -2583,7 +2596,7 @@ async function eventModal(item=null,preset={}){
  if(!item&&!writable.length){
    const connected=allAccounts.length>0;
    openModal('New event','<div class="notice">'+(connected?'Your Google account is still using the old read-only token. Reconnect it once to grant Quest Log event editing access.':'Connect a Google account before creating calendar events.')+'</div><div class="modal-actions"><button class="btn primary" id="eventConnectGoogle">'+(connected?'Reconnect Google':'Open Google settings')+'</button></div>');
-   $('eventConnectGoogle').onclick=()=>connected?location.href='/api/google/auth':setView('settings');
+   $('eventConnectGoogle').onclick=()=>connected?startGoogleConnection():setView('settings');
    return;
  }
  const editing=Boolean(item);
@@ -3470,7 +3483,7 @@ async function renderPlanner(){
    if(seq!==plannerRenderSeq)return;
    calEvents=events;
  }catch(e){if(seq!==plannerRenderSeq)return;console.warn(e);calEvents=[]}
- $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>location.href='/api/google/auth';
+ $('connectInline').textContent=state.google.connected?'Google Calendar connected':(isMobileUi()?'Connect Google':'Connect Google Calendar');$('connectInline').disabled=state.google.connected;$('connectInline').onclick=()=>startGoogleConnection();
  const stage=$('calendarStage');stage?.classList.remove('planner-pager-active');
  if(isMobileUi())renderMobilePlannerPager(range,calEvents);
  else{
@@ -4159,15 +4172,15 @@ async function renderSettings(){
  if(!accounts.length){
    html+='<div class="empty">No Google accounts connected yet.</div>';
    box.innerHTML=html;
-   if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
+   if($('addGoogleAccount'))$('addGoogleAccount').onclick=()=>startGoogleConnection();
    refreshUpdateStatus();return;
  }
  box.innerHTML=html+accounts.map(a=>{
    const needsReconnect=!a.canWrite||!a.canTasks;
    return '<div class="account-card" data-account-card="'+esc(a.id)+'"><div class="account-head"><div><div class="account-title">'+esc(a.label||a.googleId||'Google account')+'</div><div class="meta">'+(a.googleId&&a.label!==a.googleId?esc(a.googleId):'Connected Google account')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="write-state '+(a.canWrite?'ok':'warn')+'">'+(a.canWrite?'Calendar editing enabled':'Calendar reconnect needed')+'</span><span class="write-state '+(a.canTasks?'ok':'warn')+'">'+(a.canTasks?'Task sync enabled':'Task reconnect needed')+'</span></div></div><div class="account-actions">'+(needsReconnect?'<button class="btn tiny" data-reconnect-account="'+esc(a.id)+'">Reconnect</button>':'')+'<button class="btn tiny" data-disconnect-account="'+esc(a.id)+'">Disconnect</button></div></div><div class="integration-section"><div class="integration-head"><strong>Calendars</strong><span class="meta">Shown in Quest Log</span></div><div class="calendar-list" data-calendar-list="'+esc(a.id)+'"><div class="meta">Loading calendars…</div></div></div><div class="integration-section"><div class="integration-head"><strong>Google Tasks</strong><span class="meta">Two-way sync</span></div><div class="tasklist-list" data-tasklist-list="'+esc(a.id)+'"><div class="meta">'+(a.canTasks?'Loading task lists…':'Reconnect this account to grant Google Tasks access.')+'</div></div></div></div>';
  }).join('');
- $('addGoogleAccount').onclick=()=>location.href='/api/google/auth';
- box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>location.href='/api/google/auth');
+ $('addGoogleAccount').onclick=()=>startGoogleConnection();
+ box.querySelectorAll('[data-reconnect-account]').forEach(btn=>btn.onclick=()=>startGoogleConnection());
  box.querySelectorAll('[data-disconnect-account]').forEach(btn=>btn.onclick=async()=>{
    const account=accounts.find(a=>a.id===btn.dataset.disconnectAccount);
    if(!confirm('Disconnect '+(account?.label||'this Google account')+'? Linked Google Tasks will remain in Quest Log as local tasks.'))return;
