@@ -67,6 +67,17 @@ async function configureIos() {
     await writeFile(file, plist);
   }
 
+  if (!plist.includes('<string>questlog.mattmoonie.ca</string>')) {
+    const domains = `
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>questlog.mattmoonie.ca</string>
+	</array>`;
+    const dictEnd = plist.lastIndexOf('</dict>');
+    if (dictEnd < 0) throw new Error('Could not locate root dictionary in iOS Info.plist.');
+    plist = plist.slice(0, dictEnd) + domains + '\n' + plist.slice(dictEnd);
+  }
+
   const appDelegate = resolve(root, 'ios/App/App/AppDelegate.swift');
   if (await exists(appDelegate)) {
     let swift = await readFile(appDelegate, 'utf8');
