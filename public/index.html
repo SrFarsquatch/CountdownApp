@@ -2111,7 +2111,14 @@ function renderRuntimeSession(){
    if(menuName)menuName.textContent=name;
    if(menuAvatar)menuAvatar.innerHTML=accountAvatarInner(profile);
    if(navAvatar)navAvatar.innerHTML=accountAvatarInner(profile);
-   if(logoutLink)logoutLink.href=logout;
+   if(logoutLink){
+     logoutLink.href=logout;
+     logoutLink.onclick=window.QuestLogNative?.isNative?async event=>{
+       event.preventDefault();
+       try{await api('/api/auth/logout',{method:'POST'})}catch{}
+       location.replace('/login?source=native');
+     }:null;
+   }
    if(manageButton)manageButton.onclick=()=>{setAccountMenuOpen(false);openManageAccountModal()};
    if(friendsButton)friendsButton.onclick=()=>{setAccountMenuOpen(false);openFriendsModal()};
     if(notificationsButton)notificationsButton.onclick=()=>{setAccountMenuOpen(false);openNotificationCenter()};
