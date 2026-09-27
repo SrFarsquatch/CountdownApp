@@ -1534,12 +1534,12 @@ body.modal-open{overflow:hidden}
 .messages-main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;background:var(--panel)}
 .messages-empty{display:grid;place-items:center;padding:30px;text-align:center;color:var(--muted)}.messages-empty strong{color:var(--text);font-size:15px}
 .conversation-head{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;min-width:0;min-height:66px}.conversation-head .conversation-avatar{width:40px;height:40px;border-radius:50%;font-size:12px}.conversation-head .conversation-avatar.group{border-radius:13px}
-.conversation-head-copy{min-width:0;flex:1}.conversation-head-copy strong,.conversation-head-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.conversation-head-copy strong{font-size:13px}.conversation-head-copy span{font-size:9px;color:var(--muted);margin-top:3px}.conversation-head-actions{display:flex;gap:7px;align-items:center}.messages-mobile-back{display:none}
+.conversation-head-copy{min-width:0;flex:1}.conversation-head-copy strong,.conversation-head-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.conversation-head-copy strong{font-size:15px;font-weight:900;letter-spacing:-.01em}.conversation-head-copy span{font-size:9px;color:var(--muted);margin-top:2px}.conversation-head-actions{display:flex;gap:7px;align-items:center}.messages-mobile-back{display:none}
 .conversation-tabs{display:flex;gap:3px;padding:3px;background:var(--panel2);border-radius:10px}.conversation-tabs button{border:0;background:transparent;color:var(--muted);border-radius:7px;padding:6px 9px;font-size:10px;font-weight:850;cursor:pointer}.conversation-tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .conversation-pane{display:none;min-height:0}.conversation-pane.on{display:grid}.chat-pane{grid-template-rows:minmax(0,1fr) auto}
 .message-list{overflow:auto;padding:20px 18px 14px;display:flex;flex-direction:column;gap:8px}
 .message-row{display:flex;gap:8px;align-items:flex-end;max-width:min(72%,620px)}.message-row.mine{align-self:flex-end;flex-direction:row-reverse}.message-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--panel2);font-size:8px;font-weight:900;flex:0 0 auto}.message-avatar img{width:100%;height:100%;object-fit:cover}
-.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time{font-size:8px;color:var(--muted);margin-top:3px;padding:0 5px}.message-row.mine .message-time{text-align:right}
+.message-content{min-width:0;position:relative}.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time{font-size:8px;color:var(--muted);margin-top:3px;padding:0 5px}.message-row.mine .message-time{text-align:right}.message-date-divider{align-self:stretch;display:flex;align-items:center;gap:10px;margin:8px 0 4px;color:var(--muted);font-size:9px}.message-date-divider:before,.message-date-divider:after{content:"";height:1px;background:var(--line);flex:1}.message-date-divider span{padding:0 4px}.message-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.message-row.mine .message-reactions{justify-content:flex-end}.message-reaction{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 6px;font-size:12px;display:inline-flex;gap:3px;align-items:center}.message-reaction.mine{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft)}.message-reaction span{font-size:9px;font-weight:800}.message-reaction-picker{display:flex;gap:2px;margin-top:3px;opacity:0;pointer-events:none;transition:opacity .12s ease}.message-row:hover .message-reaction-picker,.message-row:focus-within .message-reaction-picker{opacity:1;pointer-events:auto}.message-reaction-picker button{border:0;background:transparent;border-radius:8px;padding:3px 4px;font-size:15px}.message-reaction-picker button:hover{background:var(--panel2)}
 .chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line);background:var(--panel)}.chat-compose textarea{min-height:42px;max-height:120px;resize:none;border-radius:21px!important;padding:10px 14px!important;background:var(--panel2)!important;border:1px solid transparent!important}.chat-compose textarea:focus{background:var(--panel)!important;border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important}.chat-compose .btn{align-self:end;min-height:42px;border-radius:21px;padding:8px 16px}
 .group-calendar-pane{grid-template-rows:auto minmax(0,1fr)}.group-calendar-toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.group-calendar-toolbar h3{margin:0}.group-calendar-events{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}.group-event-card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:12px;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:center;cursor:pointer}.group-event-date{display:grid;place-items:center;background:var(--panel2);border-radius:10px;padding:8px 4px}.group-event-date strong{font-size:20px;line-height:1}.group-event-date span{font-size:9px;color:var(--muted);font-weight:850;margin-top:3px}.group-event-copy strong{display:block}.group-event-copy .meta{margin-top:4px}.group-event-edit{font-size:10px;color:var(--muted)}
 .group-member-grid{display:grid;gap:7px}.group-member-row{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-member-row .friend-avatar{width:36px;height:36px}.group-create-members{display:grid;gap:6px;max-height:260px;overflow:auto}.group-create-member{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-create-member input{width:18px;height:18px;min-height:0}
@@ -1590,6 +1590,8 @@ body.modal-open{overflow:hidden}
  }
  body.messages-mode .messages-title-block h2{font-size:24px}
  body.messages-mode .messages-title-block p{display:none}
+ body.messages-mode.conversation-open .messages-page{grid-template-rows:minmax(0,1fr)}
+ body.messages-mode.conversation-open .messages-topbar{display:none}
  body.messages-mode .messages-icon-button{width:39px;height:39px;border:0;background:transparent}
  body.messages-mode .messages-icon-button svg{width:23px;height:23px}
  .messages-shell{
@@ -1630,6 +1632,7 @@ body.modal-open{overflow:hidden}
  .chat-pane{grid-template-rows:minmax(0,1fr) auto}
  .message-list{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px 10px}
  .message-row{max-width:86%}
+ .message-reaction-picker{opacity:.72;pointer-events:auto}
  .message-avatar{width:24px;height:24px}
  .message-bubble{font-size:13px;padding:9px 12px}
  .chat-compose{
@@ -2615,6 +2618,7 @@ function renderAppView(name){
  const mobileAccountNav=$('mobileAccountNav');if(mobileAccountNav)mobileAccountNav.classList.toggle('on',visibleView==='profile');
  document.body.classList.toggle('planner-mode',visibleView==='planner');
  document.body.classList.toggle('messages-mode',visibleView==='messages');
+ if(visibleView!=='messages')document.body.classList.remove('conversation-open');
  if(visibleView==='messages'&&document.body.classList.contains('agent-open'))closeAgentDrawer();
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
@@ -2916,15 +2920,24 @@ function conversationAvatarHtml(conversation){
 }
 function conversationRelativeTime(value){
  if(!value)return'';
- const ms=Date.now()-new Date(value).getTime();if(!Number.isFinite(ms))return'';
+ const date=new Date(value),ms=Date.now()-date.getTime();if(!Number.isFinite(ms))return'';
  if(ms<60000)return'now';if(ms<3600000)return Math.max(1,Math.floor(ms/60000))+'m';
  if(ms<86400000)return Math.max(1,Math.floor(ms/3600000))+'h';
- return new Intl.DateTimeFormat([],{month:'short',day:'numeric'}).format(new Date(value));
+ return new Intl.DateTimeFormat([],{month:'short',day:'numeric',timeZone:appTimeZone()}).format(date);
 }
 function messageTimestamp(value){
  if(!value)return'';
  const date=new Date(value);if(!Number.isFinite(date.getTime()))return'';
- return date.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ return new Intl.DateTimeFormat([],{hour:'numeric',minute:'2-digit',timeZone:appTimeZone()}).format(date);
+}
+function messageDateLabel(value){
+ if(!value)return'';
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return'';
+ const now=new Date(),zone=appTimeZone(),today=zonedDateKey(now,zone),key=zonedDateKey(date,zone);
+ if(key===today)return'Today';
+ const yesterday=new Date(now.getTime()-86400000);
+ if(key===zonedDateKey(yesterday,zone))return'Yesterday';
+ return new Intl.DateTimeFormat([],{month:'short',day:'numeric',year:date.getFullYear()===now.getFullYear()?undefined:'numeric',timeZone:zone}).format(date);
 }
 function updateMessageBadge(){
  const count=Number(conversationData?.unreadCount)||0,badge=$('mobileMessageBadge');
@@ -2988,16 +3001,53 @@ if(window.visualViewport){
 }
 window.addEventListener('resize',()=>queueMessageViewportSync(true));
 
+function reactionChipHtml(message){
+ const reactions=Array.isArray(message.reactions)?message.reactions:[];
+ if(!reactions.length)return'';
+ return '<div class="message-reactions">'+reactions.map(item=>'<button class="message-reaction '+(item.mine?'mine':'')+'" type="button" data-message-reaction="'+esc(message.messageId)+'" data-reaction-emoji="'+esc(item.emoji)+'">'+esc(item.emoji)+(item.count>1?'<span>'+esc(item.count)+'</span>':'')+'</button>').join('')+'</div>';
+}
+function messageReactionPickerHtml(message){
+ const emojis=['❤️','😂','👍','😮','😢','🔥'];
+ return '<div class="message-reaction-picker" data-reaction-picker="'+esc(message.messageId)+'">'+emojis.map(emoji=>'<button type="button" data-pick-reaction="'+esc(message.messageId)+'" data-reaction-emoji="'+esc(emoji)+'">'+emoji+'</button>').join('')+'</div>';
+}
+async function toggleReaction(messageId,emoji){
+ if(!activeConversationId||!messageId||!emoji||String(messageId).startsWith('local-'))return;
+ const index=messageItems.findIndex(item=>item.messageId===messageId);
+ if(index<0)return;
+ const previous=Array.isArray(messageItems[index].reactions)?messageItems[index].reactions.map(item=>({...item})):[];
+ const existing=previous.find(item=>item.emoji===emoji);
+ let optimistic=previous.filter(item=>item.emoji!==emoji);
+ if(!existing?.mine)optimistic.push({emoji,count:(existing?.count||0)+1,mine:true});
+ else if(existing.count>1)optimistic.push({emoji,count:existing.count-1,mine:false});
+ messageItems[index]={...messageItems[index],reactions:optimistic};
+ renderMessageItems();
+ try{
+   const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages/'+encodeURIComponent(messageId)+'/reaction',{method:'POST',body:JSON.stringify({emoji})});
+   const current=messageItems.findIndex(item=>item.messageId===messageId);
+   if(current>=0){messageItems[current]={...messageItems[current],reactions:result.reactions||[]};renderMessageItems()}
+ }catch(error){
+   const current=messageItems.findIndex(item=>item.messageId===messageId);
+   if(current>=0){messageItems[current]={...messageItems[current],reactions:previous};renderMessageItems()}
+ }
+}
+function bindMessageReactions(root){
+ root.querySelectorAll('[data-message-reaction]').forEach(button=>button.onclick=()=>toggleReaction(button.dataset.messageReaction,button.dataset.reactionEmoji));
+ root.querySelectorAll('[data-pick-reaction]').forEach(button=>button.onclick=()=>toggleReaction(button.dataset.pickReaction,button.dataset.reactionEmoji));
+}
 function renderMessageItems(){
  const root=$('messageList');if(!root)return;
  if(!messageItems.length){root.innerHTML='<div class="empty">No messages yet. Say hello.</div>';return}
+ let lastDate='';
  root.innerHTML=messageItems.map(message=>{
    const sender=message.sender||{},avatar=profileAvatarData(sender),author=message.mine?'You':(sender.displayName||sender.email||'Friend');
-   return '<div class="message-row '+(message.mine?'mine':'')+'">'+
+   const dateLabel=messageDateLabel(message.createdAt),divider=dateLabel&&dateLabel!==lastDate?'<div class="message-date-divider"><span>'+esc(dateLabel)+'</span></div>':'';
+   lastDate=dateLabel||lastDate;
+   return divider+'<div class="message-row '+(message.mine?'mine':'')+'" data-message-id="'+esc(message.messageId)+'">'+
      '<div class="message-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(sender)))+'</div>'+
-     '<div><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div><div class="message-time">'+esc(messageTimestamp(message.createdAt))+'</div></div>'+
+     '<div class="message-content"><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div>'+reactionChipHtml(message)+messageReactionPickerHtml(message)+'<div class="message-time">'+esc(messageTimestamp(message.createdAt))+'</div></div>'+
    '</div>';
  }).join('');
+ bindMessageReactions(root);
  scrollMessagesToBottom(true);
 }
 function renderGroupCalendar(){
@@ -3018,11 +3068,14 @@ function renderConversationWorkspace(){
  const shell=$('messagesShell'),workspace=$('conversationWorkspace'),empty=$('messagesEmpty');
  if(!shell||!workspace||!empty)return;
  if(!activeConversation){
-   shell.classList.remove('has-conversation');workspace.hidden=true;workspace.style.display='none';empty.hidden=false;return;
+   shell.classList.remove('has-conversation');document.body.classList.remove('conversation-open');workspace.hidden=true;workspace.style.display='none';empty.hidden=false;return;
  }
- shell.classList.add('has-conversation');workspace.hidden=false;workspace.style.display='contents';empty.hidden=true;
+ shell.classList.add('has-conversation');document.body.classList.add('conversation-open');workspace.hidden=false;workspace.style.display='contents';empty.hidden=true;
  $('conversationHeadTitle').textContent=activeConversation.title||'Conversation';
- $('conversationHeadMeta').textContent=activeConversation.type==='group'?(activeConversation.memberCount+' members · shared calendar'):'Direct message';
+ const other=activeConversation.type==='direct'?(activeConversation.members||[]).find(member=>member.userId!==runtimeInfo?.profile?.userId):null;
+ $('conversationHeadMeta').textContent=activeConversation.type==='group'
+   ?(activeConversation.memberCount+' members')
+   :(other?.displayName||other?.email||'Quest Log friend');
  const avatar=$('conversationHeadAvatar');avatar.className='conversation-avatar '+(activeConversation.type==='group'?'group':'');avatar.innerHTML=conversationAvatarHtml(activeConversation);
  $('conversationTabs').hidden=activeConversation.type!=='group';$('conversationTabs').style.display=activeConversation.type==='group'?'flex':'none';
  $('groupMembersButton').hidden=activeConversation.type!=='group';$('groupMembersButton').style.display=activeConversation.type==='group'?'inline-flex':'none';
@@ -3064,9 +3117,16 @@ function scheduleMessagePoll(delay=5000){
      const previousLast=messageItems.at(-1)?.createdAt||'';
      await loadConversations(true);renderConversationList();
      if(activeConversationId&&activeConversationTab==='chat'){
-       const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150'));
-       const fresh=result.messages||[];
-       if(fresh.length){messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];renderMessageItems()}
+       const [result,reactionResult]=await Promise.all([
+         api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150')),
+         api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/reactions')
+       ]);
+       const fresh=result.messages||[],reactionMap=reactionResult.reactions||{};
+       if(fresh.length)messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
+       const before=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||[]}));
+       const after=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       if(fresh.length||before!==after)renderMessageItems();
      }
    }catch(error){console.warn('Message refresh failed',error)}
    scheduleMessagePoll(5000);
@@ -3081,7 +3141,7 @@ function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
  }
 }
 function closeConversationMobile(){
- activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];$('messagesShell')?.classList.remove('has-conversation');renderConversationList();renderConversationWorkspace();
+ activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];document.body.classList.remove('conversation-open');$('messagesShell')?.classList.remove('has-conversation');renderConversationList();renderConversationWorkspace();
  if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages'},'',appViewUrl('messages'));
 }
 async function startDirectMessage(userId){
