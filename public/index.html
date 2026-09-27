@@ -2813,7 +2813,7 @@ function renderGroupCalendar(){
    return '<div class="group-event-card" data-group-event="'+esc(event.eventId)+'" role="button" tabindex="0">'+
      '<div class="group-event-date"><strong>'+esc(day)+'</strong><span>'+esc(month)+'</span></div>'+
      '<div class="group-event-copy"><strong>'+esc(event.title||'Event')+'</strong><div class="meta">'+esc(fmtDate(event.start,{weekday:'short',year:'numeric'}))+' · '+esc(when)+(event.location?' · '+esc(event.location):'')+'</div></div>'+
-     '<div class="group-event-edit">Edit</div></div>';
+     '<div class="group-event-edit">View</div></div>';
  }).join(''):'<div class="empty">No group events yet.<div class="meta" style="margin-top:5px">Everyone in this group can add events.</div></div>';
  root.querySelectorAll('[data-group-event]').forEach(card=>{const open=()=>{const event=events.find(item=>item.eventId===card.dataset.groupEvent);if(event)groupEventDetail(event)};card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
 }
@@ -2836,17 +2836,20 @@ function renderConversationWorkspace(){
 }
 async function loadConversationContent(){
  if(!activeConversationId)return;
- const [conversationResult,messageResult]=await Promise.all([
-   api('/api/conversations/'+encodeURIComponent(activeConversationId)),
-   api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages?limit=150')
- ]);
- activeConversation=conversationResult.conversation||null;messageItems=messageResult.messages||[];
+ const conversationResult=await api('/api/conversations/'+encodeURIComponent(activeConversationId));
+ activeConversation=conversationResult.conversation||null;
+ if(activeConversationTab==='chat'){
+   const messageResult=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages?limit=150');
+   messageItems=messageResult.messages||[];
+ }else messageItems=[];
  if(activeConversation?.type==='group'){
    try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}catch{groupEventItems=[]}
  }else groupEventItems=[];
- const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
- if(item)item.unreadCount=0;
- conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ if(activeConversationTab==='chat'){
+   const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
+   if(item)item.unreadCount=0;
+   conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ }
  renderConversationList();renderConversationWorkspace();
 }
 async function renderMessagesView(force=false){
@@ -2863,7 +2866,7 @@ function scheduleMessagePoll(delay=5000){
    try{
      const previousLast=messageItems.at(-1)?.createdAt||'';
      await loadConversations(true);renderConversationList();
-     if(activeConversationId){
+     if(activeConversationId&&activeConversationTab==='chat'){
        const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150'));
        const fresh=result.messages||[];
        if(fresh.length){messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];renderMessageItems()}
@@ -2965,7 +2968,15 @@ if($('messageForm'))$('messageForm').onsubmit=async e=>{
 };
 document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.onclick=async()=>{
  if(!activeConversation)return;activeConversationTab=button.dataset.conversationTab==='calendar'?'calendar':'chat';
- if(activeConversationTab==='calendar'&&activeConversation.type==='group'){const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}
+ if(activeConversationTab==='calendar'&&activeConversation.type==='group'){
+   const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];
+ }else if(activeConversationTab==='chat'){
+   const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages?limit=150');
+   messageItems=result.messages||[];
+   const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
+   if(item)item.unreadCount=0;
+   conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();renderConversationList();
+ }
  renderConversationWorkspace();
  if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages',conversationId:activeConversationId,tab:activeConversationTab},'',appViewUrl('messages'));
 });

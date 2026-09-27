@@ -201,7 +201,7 @@ export async function listMessages(env,identity,conversationId,{after='',limit=1
    SELECT m.message_id,m.conversation_id,m.sender_user_id,m.body,m.created_at,m.edited_at,
           u.primary_email,u.display_name,u.avatar_data
    FROM questlog_messages m JOIN questlog_users u ON u.user_id=m.sender_user_id
-   WHERE m.conversation_id=? AND m.created_at>?
+   WHERE m.conversation_id=? AND m.created_at>=?
    ORDER BY m.created_at ASC,m.message_id ASC LIMIT ?
   `).bind(row.conversation_id,after,bounded).all();
  }else{
@@ -231,10 +231,11 @@ export async function sendMessage(env,identity,conversationId,input={}){
   env.DB.prepare("UPDATE questlog_conversations SET updated_at=datetime('now') WHERE conversation_id=?").bind(row.conversation_id),
   env.DB.prepare("UPDATE questlog_conversation_members SET last_read_at=datetime('now') WHERE conversation_id=? AND user_id=?").bind(row.conversation_id,current)
  ]);
+ const stored=await env.DB.prepare('SELECT created_at FROM questlog_messages WHERE message_id=? LIMIT 1').bind(messageId).first();
  const user=await env.DB.prepare('SELECT user_id,primary_email,display_name,avatar_data FROM questlog_users WHERE user_id=?').bind(current).first();
  const members=await membersFor(env,row.conversation_id);
  return{
-  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true},
+  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:stored?.created_at||new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true},
   recipients:members.filter(member=>member.userId!==current).map(member=>member.userId),
   conversation:{conversationId:row.conversation_id,type:row.type,title:row.title||'',members}
  };
