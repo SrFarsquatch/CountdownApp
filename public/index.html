@@ -1590,6 +1590,8 @@ body.modal-open{overflow:hidden}
  }
  body.messages-mode .messages-title-block h2{font-size:24px}
  body.messages-mode .messages-title-block p{display:none}
+ body.messages-mode.conversation-open .messages-page{grid-template-rows:minmax(0,1fr)}
+ body.messages-mode.conversation-open .messages-topbar{display:none}
  body.messages-mode .messages-icon-button{width:39px;height:39px;border:0;background:transparent}
  body.messages-mode .messages-icon-button svg{width:23px;height:23px}
  .messages-shell{
@@ -2616,6 +2618,7 @@ function renderAppView(name){
  const mobileAccountNav=$('mobileAccountNav');if(mobileAccountNav)mobileAccountNav.classList.toggle('on',visibleView==='profile');
  document.body.classList.toggle('planner-mode',visibleView==='planner');
  document.body.classList.toggle('messages-mode',visibleView==='messages');
+ if(visibleView!=='messages')document.body.classList.remove('conversation-open');
  if(visibleView==='messages'&&document.body.classList.contains('agent-open'))closeAgentDrawer();
  syncBrowserChromeTheme();
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
@@ -3065,9 +3068,9 @@ function renderConversationWorkspace(){
  const shell=$('messagesShell'),workspace=$('conversationWorkspace'),empty=$('messagesEmpty');
  if(!shell||!workspace||!empty)return;
  if(!activeConversation){
-   shell.classList.remove('has-conversation');workspace.hidden=true;workspace.style.display='none';empty.hidden=false;return;
+   shell.classList.remove('has-conversation');document.body.classList.remove('conversation-open');workspace.hidden=true;workspace.style.display='none';empty.hidden=false;return;
  }
- shell.classList.add('has-conversation');workspace.hidden=false;workspace.style.display='contents';empty.hidden=true;
+ shell.classList.add('has-conversation');document.body.classList.add('conversation-open');workspace.hidden=false;workspace.style.display='contents';empty.hidden=true;
  $('conversationHeadTitle').textContent=activeConversation.title||'Conversation';
  const other=activeConversation.type==='direct'?(activeConversation.members||[]).find(member=>member.userId!==runtimeInfo?.profile?.userId):null;
  $('conversationHeadMeta').textContent=activeConversation.type==='group'
@@ -3120,8 +3123,10 @@ function scheduleMessagePoll(delay=5000){
        ]);
        const fresh=result.messages||[],reactionMap=reactionResult.reactions||{};
        if(fresh.length)messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
-       messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||item.reactions||[]}));
-       if(fresh.length||Object.keys(reactionMap).length)renderMessageItems();
+       const before=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||[]}));
+       const after=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       if(fresh.length||before!==after)renderMessageItems();
      }
    }catch(error){console.warn('Message refresh failed',error)}
    scheduleMessagePoll(5000);
@@ -3136,7 +3141,7 @@ function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
  }
 }
 function closeConversationMobile(){
- activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];$('messagesShell')?.classList.remove('has-conversation');renderConversationList();renderConversationWorkspace();
+ activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];document.body.classList.remove('conversation-open');$('messagesShell')?.classList.remove('has-conversation');renderConversationList();renderConversationWorkspace();
  if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages'},'',appViewUrl('messages'));
 }
 async function startDirectMessage(userId){
