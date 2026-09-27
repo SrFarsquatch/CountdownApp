@@ -51,6 +51,16 @@ export async function ensureMessagingSchema(env){
   )
  `).run();
  await env.DB.prepare(`
+  CREATE TABLE IF NOT EXISTS questlog_message_reactions(
+   message_id TEXT NOT NULL,
+   conversation_id TEXT NOT NULL,
+   user_id TEXT NOT NULL,
+   emoji TEXT NOT NULL,
+   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+   PRIMARY KEY(message_id,user_id)
+  )
+ `).run();
+ await env.DB.prepare(`
   CREATE TABLE IF NOT EXISTS questlog_group_events(
    event_id TEXT PRIMARY KEY,
    conversation_id TEXT NOT NULL,
@@ -67,6 +77,7 @@ export async function ensureMessagingSchema(env){
  `).run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_conv_members_user ON questlog_conversation_members(user_id,conversation_id)').run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_messages_conv ON questlog_messages(conversation_id,created_at)').run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_reactions_conv ON questlog_message_reactions(conversation_id,message_id)').run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_group_events_conv ON questlog_group_events(conversation_id,start_at,end_at)').run();
 }
 async function acceptedFriend(env,current,target){
@@ -102,6 +113,38 @@ async function membersFor(env,conversationId){
   ORDER BY CASE WHEN cm.role='owner' THEN 0 ELSE 1 END, lower(COALESCE(u.display_name,u.primary_email,''))
  `).bind(conversationId).all();
  return(result.results||[]).map(row=>({...person(row),role:String(row.role||'member'),joinedAt:row.joined_at||null}));
+}
+function reactionGroups(rows=[],current=''){
+ const grouped=new Map();
+ for(const row of rows){
+  const messageId=String(row.message_id||''),emoji=String(row.emoji||'');
+  if(!messageId||!emoji)continue;
+  if(!grouped.has(messageId))grouped.set(messageId,new Map());
+  const byEmoji=grouped.get(messageId);
+  if(!byEmoji.has(emoji))byEmoji.set(emoji,{emoji,count:0,mine:false});
+  const item=byEmoji.get(emoji);
+  item.count+=1;
+  if(String(row.user_id||'')===current)item.mine=true;
+ }
+ return Object.fromEntries([...grouped.entries()].map(([messageId,items])=>[
+  messageId,[...items.values()].sort((a,b)=>b.count-a.count||a.emoji.localeCompare(b.emoji))
+ ]));
+}
+async function reactionsForConversation(env,current,conversationId){
+ const result=await env.DB.prepare(`
+  SELECT r.message_id,r.user_id,r.emoji,r.created_at
+  FROM questlog_message_reactions r
+  JOIN questlog_messages m ON m.message_id=r.message_id
+  WHERE r.conversation_id=? AND m.conversation_id=?
+    AND m.message_id IN (
+      SELECT message_id FROM questlog_messages
+      WHERE conversation_id=?
+      ORDER BY created_at DESC,message_id DESC
+      LIMIT 200
+    )
+  ORDER BY r.created_at ASC
+ `).bind(conversationId,conversationId,conversationId).all();
+ return reactionGroups(result.results||[],current);
 }
 function publicConversation(row,current,members,last={}){
  const directOther=row.type==='direct'?members.find(member=>member.userId!==current):null;
@@ -215,9 +258,11 @@ export async function listMessages(env,identity,conversationId,{after='',limit=1
    ) ORDER BY created_at ASC,message_id ASC
   `).bind(row.conversation_id,bounded).all();
  }
+ const reactionMap=await reactionsForConversation(env,current,row.conversation_id);
  const messages=(result.results||[]).map(message=>({
   messageId:String(message.message_id||''),conversationId:String(message.conversation_id||''),body:String(message.body||''),
-  createdAt:message.created_at||null,editedAt:message.edited_at||null,sender:person(message),mine:String(message.sender_user_id||'')===current
+  createdAt:message.created_at||null,editedAt:message.edited_at||null,sender:person(message),mine:String(message.sender_user_id||'')===current,
+  reactions:reactionMap[String(message.message_id||'')]||[]
  }));
  await env.DB.prepare("UPDATE questlog_conversation_members SET last_read_at=datetime('now') WHERE conversation_id=? AND user_id=?").bind(row.conversation_id,current).run();
  return{messages};
@@ -235,11 +280,37 @@ export async function sendMessage(env,identity,conversationId,input={}){
  const user=await env.DB.prepare('SELECT user_id,primary_email,display_name,avatar_data FROM questlog_users WHERE user_id=?').bind(current).first();
  const members=await membersFor(env,row.conversation_id);
  return{
-  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:stored?.created_at||new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true},
+  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:stored?.created_at||new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true,reactions:[]},
   recipients:members.filter(member=>member.userId!==current).map(member=>member.userId),
   conversation:{conversationId:row.conversation_id,type:row.type,title:row.title||'',members}
  };
 }
+export async function listMessageReactions(env,identity,conversationId){
+ const current=accountId(identity),row=await memberRow(env,current,conversationId);
+ return{reactions:await reactionsForConversation(env,current,row.conversation_id)};
+}
+export async function toggleMessageReaction(env,identity,conversationId,messageId,input={}){
+ const current=accountId(identity),row=await memberRow(env,current,conversationId),id=clean(messageId,120),emoji=clean(input.emoji,16);
+ if(!emoji)fail('Choose an emoji reaction.');
+ const message=await env.DB.prepare('SELECT message_id FROM questlog_messages WHERE conversation_id=? AND message_id=? LIMIT 1').bind(row.conversation_id,id).first();
+ if(!message)fail('Message not found.',404);
+ const existing=await env.DB.prepare('SELECT emoji FROM questlog_message_reactions WHERE conversation_id=? AND message_id=? AND user_id=? LIMIT 1').bind(row.conversation_id,id,current).first();
+ if(existing&&String(existing.emoji||'')===emoji){
+  await env.DB.prepare('DELETE FROM questlog_message_reactions WHERE conversation_id=? AND message_id=? AND user_id=?').bind(row.conversation_id,id,current).run();
+ }else{
+  await env.DB.prepare(`
+   INSERT INTO questlog_message_reactions(message_id,conversation_id,user_id,emoji,created_at)
+   VALUES(?,?,?,?,datetime('now'))
+   ON CONFLICT(message_id,user_id) DO UPDATE SET
+    conversation_id=excluded.conversation_id,
+    emoji=excluded.emoji,
+    created_at=datetime('now')
+  `).bind(id,row.conversation_id,current,emoji).run();
+ }
+ const reactions=await reactionsForConversation(env,current,row.conversation_id);
+ return{messageId:id,reactions:reactions[id]||[]};
+}
+
 async function assertGroup(env,current,conversationId){
  const row=await memberRow(env,current,conversationId);
  if(row.type!=='group')fail('Shared calendars are available for groups only.',400);
