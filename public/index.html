@@ -2662,7 +2662,7 @@ function renderSocialProfileData(data){
  root.dataset.profileAccent=profile.profileAccent||'quest';
  const actions=isSelf
    ?'<button class="btn primary" id="profileEditButton" type="button">Edit profile</button><button class="btn" id="profileFriendsButton" type="button">Friends</button><button class="btn" id="profileNotificationsButton" type="button">Notifications</button><button class="btn" id="profileSettingsButton" type="button">Settings</button>'
-   :'<button class="btn" type="button" disabled>Friends</button>';
+   :'<button class="btn primary" id="profileMessageButton" type="button">Message</button><button class="btn" type="button" disabled>Friends</button>';
  const privacy=isSelf?'<span class="social-profile-badge">'+(profile.profileVisibility==='private'?'Private':'Friends only')+'</span>':'<span class="social-profile-badge">Friend</span>';
  const streaks=data.streaks;
  const streakHtml=streaks?'<div class="profile-streak-grid"><div class="profile-streak-card"><strong>'+esc(streaks.current||0)+'</strong><span>Current streak</span></div><div class="profile-streak-card"><strong>'+esc(streaks.longest||0)+'</strong><span>Longest streak</span></div><div class="profile-streak-card"><strong>'+esc(streaks.activeDays||0)+'</strong><span>Active days</span></div></div>':'';
@@ -2697,6 +2697,7 @@ function renderSocialProfileData(data){
  root.querySelectorAll('[data-profile-user]').forEach(button=>button.onclick=()=>openProfile(button.dataset.profileUser));
  if($('profileEditButton'))$('profileEditButton').onclick=openManageAccountModal;
  if($('profileFriendsButton'))$('profileFriendsButton').onclick=openFriendsModal;
+ if($('profileMessageButton'))$('profileMessageButton').onclick=()=>startDirectMessage(profile.userId);
  if($('profileNotificationsButton'))$('profileNotificationsButton').onclick=openNotificationCenter;
  if($('profileSettingsButton'))$('profileSettingsButton').onclick=()=>setView('settings');
 }
