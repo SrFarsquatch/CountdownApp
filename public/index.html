@@ -1541,6 +1541,7 @@ body.modal-open{overflow:hidden}
 .message-row{display:flex;gap:8px;align-items:flex-end;max-width:min(72%,620px)}.message-row.mine{align-self:flex-end;flex-direction:row-reverse}.message-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--panel2);font-size:8px;font-weight:900;flex:0 0 auto}.message-avatar img{width:100%;height:100%;object-fit:cover}
 .message-content{min-width:0;position:relative}.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;touch-action:pan-y;-webkit-user-select:none;user-select:none}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time{font-size:8px;color:var(--muted);margin-top:3px;padding:0 5px}.message-row.mine .message-time{text-align:right}.message-date-divider{align-self:stretch;display:flex;align-items:center;gap:10px;margin:8px 0 4px;color:var(--muted);font-size:9px}.message-date-divider:before,.message-date-divider:after{content:"";height:1px;background:var(--line);flex:1}.message-date-divider span{padding:0 4px}.message-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.message-row.mine .message-reactions{justify-content:flex-end}.message-reaction{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 6px;font-size:12px;display:inline-flex;gap:3px;align-items:center}.message-reaction.mine{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft)}.message-reaction span{font-size:9px;font-weight:800}.message-reaction-picker{position:absolute;z-index:25;bottom:calc(100% + 8px);left:0;display:flex;gap:2px;padding:5px 6px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 96%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.16);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);opacity:0;transform:translateY(6px) scale(.96);pointer-events:none;transition:opacity .12s ease,transform .12s ease;white-space:nowrap}.message-row.mine .message-reaction-picker{left:auto;right:0}.message-row.reaction-picker-open .message-reaction-picker{opacity:1;transform:none;pointer-events:auto}.message-reaction-picker button{width:34px;height:34px;border:0;background:transparent;border-radius:50%;padding:0;font-size:18px;display:grid;place-items:center;cursor:pointer}.message-reaction-picker button:hover,.message-reaction-picker button:focus-visible{background:var(--panel2);outline:none}
 .chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line);background:var(--panel)}.chat-compose textarea{min-height:42px;max-height:120px;resize:none;border-radius:21px!important;padding:10px 14px!important;background:var(--panel2)!important;border:1px solid transparent!important}.chat-compose textarea:focus{background:var(--panel)!important;border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important}.chat-compose .btn{align-self:end;min-height:42px;border-radius:21px;padding:8px 16px}
+.group-calendar-event{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--event-color) 34%,transparent)}
 .group-calendar-pane{grid-template-rows:auto minmax(0,1fr)}.group-calendar-toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.group-calendar-toolbar h3{margin:0}.group-calendar-events{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}.group-event-card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:12px;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:center;cursor:pointer}.group-event-date{display:grid;place-items:center;background:var(--panel2);border-radius:10px;padding:8px 4px}.group-event-date strong{font-size:20px;line-height:1}.group-event-date span{font-size:9px;color:var(--muted);font-weight:850;margin-top:3px}.group-event-copy strong{display:block}.group-event-copy .meta{margin-top:4px}.group-event-edit{font-size:10px;color:var(--muted)}
 .group-member-grid{display:grid;gap:7px}.group-member-row{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-member-row .friend-avatar{width:36px;height:36px}.group-create-members{display:grid;gap:6px;max-height:260px;overflow:auto}.group-create-member{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-create-member input{width:18px;height:18px;min-height:0}
 .mobile-message-badge{position:absolute;top:8px;left:calc(50% + 7px);min-width:17px;height:17px;border-radius:999px;background:#d93025;color:#fff;border:2px solid var(--panel);display:grid;place-items:center;font-size:8px;font-weight:900;padding:0 3px}.mobile-message-badge[hidden]{display:none!important}
@@ -3319,8 +3320,8 @@ function openGroupEventModal(event=null){
  if(!activeConversationId||activeConversation?.type!=='group')return;
  const editing=Boolean(event),start=event?.start?new Date(event.start):new Date(Date.now()+3600000),end=event?.end?new Date(event.end):new Date(start.getTime()+3600000);
  openModal(editing?'Edit group event':'New group event','<form id="groupEventForm"><div class="form-grid"><div class="field full"><label>Title</label><input id="groupEventTitle" required value="'+esc(event?.title||'')+'" placeholder="Dinner, practice, trip…"></div><div class="field"><label>Start</label><input id="groupEventStart" type="datetime-local" value="'+localInput(start)+'" required></div><div class="field"><label>End</label><input id="groupEventEnd" type="datetime-local" value="'+localInput(end)+'" required></div><div class="field full"><label><input id="groupEventAllDay" type="checkbox" style="width:auto" '+(event?.allDay?'checked':'')+'> All day</label></div><div class="field full"><label>Location</label><input id="groupEventLocation" value="'+esc(event?.location||'')+'" placeholder="Optional"></div><div class="field full"><label>Notes</label><textarea id="groupEventDescription" placeholder="Optional">'+esc(event?.description||'')+'</textarea></div></div><div class="modal-actions">'+(editing?'<button class="btn" id="deleteGroupEvent" type="button">Delete</button>':'')+'<button class="btn primary" type="submit">'+(editing?'Save changes':'Add to group calendar')+'</button></div></form>');
- $('groupEventForm').onsubmit=async e=>{e.preventDefault();const payload={title:$('groupEventTitle').value.trim(),start:zonedInputToIso($('groupEventStart').value),end:zonedInputToIso($('groupEventEnd').value),allDay:$('groupEventAllDay').checked,location:$('groupEventLocation').value.trim(),description:$('groupEventDescription').value};await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events'+(editing?'/'+encodeURIComponent(event.eventId):''),{method:editing?'PUT':'POST',body:JSON.stringify(payload)});closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
- if(editing&&$('deleteGroupEvent'))$('deleteGroupEvent').onclick=async()=>{if(!confirm('Delete this event from the group calendar?'))return;await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events/'+encodeURIComponent(event.eventId),{method:'DELETE'});closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
+ $('groupEventForm').onsubmit=async e=>{e.preventDefault();const payload={title:$('groupEventTitle').value.trim(),start:zonedInputToIso($('groupEventStart').value),end:zonedInputToIso($('groupEventEnd').value),allDay:$('groupEventAllDay').checked,location:$('groupEventLocation').value.trim(),description:$('groupEventDescription').value};await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events'+(editing?'/'+encodeURIComponent(event.eventId):''),{method:editing?'PUT':'POST',body:JSON.stringify(payload)});plannerEventCache.clear();closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
+ if(editing&&$('deleteGroupEvent'))$('deleteGroupEvent').onclick=async()=>{if(!confirm('Delete this event from the group calendar?'))return;await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events/'+encodeURIComponent(event.eventId),{method:'DELETE'});plannerEventCache.clear();closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
 }
 
 if($('newDirectMessage'))$('newDirectMessage').onclick=openNewDirectMessage;
@@ -4374,8 +4375,8 @@ function timedBlockHtml(item){
    const t=item.data;
    return'<button type="button" class="calendar-event-block task-time-block'+sizeClass+'" data-cal-task="'+esc(t.id)+'" style="top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(t.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">○ '+esc(t.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div></button>';
  }
- const e=item.data,color=eventColorFor(e);
- return'<button type="button" class="calendar-event-block'+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc(e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||'Google Calendar')+'</div></button>';
+ const e=item.data,color=eventColorFor(e),groupClass=e.groupEvent?' group-calendar-event':'';
+ return'<button type="button" class="calendar-event-block'+groupClass+sizeClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+color+';top:'+top+'px;height:'+height+'px;left:calc('+left+'% + 3px);width:calc('+width+'% - 6px)" title="'+esc((e.groupEvent?'Group · '+(e.groupTitle||'Group')+' · ':'')+e.title)+' · '+esc(fmtTime(item.start))+' – '+esc(fmtTime(item.end))+'"><div class="cal-block-title">'+esc(e.title)+'</div><div class="cal-block-time">'+fmtTime(item.start)+' – '+fmtTime(item.end)+'</div><div class="cal-block-source">'+esc(e.calendarName||'Google Calendar')+'</div></button>';
 }
 function calendarItemsForDay(day,next,eventSource=calEvents){
  const events=eventSource.filter(e=>!e.allDay&&eventOverlapsDay(e,day,next)).map(e=>({kind:'event',data:e,start:new Date(e.start),end:new Date(e.end||e.start),zonedStartMinutes:zonedMinutes(e.start),zonedEndMinutes:zonedMinutes(e.end||e.start)}));
@@ -4383,7 +4384,8 @@ function calendarItemsForDay(day,next,eventSource=calEvents){
  return layoutTimedItems([...events,...tasks],day,next);
 }
 function allDayChip(e){
- return'<button type="button" class="all-day-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(e.title)+'</button>';
+ const marker=e.groupEvent?'◆ ':'',groupClass=e.groupEvent?' group-calendar-event':'';
+ return'<button type="button" class="all-day-chip'+groupClass+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc((e.groupEvent?'Group · '+(e.groupTitle||'Group')+' · ':'')+e.title)+'">'+marker+esc(e.title)+'</button>';
 }
 function timelineFocusDate(range,eventSource=calEvents){
  const now=new Date();if(now>=range.start&&now<range.end)return now;
@@ -4421,7 +4423,21 @@ function bindCalendarInteractions(root=$('calendarStage')){
    eventModal(null,{allDay:true,startDate:cell.dataset.day,endDate:cell.dataset.day});
  });
 }
+function groupPlannerEventModal(e){
+ let body='<div class="event-detail-grid">';
+ body+='<div class="event-detail-row"><strong>When</strong><div>'+(e.allDay?'All day · '+fmtDate(e.start,{year:'numeric'}):fmtDate(e.start,{weekday:'long',year:'numeric'})+' · '+fmtTime(e.start)+' – '+fmtTime(e.end))+'</div></div>';
+ body+='<div class="event-detail-row"><strong>Group</strong><div><span class="cal-dot" style="background:'+eventColorFor(e)+'"></span> '+esc(e.groupTitle||'Group')+'<div class="meta">Shared group calendar</div></div></div>';
+ if(e.location)body+='<div class="event-detail-row"><strong>Location</strong><div>'+esc(e.location)+'</div></div>';
+ if(e.description)body+='<div class="event-detail-row"><strong>Notes</strong><div>'+esc(e.description).replace(/\n/g,'<br>')+'</div></div>';
+ body+='<div class="modal-actions"><button class="btn primary" id="openPlannerGroupCalendar" type="button">Open group calendar</button></div></div>';
+ openModal(e.title||'Group event',body);
+ if($('openPlannerGroupCalendar'))$('openPlannerGroupCalendar').onclick=()=>{
+   closeModal();
+   openConversation(e.groupConversationId,{tab:'calendar'});
+ };
+}
 function calendarEventModal(e){
+ if(e?.groupEvent)return groupPlannerEventModal(e);
  const link=safeHttpUrl(e.htmlLink),account=(state.google.accounts||[]).find(a=>a.id===e.accountId);
  const calendarWritable=['writer','owner'].includes(e.accessRole||''),canEdit=e.shared?Boolean(e.canEdit):(Boolean(account?.canWrite)&&calendarWritable);
  let body='<div class="event-detail-grid">';
@@ -4485,8 +4501,8 @@ function renderWeek(range){
  bindCalendarInteractions();scrollTimeline(range);
 }
 function monthEventChip(e){
- const prefix=e.allDay?'':fmtTime(e.start)+' ';
- return'<button type="button" class="month-chip" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc(e.title)+'">'+esc(prefix+e.title)+'</button>';
+ const prefix=(e.allDay?'':fmtTime(e.start)+' ')+(e.groupEvent?'◆ ':'');
+ return'<button type="button" class="month-chip'+(e.groupEvent?' group-calendar-event':'')+'" data-event-key="'+esc(eventKey(e))+'" style="--event-color:'+eventColorFor(e)+'" title="'+esc((e.groupEvent?'Group · '+(e.groupTitle||'Group')+' · ':'')+e.title)+'">'+esc(prefix+e.title)+'</button>';
 }
 function buildMonthHtml(range,anchor=plannerAnchor,eventSource=calEvents){
  const mobile=isMobileUi(),limit=mobile?2:3;
@@ -4511,7 +4527,7 @@ function renderMonth(range){
 }
 function plannerRangeKey(range){return range.start.toISOString()+'|'+range.end.toISOString()}
 async function fetchPlannerEvents(range){
- if(!state.google.connected)return[];
+ if(!state.google.connected&&runtimeInfo?.runtime!=='cloudflare')return[];
  const key=plannerRangeKey(range),cached=plannerEventCache.get(key);
  if(cached?.events)return cached.events;
  if(cached?.promise)return cached.promise;
@@ -4536,7 +4552,7 @@ function rangeForAnchor(anchor,view=plannerView){
  return range;
 }
 function prefetchPlannerNeighbors(){
- if(!state.google.connected)return;
+ if(!state.google.connected&&runtimeInfo?.runtime!=='cloudflare')return;
  for(const direction of [-1,1]){
    const anchor=shiftedAnchor(plannerAnchor,direction,plannerView),range=rangeForAnchor(anchor,plannerView);
    fetchPlannerEvents(range).catch(()=>{});
