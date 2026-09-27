@@ -1557,7 +1557,11 @@ body.modal-open{overflow:hidden}
  body.messages-mode .content{padding:0!important;max-width:none;margin:0}
  body.messages-mode #view-messages.on{
    position:fixed;
-   inset:0;
+   top:var(--messages-viewport-top,0px);
+   left:0;
+   right:0;
+   bottom:auto;
+   height:var(--messages-viewport-height,100dvh);
    z-index:48;
    display:block;
    min-width:0;
@@ -1568,7 +1572,7 @@ body.modal-open{overflow:hidden}
  }
  body.messages-mode .messages-page{
    width:100%;
-   height:calc(100dvh - env(safe-area-inset-top,0px));
+   height:calc(100% - env(safe-area-inset-top,0px));
    min-height:0;
    max-width:none;
    margin:0;
@@ -2616,8 +2620,11 @@ function renderAppView(name){
  if(visibleView==='planner')setPlannerSection(requestedPlannerSection||'calendar',{render:true});
  if(visibleView==='settings')setSettingsSection(requestedSettingsSection||'general',{render:true});
  if(visibleView==='profile')renderSocialProfile().catch(console.warn);
- if(visibleView==='messages'){renderMessagesView();scheduleMessagePoll(0)}
- else clearTimeout(messagePollTimer);
+ if(visibleView==='messages'){
+   syncMessageViewport({keepBottom:Boolean(activeConversationId)});
+   renderMessagesView();
+   scheduleMessagePoll(0);
+ }else clearTimeout(messagePollTimer);
  if(name==='markets'){renderFinance();renderMarkets();loadMarketHistory().catch(console.warn);}
 }
 function setView(name,{historyMode='push'}={}){
@@ -2951,6 +2958,36 @@ function renderConversationList(){
  }).join(''):'<div class="empty">'+(query?'No conversations match your search.':'No conversations yet.<div class="meta" style="margin-top:5px">Message a friend or make a group.</div>')+'</div>';
  root.querySelectorAll('[data-conversation-id]').forEach(button=>button.onclick=()=>openConversation(button.dataset.conversationId));
 }
+function scrollMessagesToBottom(force=false){
+ const root=$('messageList');if(!root)return;
+ const nearBottom=root.scrollHeight-root.scrollTop-root.clientHeight<120;
+ if(!force&&!nearBottom)return;
+ requestAnimationFrame(()=>{root.scrollTop=root.scrollHeight});
+}
+function messageViewportMetrics(){
+ const viewport=window.visualViewport;
+ const height=Math.max(240,Math.round(viewport?.height||window.innerHeight||document.documentElement.clientHeight||0));
+ const top=Math.max(0,Math.round(viewport?.offsetTop||0));
+ return{height,top};
+}
+let messageViewportRaf=0;
+function syncMessageViewport({keepBottom=false}={}){
+ if(!window.matchMedia('(max-width:760px)').matches)return;
+ const {height,top}=messageViewportMetrics();
+ document.documentElement.style.setProperty('--messages-viewport-height',height+'px');
+ document.documentElement.style.setProperty('--messages-viewport-top',top+'px');
+ if(document.body.classList.contains('messages-mode')&&(keepBottom||document.activeElement===$('messageInput')))scrollMessagesToBottom(true);
+}
+function queueMessageViewportSync(keepBottom=false){
+ cancelAnimationFrame(messageViewportRaf);
+ messageViewportRaf=requestAnimationFrame(()=>syncMessageViewport({keepBottom}));
+}
+if(window.visualViewport){
+ window.visualViewport.addEventListener('resize',()=>queueMessageViewportSync(true));
+ window.visualViewport.addEventListener('scroll',()=>queueMessageViewportSync(true));
+}
+window.addEventListener('resize',()=>queueMessageViewportSync(true));
+
 function renderMessageItems(){
  const root=$('messageList');if(!root)return;
  if(!messageItems.length){root.innerHTML='<div class="empty">No messages yet. Say hello.</div>';return}
@@ -2961,7 +2998,7 @@ function renderMessageItems(){
      '<div><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div><div class="message-time">'+esc(messageTimestamp(message.createdAt))+'</div></div>'+
    '</div>';
  }).join('');
- root.scrollTop=root.scrollHeight;
+ scrollMessagesToBottom(true);
 }
 function renderGroupCalendar(){
  const root=$('groupCalendarEvents');if(!root)return;
@@ -3123,11 +3160,21 @@ if($('conversationSearch'))$('conversationSearch').oninput=event=>{conversationS
 if($('messagesBack'))$('messagesBack').onclick=closeConversationMobile;
 if($('groupMembersButton'))$('groupMembersButton').onclick=openGroupMembers;
 if($('newGroupEvent'))$('newGroupEvent').onclick=()=>openGroupEventModal();
+if($('messageInput')){
+ $('messageInput').addEventListener('focus',()=>{
+   queueMessageViewportSync(true);
+   setTimeout(()=>queueMessageViewportSync(true),60);
+   setTimeout(()=>queueMessageViewportSync(true),260);
+ });
+ $('messageInput').addEventListener('blur',()=>{
+   setTimeout(()=>queueMessageViewportSync(false),80);
+ });
+}
 if($('messageForm'))$('messageForm').onsubmit=async e=>{
  e.preventDefault();if(!activeConversationId)return;const input=$('messageInput'),value=input.value.trim();if(!value)return;
  const button=e.currentTarget.querySelector('button');button.disabled=true;
  try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages',{method:'POST',body:JSON.stringify({body:value})});input.value='';messageItems.push(result.message);renderMessageItems();await loadConversations(true);renderConversationList()}
- finally{button.disabled=false;input.focus()}
+ finally{button.disabled=false;input.focus();queueMessageViewportSync(true)}
 };
 document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.onclick=async()=>{
  if(!activeConversation)return;activeConversationTab=button.dataset.conversationTab==='calendar'?'calendar':'chat';
