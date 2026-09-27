@@ -19,7 +19,7 @@ import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile, mutualFriends } from './friends.js';
-import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listMessageReactions, toggleMessageReaction, listGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
+import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listMessageReactions, toggleMessageReaction, listGroupEvents, listUserGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
@@ -816,9 +816,16 @@ async function handleApi(request,env,identity){
     return json({ok:true,sync});
   }
   if(p==='/api/google/events'&&method==='GET'){
-    const from=url.searchParams.get('from'),to=url.searchParams.get('to'),ownEvents=await eventsBetween(from,to,state,env);
+    const from=url.searchParams.get('from'),to=url.searchParams.get('to');
+    let ownEvents=[];
+    if(state.google?.connected||state.google?.accounts?.length)ownEvents=await eventsBetween(from,to,state,env);
     await refreshOwnedShareSnapshots(env,identity,'event',ownEvents);
-    return json({events:await mergeSharedEvents(env,identity,ownEvents,from,to)});
+    const [sharedEvents,groupEvents]=await Promise.all([
+      mergeSharedEvents(env,identity,ownEvents,from,to),
+      runtime==='cloudflare'?listUserGroupEvents(env,identity,{from,to}):Promise.resolve([])
+    ]);
+    const merged=[...sharedEvents,...groupEvents].sort((a,b)=>new Date(a.start)-new Date(b.start));
+    return json({events:merged});
   }
   const eventMatch=p.match(/^\/api\/google\/accounts\/([^/]+)\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
   if(eventMatch){
