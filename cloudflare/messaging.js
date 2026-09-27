@@ -24,68 +24,74 @@ function person(row,prefix=''){
   avatarData:String(row[p+'avatar_data']||'')
  };
 }
+let messagingSchemaReady=null;
 export async function ensureMessagingSchema(env){
  if(!env.DB)throw new Error('Cloudflare D1 binding DB is not configured.');
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_conversations(
-   conversation_id TEXT PRIMARY KEY,
-   type TEXT NOT NULL,
-   title TEXT,
-   direct_key TEXT UNIQUE,
-   created_by TEXT NOT NULL,
-   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
- `).run();
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_conversation_members(
-   conversation_id TEXT NOT NULL,
-   user_id TEXT NOT NULL,
-   role TEXT NOT NULL DEFAULT 'member',
-   joined_at TEXT NOT NULL DEFAULT (datetime('now')),
-   last_read_at TEXT,
-   PRIMARY KEY(conversation_id,user_id)
-  )
- `).run();
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_messages(
-   message_id TEXT PRIMARY KEY,
-   conversation_id TEXT NOT NULL,
-   sender_user_id TEXT NOT NULL,
-   body TEXT NOT NULL,
-   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-   edited_at TEXT
-  )
- `).run();
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_message_reactions(
-   message_id TEXT NOT NULL,
-   conversation_id TEXT NOT NULL,
-   user_id TEXT NOT NULL,
-   emoji TEXT NOT NULL,
-   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-   PRIMARY KEY(message_id,user_id)
-  )
- `).run();
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_group_events(
-   event_id TEXT PRIMARY KEY,
-   conversation_id TEXT NOT NULL,
-   title TEXT NOT NULL,
-   description TEXT,
-   location TEXT,
-   start_at TEXT NOT NULL,
-   end_at TEXT NOT NULL,
-   all_day INTEGER NOT NULL DEFAULT 0,
-   created_by TEXT NOT NULL,
-   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
- `).run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_conv_members_user ON questlog_conversation_members(user_id,conversation_id)').run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_messages_conv ON questlog_messages(conversation_id,created_at)').run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_reactions_conv ON questlog_message_reactions(conversation_id,message_id)').run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_group_events_conv ON questlog_group_events(conversation_id,start_at,end_at)').run();
+ if(!messagingSchemaReady){
+  messagingSchemaReady=env.DB.batch([
+   env.DB.prepare(\`
+    CREATE TABLE IF NOT EXISTS questlog_conversations(
+     conversation_id TEXT PRIMARY KEY,
+     type TEXT NOT NULL,
+     title TEXT,
+     direct_key TEXT UNIQUE,
+     created_by TEXT NOT NULL,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+   \`),
+   env.DB.prepare(\`
+    CREATE TABLE IF NOT EXISTS questlog_conversation_members(
+     conversation_id TEXT NOT NULL,
+     user_id TEXT NOT NULL,
+     role TEXT NOT NULL DEFAULT 'member',
+     joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+     last_read_at TEXT,
+     PRIMARY KEY(conversation_id,user_id)
+    )
+   \`),
+   env.DB.prepare(\`
+    CREATE TABLE IF NOT EXISTS questlog_messages(
+     message_id TEXT PRIMARY KEY,
+     conversation_id TEXT NOT NULL,
+     sender_user_id TEXT NOT NULL,
+     body TEXT NOT NULL,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     edited_at TEXT
+    )
+   \`),
+   env.DB.prepare(\`
+    CREATE TABLE IF NOT EXISTS questlog_message_reactions(
+     message_id TEXT NOT NULL,
+     conversation_id TEXT NOT NULL,
+     user_id TEXT NOT NULL,
+     emoji TEXT NOT NULL,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY(message_id,user_id)
+    )
+   \`),
+   env.DB.prepare(\`
+    CREATE TABLE IF NOT EXISTS questlog_group_events(
+     event_id TEXT PRIMARY KEY,
+     conversation_id TEXT NOT NULL,
+     title TEXT NOT NULL,
+     description TEXT,
+     location TEXT,
+     start_at TEXT NOT NULL,
+     end_at TEXT NOT NULL,
+     all_day INTEGER NOT NULL DEFAULT 0,
+     created_by TEXT NOT NULL,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+   \`),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_conv_members_user ON questlog_conversation_members(user_id,conversation_id)'),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_messages_conv ON questlog_messages(conversation_id,created_at)'),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_reactions_conv ON questlog_message_reactions(conversation_id,message_id)'),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_group_events_conv ON questlog_group_events(conversation_id,start_at,end_at)')
+  ]).then(()=>undefined).catch(error=>{messagingSchemaReady=null;throw error});
+ }
+ return messagingSchemaReady;
 }
 async function acceptedFriend(env,current,target){
  const low=String(current)<String(target)?String(current):String(target),high=String(current)<String(target)?String(target):String(current);
@@ -120,6 +126,26 @@ async function membersFor(env,conversationId){
   ORDER BY CASE WHEN cm.role='owner' THEN 0 ELSE 1 END, lower(COALESCE(u.display_name,u.primary_email,''))
  `).bind(conversationId).all();
  return(result.results||[]).map(row=>({...person(row),role:String(row.role||'member'),joinedAt:dbIso(row.joined_at)}));
+}
+async function membersForConversations(env,conversationIds=[]){
+ const ids=[...new Set((conversationIds||[]).map(value=>clean(value,120)).filter(Boolean))];
+ const grouped=new Map(ids.map(id=>[id,[]]));
+ for(let offset=0;offset<ids.length;offset+=90){
+  const chunk=ids.slice(offset,offset+90),placeholders=chunk.map(()=>'?').join(',');
+  const result=await env.DB.prepare(\`
+   SELECT cm.conversation_id,cm.user_id,cm.role,cm.joined_at,u.primary_email,u.display_name,u.avatar_data
+   FROM questlog_conversation_members cm
+   JOIN questlog_users u ON u.user_id=cm.user_id
+   WHERE cm.conversation_id IN (\${placeholders}) AND u.status='active'
+   ORDER BY cm.conversation_id,CASE WHEN cm.role='owner' THEN 0 ELSE 1 END,lower(COALESCE(u.display_name,u.primary_email,''))
+  \`).bind(...chunk).all();
+  for(const row of result.results||[]){
+   const conversationId=String(row.conversation_id||'');
+   if(!grouped.has(conversationId))grouped.set(conversationId,[]);
+   grouped.get(conversationId).push({...person(row),role:String(row.role||'member'),joinedAt:dbIso(row.joined_at)});
+  }
+ }
+ return grouped;
 }
 function reactionGroups(rows=[],current=''){
  const grouped=new Map();
@@ -175,7 +201,7 @@ function publicConversation(row,current,members,last={}){
 export async function listConversations(env,identity){
  await ensureMessagingSchema(env);
  const current=accountId(identity);
- const result=await env.DB.prepare(`
+ const result=await env.DB.prepare(\`
   SELECT c.*,cm.role,cm.joined_at,cm.last_read_at,
    (SELECT body FROM questlog_messages m WHERE m.conversation_id=c.conversation_id ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1) AS last_body,
    (SELECT sender_user_id FROM questlog_messages m WHERE m.conversation_id=c.conversation_id ORDER BY m.created_at DESC,m.message_id DESC LIMIT 1) AS last_sender_user_id,
@@ -186,12 +212,15 @@ export async function listConversations(env,identity){
   WHERE cm.user_id=?
   ORDER BY COALESCE(last_message_at,c.updated_at) DESC
   LIMIT 100
- `).bind(current,current).all();
- const conversations=[];
- for(const row of result.results||[]){
-  const members=await membersFor(env,row.conversation_id);
-  conversations.push(publicConversation(row,current,members,{body:row.last_body,created_at:row.last_message_at,sender_user_id:row.last_sender_user_id,unread_count:row.unread_count}));
- }
+ \`).bind(current,current).all();
+ const rows=result.results||[];
+ const membersByConversation=await membersForConversations(env,rows.map(row=>row.conversation_id));
+ const conversations=rows.map(row=>publicConversation(
+  row,
+  current,
+  membersByConversation.get(String(row.conversation_id||''))||[],
+  {body:row.last_body,created_at:row.last_message_at,sender_user_id:row.last_sender_user_id,unread_count:row.unread_count}
+ ));
  return{conversations,unreadCount:conversations.reduce((sum,item)=>sum+item.unreadCount,0)};
 }
 export async function createDirectConversation(env,identity,targetUserId){
@@ -265,7 +294,7 @@ export async function listMessages(env,identity,conversationId,{after='',limit=1
    ) ORDER BY created_at ASC,message_id ASC
   `).bind(row.conversation_id,bounded).all();
  }
- const reactionMap=await reactionsForConversation(env,current,row.conversation_id);
+ const reactionMap=after?{}:await reactionsForConversation(env,current,row.conversation_id);
  const messages=(result.results||[]).map(message=>({
   messageId:String(message.message_id||''),conversationId:String(message.conversation_id||''),body:String(message.body||''),
   createdAt:dbIso(message.created_at),editedAt:dbIso(message.edited_at),sender:person(message),mine:String(message.sender_user_id||'')===current,
