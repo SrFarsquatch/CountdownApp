@@ -14,6 +14,18 @@ async function configureAndroid() {
   if (!await exists(file)) return { platform: 'android', status: 'not-created' };
 
   let xml = await readFile(file, 'utf8');
+
+  // Keep the WebView sized to the visible area when the software keyboard opens.
+  // This is especially important for the full-screen Messages composer.
+  if (/android:windowSoftInputMode="[^"]*"/.test(xml)) {
+    xml = xml.replace(/android:windowSoftInputMode="[^"]*"/, 'android:windowSoftInputMode="adjustResize"');
+  } else {
+    const activityMatch = xml.match(/<activity\b[^>]*android:name="\.MainActivity"[^>]*>/);
+    if (!activityMatch) throw new Error('Could not locate Android MainActivity activity element.');
+    const updatedActivity = activityMatch[0].replace(/>$/, ' android:windowSoftInputMode="adjustResize">');
+    xml = xml.replace(activityMatch[0], updatedActivity);
+  }
+
   const drawableDir = resolve(root, 'android/app/src/main/res/drawable');
   await mkdir(drawableDir, { recursive: true });
   const pushIcon = resolve(drawableDir, 'ic_stat_questlog.xml');
