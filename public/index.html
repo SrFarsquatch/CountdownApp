@@ -2834,8 +2834,8 @@ async function openManageAccountModal(){
        displayName:$('profileDisplayName').value.trim(),avatarData:avatarDraft,bio:$('profileBio').value.trim(),
        profileVisibility:$('profileVisibility').value,profileAccent:$('profileAccent').value,profileSettings,pinnedGoalIds
      })});
-     runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;renderRuntimeSession();
-     if(activeAppRoute==='profile'){activeProfileUserId=updated.userId;profileViewData=null;renderSocialProfile(true).catch(console.warn)}
+     runtimeInfo.profile=updated;runtimeInfo.user=updated.email||runtimeInfo.user;profileViewCache.delete(String(updated.userId||''));renderRuntimeSession();
+     if(activeAppRoute==='profile'){activeProfileUserId=updated.userId;profileViewData=instantProfileSnapshot(updated.userId);renderSocialProfile(true).catch(console.warn)}
      closeModal();
    }catch(error){status.textContent=error.message||'Could not save profile.';status.className='profile-status error';save.disabled=false}
  };
@@ -3070,6 +3070,13 @@ async function loadConversations(force=false){
  }catch(error){console.warn('Could not load conversations',error);return conversationData}
  finally{messageLoading=false}
 }
+function prefetchConversationMessages(conversationId){
+ const id=String(conversationId||'');
+ if(!id||messageCache.has(id))return;
+ api('/api/conversations/'+encodeURIComponent(id)+'/messages?limit=150').then(result=>{
+   if(!messageCache.has(id))messageCache.set(id,result.messages||[]);
+ }).catch(()=>{});
+}
 function renderConversationList(){
  const root=$('conversationList');if(!root)return;
  const all=conversationData?.conversations||[],query=String(conversationSearchQuery||'').trim().toLowerCase();
@@ -3085,7 +3092,11 @@ function renderConversationList(){
      '<span class="conversation-meta"><span class="conversation-time">'+esc(conversationRelativeTime(conversation.lastMessageAt||conversation.updatedAt))+'</span>'+(conversation.unreadCount?'<span class="message-unread" aria-label="'+esc(conversation.unreadCount)+' unread"></span>':'')+'</span>'+
    '</button>';
  }).join(''):'<div class="empty">'+(query?'No conversations match your search.':'No conversations yet.<div class="meta" style="margin-top:5px">Message a friend or make a group.</div>')+'</div>';
- root.querySelectorAll('[data-conversation-id]').forEach(button=>button.onclick=()=>openConversation(button.dataset.conversationId));
+ root.querySelectorAll('[data-conversation-id]').forEach(button=>{
+   button.onpointerdown=()=>prefetchConversationMessages(button.dataset.conversationId);
+   button.onmouseenter=()=>prefetchConversationMessages(button.dataset.conversationId);
+   button.onclick=()=>openConversation(button.dataset.conversationId);
+ });
 }
 function scrollMessagesToBottom(force=false){
  const root=$('messageList');if(!root)return;
@@ -3278,7 +3289,8 @@ async function loadConversationContent(){
    renderConversationList();renderConversationWorkspace();
  }
  const conversationPromise=listedConversation?Promise.resolve({conversation:listedConversation}):api('/api/conversations/'+encoded);
- const messagesPromise=tab==='chat'?api('/api/conversations/'+encoded+'/messages?limit=150'):Promise.resolve({messages:[]});
+ const prefetched=tab==='chat'?messageCache.get(conversationId):null;
+ const messagesPromise=tab==='chat'?(prefetched?Promise.resolve({messages:prefetched}):api('/api/conversations/'+encoded+'/messages?limit=150')):Promise.resolve({messages:[]});
  const [conversationResult,messageResult]=await Promise.all([conversationPromise,messagesPromise]);
  if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
  activeConversation=conversationResult.conversation||listedConversation||null;
