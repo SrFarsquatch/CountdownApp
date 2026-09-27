@@ -2845,9 +2845,11 @@ async function loadConversationContent(){
  if(activeConversation?.type==='group'){
    try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}catch{groupEventItems=[]}
  }else groupEventItems=[];
- const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
- if(item)item.unreadCount=0;
- conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ if(activeConversationTab==='chat'){
+   const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
+   if(item)item.unreadCount=0;
+   conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ }
  renderConversationList();renderConversationWorkspace();
 }
 async function renderMessagesView(force=false){
