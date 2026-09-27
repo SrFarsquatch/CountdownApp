@@ -112,6 +112,7 @@ export async function removeFriend(env,identity,friendshipId){
 
 
 export async function getSocialProfile(env,identity,targetUserId=''){
+ await ensureFriendsSchema(env);
  const current=userId(identity),target=clean(targetUserId||current,120),isSelf=target===current;
  if(!target){const e=new Error('Profile user is required.');e.status=400;throw e}
  const rowPromise=env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,profile_accent,profile_settings_json,pinned_goal_ids_json,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
