@@ -1,4 +1,4 @@
-const CACHE_NAME='quest-log-pwa-v6';
+const CACHE_NAME='quest-log-pwa-v7';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
