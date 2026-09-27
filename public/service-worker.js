@@ -1,4 +1,4 @@
-const CACHE_NAME='quest-log-pwa-v5';
+const CACHE_NAME='quest-log-pwa-v6';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
@@ -6,7 +6,9 @@ const STATIC_ASSETS=[
   '/branding/icon-quest-192.png',
   '/branding/icon-quest-512.png',
   '/branding/icon-classic-maskable.svg',
-  '/branding/apple-touch-icon.png'
+  '/branding/apple-touch-icon.png',
+  '/integrations.css?v=1',
+  '/integrations-ui.js?v=1'
 ];
 
 self.addEventListener('install',event=>{
