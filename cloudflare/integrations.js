@@ -1,3 +1,4 @@
+import { applyActivityToChallenges } from './challenges.js';
 const clean=(value,max=500)=>String(value==null?'':value).trim().slice(0,max);
 const number=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
@@ -293,10 +294,17 @@ export async function recordNormalizedActivity(env,identity,input={}){
   if(inserted&&xp>0)await updateProgress(env,uid,category,xp,occurredAt);
   const row=await env.DB.prepare('SELECT * FROM questlog_progress_events WHERE user_id=? AND provider_id=? AND source_event_id=?').bind(uid,providerId,sourceEventId).first();
   const profile=await env.DB.prepare('SELECT * FROM questlog_progress_profiles WHERE user_id=?').bind(uid).first();
-  return{ok:true,duplicate:!inserted,event:eventPublic(row||{}),progress:profilePublic(profile)};
+  const publicEvent=eventPublic(row||{});
+  const challengeUpdates=inserted&&pref.challengeEligible?await applyActivityToChallenges(env,identity,publicEvent):[];
+  return{ok:true,duplicate:!inserted,event:publicEvent,progress:profilePublic(profile),challengeUpdates};
 }
 export async function recordFirstPartyActivity(env,identity,input={}){
   const providerId=clean(input.providerId,80);
   if(!new Set(['questlog_focus']).has(providerId)){const error=new Error('This endpoint only accepts first-party Quest Log activities.');error.status=403;throw error}
   return recordNormalizedActivity(env,identity,{...input,providerId,verification:'questlog'});
+}
+export async function recordNativeActivity(env,identity,input={}){
+  const providerId=clean(input.providerId,80);
+  if(!new Set(['apple_health','health_connect','samsung_health']).has(providerId)){const error=new Error('Unsupported native health provider.');error.status=400;throw error}
+  return recordNormalizedActivity(env,identity,{...input,providerId,verification:'device'});
 }
