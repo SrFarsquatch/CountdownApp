@@ -1,6 +1,6 @@
 (()=>{
 const KEY='questlog.focus.session.v1';
-let data=null,phase='all',timer=null;
+let data=null,challenges=[],nativeHealth=null,phase='all',timer=null;
 const E=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const icon=id=>({apple_health:'AH',health_connect:'HC',strava:'ST',google_calendar:'GC',google_tasks:'GT',questlog_focus:'QL',github:'GH',todoist:'TD',microsoft_todo:'MT',microsoft_planner:'MP',fitbit:'FB',whoop:'WH',oura:'OR',garmin:'GA',samsung_health:'SH',jira:'JI',browser_companion:'BC'})[id]||'QL';
 const root=()=>document.getElementById('integrationsRoot');
@@ -34,6 +34,28 @@ async function pref(id,key,value){
  p.preference={...p.preference,[key]:value,providerId:id};
  try{await api('/api/integrations/preferences',{method:'PUT',body:JSON.stringify(p.preference)})}catch(e){console.warn(e)}
 }
+async function refreshNativeHealth(){
+ nativeHealth=window.QuestLogNative?.isNative&&window.QuestLogNative?.health?await window.QuestLogNative.health.status().catch(e=>({supported:true,available:false,reason:e.message||String(e)})):null;
+}
+const challengeTemplates=[
+ {title:'Deep Work Week',description:'Complete 180 minutes of focused work.',rule:{eventType:'focus.session.completed',metric:'durationMinutes',mode:'sum',target:180}},
+ {title:'Workout Five',description:'Complete five workouts.',rule:{eventType:'health.workout.completed',metric:'count',mode:'count',target:5}},
+ {title:'70K Step Week',description:'Reach 70,000 recorded steps.',rule:{eventType:'health.steps.recorded',metric:'steps',mode:'sum',target:70000}},
+ {title:'Task Slayer',description:'Complete 10 productivity tasks.',rule:{eventType:'productivity.task.completed',metric:'count',mode:'count',target:10}},
+ {title:'Ship It',description:'Merge three pull requests.',rule:{eventType:'development.pull_request.merged',metric:'count',mode:'count',target:3}}
+];
+async function createTemplateChallenge(index){
+ const template=challengeTemplates[Number(index)];if(!template)return;
+ const now=new Date(),end=new Date(now.getTime()+7*86400000);
+ try{
+  const created=await api('/api/challenges',{method:'POST',body:JSON.stringify({...template,startsAt:now.toISOString(),endsAt:end.toISOString()})});
+  challenges=[created,...challenges];render();
+ }catch(e){alert(e.message||String(e))}
+}
+function challengeCard(x){
+ const target=Number(x.rule?.target)||1,progress=Number(x.progress)||0,pct=Math.max(0,Math.min(100,Math.round(progress/target*100)));
+ return '<div class="integration-card"><div class="integration-title"><strong>'+E(x.title)+'</strong><span>'+E(x.description||'')+'</span></div><div class="integrations-xp-track"><div class="integrations-xp-fill" style="width:'+pct+'%"></div></div><div class="integrations-level-meta"><span>'+progress+' / '+target+'</span><span>'+(x.complete?'Complete':'Active')+'</span></div></div>';
+}
 function card(p){
  const s=p.id==='questlog_focus'?['Active','active']:p.setupState==='ready'?['Ready','ready']:p.setupState==='native_bridge'?['Native bridge','']:['Setup later',''];
  const pr=p.preference||{},action=p.id==='questlog_focus'?'<button class="btn" data-open-focus>Open focus</button>':'<button class="btn" disabled>'+(p.setupState==='ready'?'Connect later':'Configure later')+'</button>';
@@ -51,14 +73,16 @@ function render(){
  let h='<div class="integrations-shell"><div class="integrations-hero"><section class="integrations-level-card"><div class="integrations-level-head"><div class="integrations-level-copy"><div class="eyebrow">Life progression</div><h3>Level '+(p.level||1)+'</h3><p>'+(p.weeklyXp||0)+' XP earned in the last 7 days.</p></div><div class="integrations-level-number">'+(p.totalXp||0)+'<span style="font-size:11px;color:var(--muted);font-weight:800"> XP</span></div></div><div class="integrations-xp-track"><div class="integrations-xp-fill" style="width:'+Math.round((p.progress||0)*100)+'%"></div></div><div class="integrations-level-meta"><span>'+(p.levelXp||0)+' / '+(p.nextLevelXp||100)+' XP</span><span>'+(p.currentStreak||0)+' day streak · best '+(p.bestStreak||0)+'</span></div><div class="integrations-stat-grid"><div class="integrations-stat"><strong>'+(p.fitnessXp||0)+'</strong><span>Fitness XP</span></div><div class="integrations-stat"><strong>'+(p.productivityXp||0)+'</strong><span>Productivity XP</span></div><div class="integrations-stat"><strong>'+(p.focusXp||0)+'</strong><span>Focus XP</span></div><div class="integrations-stat"><strong>'+(p.developmentXp||0)+'</strong><span>Developer XP</span></div></div></section><section class="integrations-focus-card" id="focusCard"><div><div class="eyebrow">Built in</div><div class="integrations-focus-time" id="focusTime">'+clock(s)+'</div><div class="integrations-focus-sub" id="focusSub">'+(s?E(s.label)+' · '+(s.status==='paused'?'Paused':'In progress'):'Ready when you are.')+'</div></div><div class="integrations-focus-setup"><input id="focusLabel" value="'+E(s?.label||'Deep work')+'"><select id="focusMinutes"><option value="25">25 min</option><option value="45">45 min</option><option value="60">60 min</option><option value="90">90 min</option></select></div><div class="integrations-focus-controls">'+(!s?'<button class="btn primary" data-focus="start">Start focus</button>':s.status==='paused'?'<button class="btn primary" data-focus="resume">Resume</button><button class="btn" data-focus="cancel">Cancel</button>':'<button class="btn" data-focus="pause">Pause</button><button class="btn" data-focus="cancel">Cancel</button>')+'</div></section></div>';
  h+='<div class="integrations-toolbar"><div class="integrations-filters">'+['all',1,2,3].map(x=>'<button class="integrations-filter '+(String(phase)===String(x)?'on':'')+'" data-phase="'+x+'">'+(x==='all'?'All phases':'Phase '+x)+'</button>').join('')+'</div></div>';
  groups.forEach(g=>{h+='<section class="integration-phase-section"><div class="integration-phase-head"><div><div class="eyebrow">Phase '+g.n+'</div><h3>'+({1:'Core integrations',2:'Expanded ecosystem',3:'Advanced & partner integrations'}[g.n])+'</h3></div><span class="meta">'+g.items.length+' integrations</span></div><div class="integration-grid">'+g.items.map(card).join('')+'</div></section>'});
+ h+='<section class="card"><div class="section-title"><h3>Challenge Lab</h3><span class="meta">Uses normalized activity rules</span></div><div class="integration-grid">'+(challenges.length?challenges.map(challengeCard).join(''):challengeTemplates.map((t,i)=>'<div class="integration-card"><div class="integration-title"><strong>'+E(t.title)+'</strong><span>'+E(t.description)+'</span></div><button class="btn" data-challenge-template="'+i+'">Start 7-day challenge</button></div>').join(''))+'</div></section>';
  h+='<section class="card"><div class="section-title"><h3>Recent verified activity</h3><span class="meta">Normalized Quest Log events</span></div><div class="integrations-activity">'+((data.recentActivity||[]).length?data.recentActivity.map(activity).join(''):'<div class="empty">Complete a Focus session to create the first verified activity.</div>')+'</div></section><div class="integrations-privacy-note"><strong>Privacy by default.</strong> Quest Log stores normalized accomplishments for the game layer. Raw health records are not social activity. Each source controls XP, challenge eligibility and visibility.</div></div>';
  el.innerHTML=h;
  el.querySelectorAll('[data-phase]').forEach(b=>b.onclick=()=>{phase=b.dataset.phase==='all'?'all':Number(b.dataset.phase);render()});
  el.querySelectorAll('[data-provider]').forEach(c=>c.querySelectorAll('[data-pref]').forEach(x=>x.onchange=()=>pref(c.dataset.provider,x.dataset.pref,x.type==='checkbox'?x.checked:x.value)));
  el.querySelectorAll('[data-open-focus]').forEach(b=>b.onclick=()=>document.getElementById('focusCard')?.scrollIntoView({behavior:'smooth'}));
  el.querySelectorAll('[data-focus]').forEach(b=>b.onclick=()=>({start,pause,resume,cancel}[b.dataset.focus]||(()=>{}))());
+ el.querySelectorAll('[data-challenge-template]').forEach(b=>b.onclick=()=>createTemplateChallenge(b.dataset.challengeTemplate));
  clear();if(focus()?.status==='running')timer=setInterval(tick,1000);
 }
-async function load(quiet=false){if(!quiet&&root())root().innerHTML='<div class="card"><div class="empty">Loading integrations…</div></div>';try{data=await api('/api/integrations')}catch(e){data=null;if(root())root().innerHTML='<div class="card"><div class="empty">Could not load integrations: '+E(e.message||e)+'</div></div>'}}
+async function load(quiet=false){if(!quiet&&root())root().innerHTML='<div class="card"><div class="empty">Loading integrations…</div></div>';try{const results=await Promise.all([api('/api/integrations'),api('/api/challenges').catch(()=>({challenges:[]})),refreshNativeHealth()]);data=results[0];challenges=results[1]?.challenges||[]}catch(e){data=null;if(root())root().innerHTML='<div class="card"><div class="empty">Could not load integrations: '+E(e.message||e)+'</div></div>'}}
 window.QuestLogIntegrations={render:async()=>{await load();render()},refresh:async()=>{await load(true);render()}};
 })();
