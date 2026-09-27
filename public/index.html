@@ -2190,7 +2190,7 @@ body.modal-open{overflow:hidden}
 
 <script src="/native-runtime.js"></script>
 <script>
-let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewCache=new Map(),profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',conversationData={conversations:[],unreadCount:0},activeConversationId=new URLSearchParams(location.search).get('conversation')||'',activeConversation=null,activeConversationTab=new URLSearchParams(location.search).get('tab')==='calendar'?'calendar':'chat',messageItems=[],messageCache=new Map(),groupEventItems=[],groupEventCache=new Map(),messagePollTimer=null,messageLoading=false,conversationSearchQuery='',activityData={notifications:[],unreadCount:0},activityKnownIds=new Set(),activityPollPrimed=false,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewCache=new Map(),profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',conversationData={conversations:[],unreadCount:0},activeConversationId=new URLSearchParams(location.search).get('conversation')||'',activeConversation=null,activeConversationTab=new URLSearchParams(location.search).get('tab')==='calendar'?'calendar':'chat',messageItems=[],messageCache=new Map(),groupEventItems=[],groupEventCache=new Map(),messagePollTimer=null,messageLoading=false,suppressMessageAutoLoad=false,conversationSearchQuery='',activityData={notifications:[],unreadCount:0},activityKnownIds=new Set(),activityPollPrimed=false,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{
  if(window.QuestLogNative?.isNative){
@@ -2705,7 +2705,7 @@ function renderAppView(name){
  if(visibleView==='messages'){
    runViewRenderer('Messages',()=>{
      syncMessageViewport({keepBottom:Boolean(activeConversationId)});
-     renderMessagesView();
+     renderMessagesView(false,{loadActive:!suppressMessageAutoLoad});
      scheduleMessagePoll(0);
    });
  }else clearTimeout(messagePollTimer);
@@ -3349,7 +3349,8 @@ function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
  messageItems=nextTab==='chat'?(messageCache.get(nextConversationId)||[]):[];
  groupEventItems=listedConversation?.type==='group'?(groupEventCache.get(nextConversationId)||[]):[];
  conversationContentRequestSeq++;
- setView('messages',{historyMode:'none'});
+ suppressMessageAutoLoad=true;
+ try{setView('messages',{historyMode:'none'})}finally{suppressMessageAutoLoad=false}
  renderConversationList();renderConversationWorkspace();
  loadConversationContent().catch(console.warn);
  scheduleMessagePoll();
