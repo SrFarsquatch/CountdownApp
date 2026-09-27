@@ -3293,14 +3293,21 @@ async function loadConversationContent(){
  const conversationPromise=listedConversation?Promise.resolve({conversation:listedConversation}):api('/api/conversations/'+encoded);
  const prefetched=tab==='chat'?messageCache.get(conversationId):null;
  const inFlight=tab==='chat'?messagePrefetches.get(conversationId):null;
+ const usedPeek=Boolean(tab==='chat'&&(prefetched||inFlight));
  const messagesPromise=tab==='chat'
-   ?(prefetched?Promise.resolve({messages:prefetched}):(inFlight?inFlight.then(result=>api('/api/conversations/'+encoded+'/messages?after='+(result.messages?.at(-1)?.createdAt?encodeURIComponent(result.messages.at(-1).createdAt):'')+'&limit=150').then(fresh=>({messages:[...(result.messages||[]),...(fresh.messages||[]).filter(item=>!(result.messages||[]).some(existing=>existing.messageId===item.messageId))]}))):api('/api/conversations/'+encoded+'/messages?limit=150')))
+   ?(prefetched?Promise.resolve({messages:prefetched}):(inFlight?inFlight:api('/api/conversations/'+encoded+'/messages?limit=150')))
    :Promise.resolve({messages:[]});
  const [conversationResult,messageResult]=await Promise.all([conversationPromise,messagesPromise]);
  if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
  activeConversation=conversationResult.conversation||listedConversation||null;
  messageItems=messageResult.messages||[];
- if(tab==='chat')messageCache.set(conversationId,messageItems);
+ if(tab==='chat'){
+   messageCache.set(conversationId,messageItems);
+   if(usedPeek){
+     const last=messageItems.at(-1)?.createdAt||'';
+     api('/api/conversations/'+encoded+'/messages?after='+encodeURIComponent(last)+'&limit=1').catch(()=>{});
+   }
+ }
  groupEventItems=activeConversation?.type==='group'?(groupEventCache.get(conversationId)||[]):[];
  if(tab==='chat'){
    const item=(conversationData.conversations||[]).find(x=>x.conversationId===conversationId);
