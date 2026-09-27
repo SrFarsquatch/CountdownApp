@@ -7,8 +7,8 @@ const STATIC_ASSETS=[
   '/branding/icon-quest-512.png',
   '/branding/icon-classic-maskable.svg',
   '/branding/apple-touch-icon.png',
-  '/integrations.css?v=1',
-  '/integrations-ui.js?v=1'
+  '/integrations.css',
+  '/integrations-ui.js'
 ];
 
 self.addEventListener('install',event=>{
@@ -42,7 +42,7 @@ self.addEventListener('fetch',event=>{
 
   if(!STATIC_ASSETS.includes(url.pathname))return;
   event.respondWith(
-    caches.match(request).then(cached=>{
+    caches.match(request,{ignoreSearch:true}).then(cached=>{
       const fresh=fetch(request).then(response=>{
         if(response&&response.ok){
           const copy=response.clone();
