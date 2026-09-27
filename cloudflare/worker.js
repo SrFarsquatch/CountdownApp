@@ -822,7 +822,7 @@ async function handleApi(request,env,identity){
     await refreshOwnedShareSnapshots(env,identity,'event',ownEvents);
     const [sharedEvents,groupEvents]=await Promise.all([
       mergeSharedEvents(env,identity,ownEvents,from,to),
-      runtime==='cloudflare'?listUserGroupEvents(env,identity,{from,to}):Promise.resolve([])
+      listUserGroupEvents(env,identity,{from,to})
     ]);
     const merged=[...sharedEvents,...groupEvents].sort((a,b)=>new Date(a.start)-new Date(b.start));
     return json({events:merged});
