@@ -3244,6 +3244,13 @@ async function loadConversationContent(){
  if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
  activeConversation=conversationResult.conversation||null;
  messageItems=messageResult.messages||[];
+ groupEventItems=[];
+ if(tab==='chat'){
+   const item=(conversationData.conversations||[]).find(x=>x.conversationId===conversationId);
+   if(item)item.unreadCount=0;
+   conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ }
+ renderConversationList();renderConversationWorkspace();
  if(activeConversation?.type==='group'){
    try{
      const result=await api('/api/conversations/'+encoded+'/events');
@@ -3253,13 +3260,8 @@ async function loadConversationContent(){
      if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
      groupEventItems=[];
    }
- }else groupEventItems=[];
- if(tab==='chat'){
-   const item=(conversationData.conversations||[]).find(x=>x.conversationId===conversationId);
-   if(item)item.unreadCount=0;
-   conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+   renderGroupCalendar();
  }
- renderConversationList();renderConversationWorkspace();
 }
 async function renderMessagesView(force=false,{loadActive=true}={}){
  if(force||!(conversationData?.conversations||[]).length)await loadConversations(force);
@@ -3280,14 +3282,18 @@ function scheduleMessagePoll(delay=5000){
      const messagesPromise=conversationId&&tab==='chat'
        ?api('/api/conversations/'+encodeURIComponent(conversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150'))
        :Promise.resolve(null);
-     const [conversationResult,messageResult]=await Promise.all([conversationsPromise,messagesPromise]);
+     const reactionsPromise=conversationId&&tab==='chat'
+       ?api('/api/conversations/'+encodeURIComponent(conversationId)+'/reactions')
+       :Promise.resolve(null);
+     const [conversationResult,messageResult,reactionResult]=await Promise.all([conversationsPromise,messagesPromise,reactionsPromise]);
      if(conversationResult)renderConversationList();
      if(messageResult&&conversationId===activeConversationId&&tab===activeConversationTab){
-       const fresh=messageResult.messages||[];
-       if(fresh.length){
-         messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
-         renderMessageItems();
-       }
+       const fresh=messageResult.messages||[],reactionMap=reactionResult?.reactions||{};
+       if(fresh.length)messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
+       const before=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||[]}));
+       const after=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
+       if(fresh.length||before!==after)renderMessageItems();
      }
    }catch(error){console.warn('Message refresh failed',error)}
    finally{messagePollInFlight=false}
@@ -3295,10 +3301,12 @@ function scheduleMessagePoll(delay=5000){
  },Math.max(0,delay));
 }
 function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
- activeConversationId=String(conversationId||'');activeConversationTab=tab==='calendar'?'calendar':'chat';activeConversation=null;messageItems=[];groupEventItems=[];
+ const nextConversationId=String(conversationId||''),nextTab=tab==='calendar'?'calendar':'chat';
+ activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];
  conversationContentRequestSeq++;
  setView('messages',{historyMode:'none'});
- renderMessagesView(false,{loadActive:false}).catch(console.warn);
+ activeConversationId=nextConversationId;activeConversationTab=nextTab;
+ renderConversationList();renderConversationWorkspace();
  loadConversationContent().catch(console.warn);
  scheduleMessagePoll();
  if(appHistoryReady&&historyMode!=='none'){
