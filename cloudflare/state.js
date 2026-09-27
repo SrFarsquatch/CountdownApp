@@ -49,6 +49,8 @@ export function normalizeNotifications(x={}){
     goalReminders:x.goalReminders!==false,
     countdownReminders:x.countdownReminders!==false,
     socialUpdates:x.socialUpdates!==false,
+    messageNotifications:x.messageNotifications!==false,
+    messagePush:x.messagePush!==false,
     taskLeadMinutes:clamp(Math.round(num(x.taskLeadMinutes,30)),1,10080),
     eventLeadMinutes:clamp(Math.round(num(x.eventLeadMinutes,15)),1,1440),
     goalLeadMinutes:clamp(Math.round(num(x.goalLeadMinutes,1440)),15,43200),
