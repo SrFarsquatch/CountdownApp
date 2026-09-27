@@ -19,7 +19,7 @@ import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile, mutualFriends } from './friends.js';
-import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
+import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listMessageReactions, toggleMessageReaction, listGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
@@ -403,6 +403,10 @@ async function handleApi(request,env,identity){
     }
     return json(result,201);
   }
+  const conversationReactionsMatch=p.match(/^\/api\/conversations\/([^/]+)\/reactions$/);
+  if(conversationReactionsMatch&&method==='GET')return json(await listMessageReactions(env,identity,decodeURIComponent(conversationReactionsMatch[1])));
+  const messageReactionMatch=p.match(/^\/api\/conversations\/([^/]+)\/messages\/([^/]+)\/reaction$/);
+  if(messageReactionMatch&&method==='POST')return json(await toggleMessageReaction(env,identity,decodeURIComponent(messageReactionMatch[1]),decodeURIComponent(messageReactionMatch[2]),await body(request)));
   const groupEventsMatch=p.match(/^\/api\/conversations\/([^/]+)\/events$/);
   if(groupEventsMatch&&method==='GET')return json(await listGroupEvents(env,identity,decodeURIComponent(groupEventsMatch[1]),{from:url.searchParams.get('from')||'',to:url.searchParams.get('to')||''}));
   if(groupEventsMatch&&method==='POST'){
