@@ -391,14 +391,15 @@ async function handleApi(request,env,identity){
   if(conversationMessagesMatch&&method==='POST'){
     const incoming=await body(request),result=await sendMessage(env,identity,decodeURIComponent(conversationMessagesMatch[1]),incoming);
     const senderName=identity.user?.displayName||identity.email||'Quest Log friend';
-    for(const userId of result.recipients||[]){
-      await notifyUserActivity(env,userId,{
-        kind:'message',actorUserId:identity.userId,targetType:'conversation',targetId:result.conversation.conversationId,
-        subject:result.conversation.type==='group'?(result.conversation.title||'Group chat'):senderName,
-        meta:{body:(result.conversation.type==='group'?senderName+': ':'')+result.message.body.slice(0,180)},
-        dedupeKey:'message:'+result.message.messageId+':'+userId,
-        route:'/?view=messages&conversation='+encodeURIComponent(result.conversation.conversationId)
-      });
+    const notificationResults=await Promise.allSettled((result.recipients||[]).map(userId=>notifyUserActivity(env,userId,{
+      kind:'message',actorUserId:identity.userId,targetType:'conversation',targetId:result.conversation.conversationId,
+      subject:result.conversation.type==='group'?(result.conversation.title||'Group chat'):senderName,
+      meta:{body:(result.conversation.type==='group'?senderName+': ':'')+result.message.body.slice(0,180)},
+      dedupeKey:'message:'+result.message.messageId+':'+userId,
+      route:'/?view=messages&conversation='+encodeURIComponent(result.conversation.conversationId)
+    })));
+    for(const notification of notificationResults){
+      if(notification.status==='rejected')console.warn('Quest Log message notification failed',notification.reason);
     }
     return json(result,201);
   }

@@ -3171,10 +3171,51 @@ if($('messageInput')){
  });
 }
 if($('messageForm'))$('messageForm').onsubmit=async e=>{
- e.preventDefault();if(!activeConversationId)return;const input=$('messageInput'),value=input.value.trim();if(!value)return;
- const button=e.currentTarget.querySelector('button');button.disabled=true;
- try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages',{method:'POST',body:JSON.stringify({body:value})});input.value='';messageItems.push(result.message);renderMessageItems();await loadConversations(true);renderConversationList()}
- finally{button.disabled=false;input.focus();queueMessageViewportSync(true)}
+ e.preventDefault();
+ if(!activeConversationId)return;
+ const input=$('messageInput'),value=input.value.trim();
+ if(!value)return;
+ const button=e.currentTarget.querySelector('button');
+ const optimisticId='local-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+ const optimisticMessage={
+   messageId:optimisticId,
+   conversationId:activeConversationId,
+   body:value,
+   createdAt:new Date().toISOString(),
+   editedAt:null,
+   sender:{
+     userId:runtimeInfo?.profile?.userId||'',
+     displayName:runtimeInfo?.profile?.displayName||'',
+     email:runtimeInfo?.profile?.email||runtimeInfo?.user||'',
+     avatarData:runtimeInfo?.profile?.avatarData||''
+   },
+   mine:true,
+   optimistic:true
+ };
+ input.value='';
+ messageItems.push(optimisticMessage);
+ renderMessageItems();
+ button.disabled=true;
+ queueMessageViewportSync(true);
+ try{
+   const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages',{method:'POST',body:JSON.stringify({body:value})});
+   const index=messageItems.findIndex(item=>item.messageId===optimisticId);
+   if(index>=0)messageItems[index]=result.message;
+   else if(result.message&&!messageItems.some(item=>item.messageId===result.message.messageId))messageItems.push(result.message);
+   renderMessageItems();
+   await loadConversations(true);
+   renderConversationList();
+ }catch(error){
+   const index=messageItems.findIndex(item=>item.messageId===optimisticId);
+   if(index>=0)messageItems.splice(index,1);
+   if(!input.value)input.value=value;
+   renderMessageItems();
+   alert(error.message||'Could not send message.');
+ }finally{
+   button.disabled=false;
+   input.focus();
+   queueMessageViewportSync(true);
+ }
 };
 document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.onclick=async()=>{
  if(!activeConversation)return;activeConversationTab=button.dataset.conversationTab==='calendar'?'calendar':'chat';
