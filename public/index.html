@@ -1508,23 +1508,58 @@ body.modal-open{overflow:hidden}
 
 /* Prevent iOS Safari from auto-zooming focused form controls */
 /* Messaging, groups and shared calendars */
-.messages-shell{display:grid;grid-template-columns:320px minmax(0,1fr);height:min(760px,calc(100vh - 150px));min-height:560px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--panel)}
-.messages-sidebar{border-right:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0}.messages-sidebar-head{padding:16px;border-bottom:1px solid var(--line);display:grid;gap:10px}.messages-sidebar-actions{display:flex;gap:8px}.messages-sidebar-actions .btn{flex:1}.conversation-list{overflow:auto;padding:8px}.conversation-row{width:100%;border:0;background:transparent;color:var(--text);display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border-radius:12px;text-align:left;cursor:pointer}.conversation-row:hover,.conversation-row.on{background:var(--panel2)}.conversation-avatar{width:46px;height:46px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--accent-soft);font-weight:900;color:var(--accent)}.conversation-avatar img{width:100%;height:100%;object-fit:cover}.conversation-avatar.group{border-radius:14px}.conversation-copy{min-width:0}.conversation-copy strong,.conversation-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.conversation-copy span{font-size:11px;color:var(--muted);margin-top:3px}.conversation-meta{text-align:right;display:grid;justify-items:end;gap:5px}.conversation-time{font-size:9px;color:var(--muted)}.message-unread{min-width:19px;height:19px;border-radius:999px;background:var(--accent);color:var(--accent-contrast);display:grid;place-items:center;font-size:9px;font-weight:900;padding:0 5px}
-.messages-main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}.messages-empty{display:grid;place-items:center;padding:30px;text-align:center;color:var(--muted)}.conversation-head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;min-width:0}.conversation-head-copy{min-width:0;flex:1}.conversation-head-copy strong,.conversation-head-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.conversation-head-copy span{font-size:10px;color:var(--muted);margin-top:2px}.conversation-head-actions{display:flex;gap:7px;align-items:center}.messages-mobile-back{display:none}
-.conversation-tabs{display:flex;gap:4px;padding:4px;background:var(--panel2);border-radius:10px}.conversation-tabs button{border:0;background:transparent;color:var(--muted);border-radius:7px;padding:6px 9px;font-size:11px;font-weight:800}.conversation-tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.conversation-pane{display:none;min-height:0}.conversation-pane.on{display:grid}.chat-pane{grid-template-rows:minmax(0,1fr) auto}.message-list{overflow:auto;padding:18px;display:flex;flex-direction:column;gap:10px}.message-row{display:flex;gap:8px;align-items:flex-end;max-width:78%}.message-row.mine{align-self:flex-end;flex-direction:row-reverse}.message-avatar{width:28px;height:28px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--panel2);font-size:9px;font-weight:900;flex:0 0 auto}.message-avatar img{width:100%;height:100%;object-fit:cover}.message-bubble{padding:9px 11px;border-radius:16px 16px 16px 4px;background:var(--panel2);border:1px solid var(--line);line-height:1.4;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.message-row.mine .message-bubble{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);border-radius:16px 16px 4px 16px}.message-author{font-size:9px;color:var(--muted);margin:0 0 3px 3px}.message-row.mine .message-author{text-align:right;margin-right:3px}.message-time{font-size:8px;color:var(--muted);margin-top:3px}.chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:12px;border-top:1px solid var(--line);background:var(--panel)}.chat-compose textarea{min-height:44px;max-height:120px;resize:none}.chat-compose .btn{align-self:end;min-height:44px}
+.messages-page{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+.messages-topbar{min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 2px 8px}
+.messages-title-block{min-width:0}.messages-title-block h2{margin:0;font-size:28px;line-height:1.05;letter-spacing:-.035em}.messages-title-block p{margin:6px 0 0;color:var(--muted);font-size:11px}
+.messages-top-actions{display:flex;align-items:center;gap:8px}
+.messages-icon-button{position:relative;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--text);display:grid;place-items:center;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.messages-icon-button:hover{background:var(--panel2);border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}.messages-icon-button:active{transform:scale(.96)}
+.messages-icon-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.messages-notification-badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#e53935;color:#fff;border:2px solid var(--panel);font-size:8px;font-weight:900;display:grid;place-items:center}.messages-notification-badge[hidden]{display:none!important}
+.messages-shell{display:grid;grid-template-columns:360px minmax(0,1fr);height:min(760px,calc(100vh - 142px));min-height:590px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--panel);box-shadow:0 10px 34px rgba(0,0,0,.035)}
+.messages-sidebar{border-right:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;background:var(--panel)}
+.messages-sidebar-head{padding:14px 14px 10px;display:grid;gap:10px}
+.messages-search{height:42px;border-radius:12px;background:var(--panel2);display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;padding:0 12px;border:1px solid transparent}
+.messages-search:focus-within{border-color:color-mix(in srgb,var(--accent) 28%,var(--line));background:var(--panel)}
+.messages-search svg{width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:1.8}.messages-search input{min-height:0!important;height:auto!important;padding:0!important;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;font-size:13px!important;color:var(--text)}
+.messages-sidebar-actions{display:flex;align-items:center;gap:8px}.messages-sidebar-actions .btn{min-height:34px;padding:7px 11px;border-radius:10px;font-size:11px}.messages-sidebar-actions .btn.primary{margin-left:auto}
+.messages-inbox-meta{font-size:9px;color:var(--muted);padding:0 2px}
+.conversation-list{overflow:auto;padding:2px 8px 14px}
+.conversation-row{width:100%;border:0;background:transparent;color:var(--text);display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 8px;border-radius:14px;text-align:left;cursor:pointer;transition:background .13s}
+.conversation-row:hover,.conversation-row.on{background:var(--panel2)}.conversation-row.unread .conversation-copy strong{font-weight:900}.conversation-row.unread .conversation-preview{color:var(--text);font-weight:730}
+.conversation-avatar{width:56px;height:56px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:linear-gradient(145deg,var(--accent-soft),color-mix(in srgb,var(--accent-soft) 55%,var(--panel2)));font-size:15px;font-weight:900;color:var(--accent);flex:0 0 auto}
+.conversation-avatar img{width:100%;height:100%;object-fit:cover}.conversation-avatar.group{border-radius:18px}
+.conversation-copy{min-width:0;align-self:center}.conversation-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:790}.conversation-preview{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted);margin-top:4px}
+.conversation-meta{text-align:right;display:grid;justify-items:end;align-self:center;gap:7px;min-width:36px}.conversation-time{font-size:9px;color:var(--muted)}.message-unread{width:9px;height:9px;border-radius:999px;background:var(--accent);font-size:0;padding:0}
+.messages-main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;background:var(--panel)}
+.messages-empty{display:grid;place-items:center;padding:30px;text-align:center;color:var(--muted)}.messages-empty strong{color:var(--text);font-size:15px}
+.conversation-head{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;min-width:0;min-height:66px}.conversation-head .conversation-avatar{width:40px;height:40px;border-radius:50%;font-size:12px}.conversation-head .conversation-avatar.group{border-radius:13px}
+.conversation-head-copy{min-width:0;flex:1}.conversation-head-copy strong,.conversation-head-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.conversation-head-copy strong{font-size:13px}.conversation-head-copy span{font-size:9px;color:var(--muted);margin-top:3px}.conversation-head-actions{display:flex;gap:7px;align-items:center}.messages-mobile-back{display:none}
+.conversation-tabs{display:flex;gap:3px;padding:3px;background:var(--panel2);border-radius:10px}.conversation-tabs button{border:0;background:transparent;color:var(--muted);border-radius:7px;padding:6px 9px;font-size:10px;font-weight:850;cursor:pointer}.conversation-tabs button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.conversation-pane{display:none;min-height:0}.conversation-pane.on{display:grid}.chat-pane{grid-template-rows:minmax(0,1fr) auto}
+.message-list{overflow:auto;padding:20px 18px 14px;display:flex;flex-direction:column;gap:8px}
+.message-row{display:flex;gap:8px;align-items:flex-end;max-width:min(72%,620px)}.message-row.mine{align-self:flex-end;flex-direction:row-reverse}.message-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--panel2);font-size:8px;font-weight:900;flex:0 0 auto}.message-avatar img{width:100%;height:100%;object-fit:cover}
+.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time{font-size:8px;color:var(--muted);margin-top:3px;padding:0 5px}.message-row.mine .message-time{text-align:right}
+.chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line);background:var(--panel)}.chat-compose textarea{min-height:42px;max-height:120px;resize:none;border-radius:21px!important;padding:10px 14px!important;background:var(--panel2)!important;border:1px solid transparent!important}.chat-compose textarea:focus{background:var(--panel)!important;border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important}.chat-compose .btn{align-self:end;min-height:42px;border-radius:21px;padding:8px 16px}
 .group-calendar-pane{grid-template-rows:auto minmax(0,1fr)}.group-calendar-toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.group-calendar-toolbar h3{margin:0}.group-calendar-events{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}.group-event-card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:12px;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:center;cursor:pointer}.group-event-date{display:grid;place-items:center;background:var(--panel2);border-radius:10px;padding:8px 4px}.group-event-date strong{font-size:20px;line-height:1}.group-event-date span{font-size:9px;color:var(--muted);font-weight:850;margin-top:3px}.group-event-copy strong{display:block}.group-event-copy .meta{margin-top:4px}.group-event-edit{font-size:10px;color:var(--muted)}
 .group-member-grid{display:grid;gap:7px}.group-member-row{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-member-row .friend-avatar{width:36px;height:36px}.group-create-members{display:grid;gap:6px;max-height:260px;overflow:auto}.group-create-member{display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}.group-create-member input{width:18px;height:18px;min-height:0}
 .mobile-message-badge{position:absolute;top:8px;left:calc(50% + 7px);min-width:17px;height:17px;border-radius:999px;background:#d93025;color:#fff;border:2px solid var(--panel);display:grid;place-items:center;font-size:8px;font-weight:900;padding:0 3px}.mobile-message-badge[hidden]{display:none!important}
+.in-app-notification-stack{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:4000;width:min(390px,calc(100vw - 28px));display:grid;gap:8px;pointer-events:none}
+.in-app-notification{pointer-events:auto;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 96%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 14px 44px rgba(0,0,0,.14);border-radius:16px;padding:11px;display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;animation:questNoticeIn .2s ease-out}
+.in-app-notification-avatar{width:42px;height:42px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:900}.in-app-notification-avatar img{width:100%;height:100%;object-fit:cover}.in-app-notification-copy{min-width:0}.in-app-notification-copy strong{display:block;font-size:12px}.in-app-notification-copy span{display:block;margin-top:2px;color:var(--muted);font-size:10px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.in-app-notification-close{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:6px}
+@keyframes questNoticeIn{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:none}}
 @media(max-width:760px){
- .messages-shell{height:calc(100dvh - 102px - env(safe-area-inset-bottom));min-height:0;border:0;border-radius:0;margin:0 -14px;background:var(--panel)}
- .messages-sidebar{border-right:0}.messages-main{display:none}.messages-shell.has-conversation .messages-sidebar{display:none}.messages-shell.has-conversation .messages-main{display:grid}
- .messages-mobile-back{display:grid;border:0;background:transparent;width:38px;height:38px;place-items:center;font-size:22px;color:var(--text)}
- .conversation-head{padding:9px 10px}.conversation-head-actions .btn{padding:7px 9px}.conversation-tabs{padding:3px}.conversation-tabs button{padding:6px 7px}
- .message-list{padding:12px}.message-row{max-width:88%}.chat-compose{padding:9px 10px calc(9px + env(safe-area-inset-bottom))}
- .group-calendar-toolbar{padding:10px 12px}.group-calendar-events{padding:10px}.group-event-card{grid-template-columns:52px minmax(0,1fr);}.group-event-edit{display:none}
+ #view-messages{margin:-4px -14px 0}.messages-page{gap:0;max-width:none}.messages-topbar{padding:8px 18px 10px;min-height:58px;border-bottom:0;background:var(--bg)}.messages-title-block h2{font-size:25px}.messages-title-block p{display:none}.messages-icon-button{width:39px;height:39px;border:0;background:transparent}.messages-icon-button svg{width:23px;height:23px}
+ .messages-shell{height:calc(100dvh - 116px - env(safe-area-inset-bottom));min-height:0;border:0;border-radius:0;margin:0;background:var(--panel);box-shadow:none;grid-template-columns:1fr}
+ .messages-sidebar{border-right:0}.messages-sidebar-head{padding:4px 14px 8px;gap:8px}.messages-search{height:40px;border-radius:11px}.messages-sidebar-actions{padding:0 2px}.messages-sidebar-actions .btn{min-height:32px;padding:6px 10px}.messages-inbox-meta{padding:1px 3px 3px}
+ .conversation-list{padding:0 8px 18px}.conversation-row{grid-template-columns:60px minmax(0,1fr) auto;gap:12px;padding:9px 8px;border-radius:13px}.conversation-avatar{width:60px;height:60px;font-size:16px}.conversation-copy strong{font-size:14px}.conversation-preview{font-size:11px;margin-top:4px}.conversation-time{font-size:9px}
+ .messages-main{display:none}.messages-shell.has-conversation .messages-sidebar{display:none}.messages-shell.has-conversation .messages-main{display:grid}
+ .messages-mobile-back{display:grid;border:0;background:transparent;width:34px;height:38px;place-items:center;font-size:26px;color:var(--text);padding:0}
+ .conversation-head{padding:8px 10px;min-height:58px}.conversation-head .conversation-avatar{width:38px;height:38px}.conversation-head-copy strong{font-size:13px}.conversation-head-actions .btn{padding:7px 9px}.conversation-tabs{padding:3px}.conversation-tabs button{padding:6px 7px}
+ .message-list{padding:12px 10px}.message-row{max-width:86%}.message-avatar{width:24px;height:24px}.message-bubble{font-size:13px;padding:9px 12px}.chat-compose{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
+ .group-calendar-toolbar{padding:10px 12px}.group-calendar-events{padding:10px}.group-event-card{grid-template-columns:52px minmax(0,1fr)}.group-event-edit{display:none}
+ .in-app-notification-stack{top:calc(10px + env(safe-area-inset-top));right:10px;width:calc(100vw - 20px)}
 }
-
 @media(max-width:760px){
   input,select,textarea{font-size:16px!important}
 }
@@ -1624,37 +1659,57 @@ body.modal-open{overflow:hidden}
 </section>
 
 <section class="view" id="view-messages">
-  <div class="hero"><div><h2>Messages</h2><p>Chat with friends, make groups, and plan together.</p></div></div>
-  <div class="messages-shell" id="messagesShell">
-    <aside class="messages-sidebar">
-      <div class="messages-sidebar-head">
-        <div class="messages-sidebar-actions"><button class="btn" id="newDirectMessage" type="button">New message</button><button class="btn primary" id="newGroupMessage" type="button">New group</button></div>
-        <div class="meta" id="messagesInboxMeta">Quest Log friends only</div>
+  <div class="messages-page">
+    <div class="messages-topbar">
+      <div class="messages-title-block"><h2>Messages</h2><p>Chat with friends, make groups, and plan together.</p></div>
+      <div class="messages-top-actions">
+        <button class="messages-icon-button" id="messagesNotifications" type="button" aria-label="Notifications" title="Notifications">
+          <span class="messages-notification-badge" id="messagesNotificationBadge" hidden></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+        </button>
+        <button class="messages-icon-button" id="newDirectMessageTop" type="button" aria-label="New message" title="New message">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 5.5H6.8A2.8 2.8 0 0 0 4 8.3v8.9A2.8 2.8 0 0 0 6.8 20h8.9a2.8 2.8 0 0 0 2.8-2.8v-6.7"></path><path d="m13 11 7-7M15.5 4H20v4.5"></path></svg>
+        </button>
       </div>
-      <div class="conversation-list" id="conversationList"><div class="empty">Loading conversations…</div></div>
-    </aside>
-    <section class="messages-main" id="messagesMain">
-      <div class="messages-empty" id="messagesEmpty"><div><strong>Choose a conversation</strong><div class="meta" style="margin-top:5px">Message a friend or create a group to get started.</div></div></div>
-      <div id="conversationWorkspace" hidden style="display:none">
-        <header class="conversation-head">
-          <button class="messages-mobile-back" id="messagesBack" type="button" aria-label="Back to conversations">‹</button>
-          <div class="conversation-avatar" id="conversationHeadAvatar"></div>
-          <div class="conversation-head-copy"><strong id="conversationHeadTitle">Conversation</strong><span id="conversationHeadMeta"></span></div>
-          <div class="conversation-head-actions">
-            <div class="conversation-tabs" id="conversationTabs"><button class="on" type="button" data-conversation-tab="chat">Chat</button><button type="button" data-conversation-tab="calendar">Calendar</button></div>
-            <button class="btn tiny" id="groupMembersButton" type="button">Members</button>
+    </div>
+    <div class="messages-shell" id="messagesShell">
+      <aside class="messages-sidebar">
+        <div class="messages-sidebar-head">
+          <label class="messages-search" aria-label="Search conversations">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>
+            <input id="conversationSearch" type="search" autocomplete="off" placeholder="Search">
+          </label>
+          <div class="messages-sidebar-actions">
+            <button class="btn" id="newDirectMessage" type="button">New message</button>
+            <button class="btn primary" id="newGroupMessage" type="button">New group</button>
           </div>
-        </header>
-        <div class="conversation-pane chat-pane on" data-conversation-pane="chat">
-          <div class="message-list" id="messageList"></div>
-          <form class="chat-compose" id="messageForm"><textarea id="messageInput" rows="1" maxlength="4000" placeholder="Message…"></textarea><button class="btn primary" type="submit">Send</button></form>
+          <div class="messages-inbox-meta" id="messagesInboxMeta">Quest Log friends only</div>
         </div>
-        <div class="conversation-pane group-calendar-pane" data-conversation-pane="calendar">
-          <div class="group-calendar-toolbar"><div><h3>Shared calendar</h3><div class="meta">Everyone in this group can add and edit events.</div></div><button class="btn primary" id="newGroupEvent" type="button">+ Event</button></div>
-          <div class="group-calendar-events" id="groupCalendarEvents"><div class="empty">No group events yet.</div></div>
+        <div class="conversation-list" id="conversationList"><div class="empty">Loading conversations…</div></div>
+      </aside>
+      <section class="messages-main" id="messagesMain">
+        <div class="messages-empty" id="messagesEmpty"><div><strong>Your messages</strong><div class="meta" style="margin-top:6px">Choose a conversation or start a new one.</div></div></div>
+        <div id="conversationWorkspace" hidden style="display:none">
+          <header class="conversation-head">
+            <button class="messages-mobile-back" id="messagesBack" type="button" aria-label="Back to conversations">‹</button>
+            <div class="conversation-avatar" id="conversationHeadAvatar"></div>
+            <div class="conversation-head-copy"><strong id="conversationHeadTitle">Conversation</strong><span id="conversationHeadMeta"></span></div>
+            <div class="conversation-head-actions">
+              <div class="conversation-tabs" id="conversationTabs"><button class="on" type="button" data-conversation-tab="chat">Chat</button><button type="button" data-conversation-tab="calendar">Calendar</button></div>
+              <button class="btn tiny" id="groupMembersButton" type="button">Members</button>
+            </div>
+          </header>
+          <div class="conversation-pane chat-pane on" data-conversation-pane="chat">
+            <div class="message-list" id="messageList"></div>
+            <form class="chat-compose" id="messageForm"><textarea id="messageInput" rows="1" maxlength="4000" placeholder="Message…"></textarea><button class="btn primary" type="submit">Send</button></form>
+          </div>
+          <div class="conversation-pane group-calendar-pane" data-conversation-pane="calendar">
+            <div class="group-calendar-toolbar"><div><h3>Shared calendar</h3><div class="meta">Everyone in this group can add and edit events.</div></div><button class="btn primary" id="newGroupEvent" type="button">+ Event</button></div>
+            <div class="group-calendar-events" id="groupCalendarEvents"><div class="empty">No group events yet.</div></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 </section>
 
@@ -1990,7 +2045,7 @@ body.modal-open{overflow:hidden}
   <button id="mobileAccountNav" class="mobile-account-nav" type="button" aria-label="Account" title="Account" aria-expanded="false"><span class="mobile-notification-badge" id="mobileNotificationBadge" hidden></span><span class="account-avatar" id="mobileNavAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span><span class="sr-only">Account</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
-<div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
+<div class="in-app-notification-stack" id="inAppNotificationStack" aria-live="polite" aria-atomic="false"></div>\n\n<div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -1999,7 +2054,7 @@ body.modal-open{overflow:hidden}
 
 <script src="/native-runtime.js"></script>
 <script>
-let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',conversationData={conversations:[],unreadCount:0},activeConversationId=new URLSearchParams(location.search).get('conversation')||'',activeConversation=null,activeConversationTab=new URLSearchParams(location.search).get('tab')==='calendar'?'calendar':'chat',messageItems=[],groupEventItems=[],messagePollTimer=null,messageLoading=false,activityData={notifications:[],unreadCount:0},calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
+let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',conversationData={conversations:[],unreadCount:0},activeConversationId=new URLSearchParams(location.search).get('conversation')||'',activeConversation=null,activeConversationTab=new URLSearchParams(location.search).get('tab')==='calendar'?'calendar':'chat',messageItems=[],groupEventItems=[],messagePollTimer=null,messageLoading=false,conversationSearchQuery='',activityData={notifications:[],unreadCount:0},activityKnownIds=new Set(),activityPollPrimed=false,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
 const api=async(path,options={})=>{
  if(window.QuestLogNative?.isNative){
@@ -2313,12 +2368,19 @@ function renderRuntimeSession(){
  }
 }
 
+function refreshSocialIndicators({announce=false}={}){
+ if(runtimeInfo?.runtime!=='cloudflare')return;
+ refreshActivityBadge(announce).catch(()=>{});
+ loadConversations(true).then(()=>{if(currentAppView()==='messages')renderConversationList()}).catch(()=>{});
+ refreshFriendBadge().catch(()=>{});
+}
 function startActivityPolling(){
  clearInterval(activityPollTimer);
  if(runtimeInfo?.runtime!=='cloudflare')return;
- activityPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshActivityBadge().catch(()=>{})},60000);
+ refreshSocialIndicators({announce:false});
+ activityPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshSocialIndicators({announce:true})},15000);
 }
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare')refreshActivityBadge().catch(()=>{})});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare')refreshSocialIndicators({announce:true})});
 
 document.addEventListener('click',event=>{
  const menu=$('accountMenu');
@@ -2779,16 +2841,19 @@ async function loadConversations(force=false){
 }
 function renderConversationList(){
  const root=$('conversationList');if(!root)return;
- const list=conversationData?.conversations||[];
- $('messagesInboxMeta').textContent=list.length?(list.length+' conversation'+(list.length===1?'':'s')):'Quest Log friends only';
+ const all=conversationData?.conversations||[],query=String(conversationSearchQuery||'').trim().toLowerCase();
+ const list=query?all.filter(conversation=>[conversation.title,conversation.lastMessage,...(conversation.members||[]).flatMap(member=>[member.displayName,member.email])].some(value=>String(value||'').toLowerCase().includes(query))):all;
+ const inboxMeta=$('messagesInboxMeta');
+ if(inboxMeta)inboxMeta.textContent=query?(list.length+' result'+(list.length===1?'':'s')):(all.length?(all.length+' conversation'+(all.length===1?'':'s')):'Quest Log friends only');
  root.innerHTML=list.length?list.map(conversation=>{
-   const preview=conversation.lastMessage||((conversation.type==='group'?conversation.memberCount+' members':'Start chatting'));
-   return '<button class="conversation-row '+(conversation.conversationId===activeConversationId?'on':'')+'" type="button" data-conversation-id="'+esc(conversation.conversationId)+'">'+
+   const fromYou=conversation.lastSenderUserId&&conversation.lastSenderUserId===runtimeInfo?.profile?.userId;
+   const preview=conversation.lastMessage?((fromYou?'You: ':'')+conversation.lastMessage):(conversation.type==='group'?conversation.memberCount+' members':'Start chatting');
+   return '<button class="conversation-row '+(conversation.conversationId===activeConversationId?'on ':'')+(conversation.unreadCount?'unread':'')+'" type="button" data-conversation-id="'+esc(conversation.conversationId)+'">'+
      '<span class="conversation-avatar '+(conversation.type==='group'?'group':'')+'">'+conversationAvatarHtml(conversation)+'</span>'+
-     '<span class="conversation-copy"><strong>'+esc(conversation.title||'Conversation')+'</strong><span>'+esc(preview)+'</span></span>'+
-     '<span class="conversation-meta"><span class="conversation-time">'+esc(conversationRelativeTime(conversation.lastMessageAt||conversation.updatedAt))+'</span>'+(conversation.unreadCount?'<span class="message-unread">'+esc(conversation.unreadCount)+'</span>':'')+'</span>'+
+     '<span class="conversation-copy"><strong>'+esc(conversation.title||'Conversation')+'</strong><span class="conversation-preview">'+esc(preview)+'</span></span>'+
+     '<span class="conversation-meta"><span class="conversation-time">'+esc(conversationRelativeTime(conversation.lastMessageAt||conversation.updatedAt))+'</span>'+(conversation.unreadCount?'<span class="message-unread" aria-label="'+esc(conversation.unreadCount)+' unread"></span>':'')+'</span>'+
    '</button>';
- }).join(''):'<div class="empty">No conversations yet.<div class="meta" style="margin-top:5px">Message a friend or make a group.</div></div>';
+ }).join(''):'<div class="empty">'+(query?'No conversations match your search.':'No conversations yet.<div class="meta" style="margin-top:5px">Message a friend or make a group.</div>')+'</div>';
  root.querySelectorAll('[data-conversation-id]').forEach(button=>button.onclick=()=>openConversation(button.dataset.conversationId));
 }
 function renderMessageItems(){
@@ -2956,7 +3021,10 @@ function openGroupEventModal(event=null){
 }
 
 if($('newDirectMessage'))$('newDirectMessage').onclick=openNewDirectMessage;
+if($('newDirectMessageTop'))$('newDirectMessageTop').onclick=openNewDirectMessage;
 if($('newGroupMessage'))$('newGroupMessage').onclick=openNewGroup;
+if($('messagesNotifications'))$('messagesNotifications').onclick=openNotificationCenter;
+if($('conversationSearch'))$('conversationSearch').oninput=event=>{conversationSearchQuery=event.target.value.trim().toLowerCase();renderConversationList()};
 if($('messagesBack'))$('messagesBack').onclick=closeConversationMobile;
 if($('groupMembersButton'))$('groupMembersButton').onclick=openGroupMembers;
 if($('newGroupEvent'))$('newGroupEvent').onclick=()=>openGroupEventModal();
@@ -3057,29 +3125,77 @@ function activityRelativeTime(value){
  return new Date(value).toLocaleDateString([],{month:'short',day:'numeric'});
 }
 function activityIcon(item){
- const map={friend_request:'+',friend_accepted:'✓',share_invite:'↗',share_accepted:'✓',share_declined:'×',share_permission:'✎',share_revoked:'−',shared_item_completed:'✓',shared_item_updated:'✦'};
+ const map={friend_request:'+',friend_accepted:'✓',share_invite:'↗',share_accepted:'✓',share_declined:'×',share_permission:'✎',share_revoked:'−',shared_item_completed:'✓',shared_item_updated:'✦',message:'✉',group_added:'◎',group_event_created:'◫',group_event_updated:'◫'};
  return map[item?.kind]||'•';
 }
 function setActivityBadge(count){
  const value=Math.max(0,Number(count)||0),text=value>99?'99+':String(value);
- for(const id of ['notificationBadge','desktopNotificationBadge','mobileNotificationBadge']){
+ for(const id of ['notificationBadge','desktopNotificationBadge','mobileNotificationBadge','messagesNotificationBadge']){
    const el=$(id);if(!el)continue;el.hidden=value===0;el.textContent=text;
  }
 }
-async function refreshActivityBadge(){
+function dismissInAppNotification(card){
+ if(!card)return;card.style.opacity='0';card.style.transform='translateY(-6px)';setTimeout(()=>card.remove(),180);
+}
+function navigateActivityRoute(route=''){
+ if(!route)return false;
+ try{
+   const target=new URL(route,location.origin),view=target.searchParams.get('view')||'';
+   if(view==='messages'){
+     const conversationId=target.searchParams.get('conversation')||'',tab=target.searchParams.get('tab')==='calendar'?'calendar':'chat';
+     if(conversationId){openConversation(conversationId,{tab});return true}
+   }
+   if(view==='profile'){
+     const userId=target.searchParams.get('user')||'';
+     if(userId){openProfile(userId);return true}
+   }
+   if(view&&APP_VIEWS.has(view)){setView(view);return true}
+ }catch{}
+ return false;
+}
+async function openActivityItem(item,{fromToast=false}={}){
+ if(!item)return;
+ if(item.kind==='friend_request'||item.kind==='share_invite'){
+   if(fromToast)openNotificationCenter();
+   return;
+ }
+ await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[item.notificationId]})}).catch(()=>{});
+ item.read=true;
+ activityData.unreadCount=Math.max(0,(activityData.unreadCount||0)-1);setActivityBadge(activityData.unreadCount);
+ if(!navigateActivityRoute(item.route)&&fromToast)openNotificationCenter();
+}
+function showInAppNotification(item){
+ const stack=$('inAppNotificationStack');if(!stack||!item)return;
+ const avatar=profileAvatarData({avatarData:item.actorAvatarData}),initial=(item.actorName||'?').trim().charAt(0).toUpperCase()||activityIcon(item);
+ const card=document.createElement('div');card.className='in-app-notification';card.setAttribute('role','button');card.tabIndex=0;
+ card.innerHTML='<div class="in-app-notification-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(initial))+'</div><div class="in-app-notification-copy"><strong>'+esc(item.title||'Quest Log')+'</strong><span>'+esc(item.body||'')+'</span></div><button class="in-app-notification-close" type="button" aria-label="Dismiss">×</button>';
+ const open=async()=>{dismissInAppNotification(card);await openActivityItem(item,{fromToast:true})};
+ card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
+ card.querySelector('.in-app-notification-close').onclick=e=>{e.stopPropagation();dismissInAppNotification(card)};
+ stack.prepend(card);while(stack.children.length>3)stack.lastElementChild.remove();
+ setTimeout(()=>dismissInAppNotification(card),6500);
+}
+async function refreshActivityBadge(announce=false){
  if(runtimeInfo?.runtime!=='cloudflare'){setActivityBadge(0);return activityData}
- try{activityData=await api('/api/activity?limit=60');setActivityBadge(activityData.unreadCount||0);return activityData}catch{return activityData}
+ try{
+   const next=await api('/api/activity?limit=60'),items=next.notifications||[];
+   if(activityPollPrimed){
+     const fresh=items.filter(item=>!item.read&&!activityKnownIds.has(item.notificationId));
+     if(announce)fresh.slice(0,2).reverse().forEach(showInAppNotification);
+   }
+   activityKnownIds=new Set(items.map(item=>item.notificationId));activityPollPrimed=true;activityData=next;setActivityBadge(next.unreadCount||0);return activityData;
+ }catch{return activityData}
 }
 function activityCardHtml(item){
- const avatar=profileAvatarData({avatarData:item.actorAvatarData}),initial=(item.actorName||'?').trim().charAt(0).toUpperCase(),pending=item.kind==='friend_request'||item.kind==='share_invite';
+ const avatar=profileAvatarData({avatarData:item.actorAvatarData}),initial=(item.actorName||'?').trim().charAt(0).toUpperCase();
  let actions='';
  if(item.kind==='friend_request'&&item.data?.friendshipId)actions='<div class="activity-actions"><button class="btn tiny primary" data-activity-friend="accept" data-notification-id="'+esc(item.notificationId)+'" data-friendship-id="'+esc(item.data.friendshipId)+'">Accept</button><button class="btn tiny ghost" data-activity-friend="decline" data-notification-id="'+esc(item.notificationId)+'" data-friendship-id="'+esc(item.data.friendshipId)+'">Decline</button></div>';
  if(item.kind==='share_invite')actions='<div class="activity-actions"><button class="btn tiny primary" data-activity-share="accept" data-notification-id="'+esc(item.notificationId)+'" data-owner-id="'+esc(item.targetOwnerUserId)+'" data-item-type="'+esc(item.targetType)+'" data-item-id="'+esc(item.targetId)+'">Accept</button><button class="btn tiny ghost" data-activity-share="decline" data-notification-id="'+esc(item.notificationId)+'" data-owner-id="'+esc(item.targetOwnerUserId)+'" data-item-type="'+esc(item.targetType)+'" data-item-id="'+esc(item.targetId)+'">Decline</button></div>';
- return '<div class="activity-card '+(item.read?'':'unread')+'" data-activity-open="'+esc(item.notificationId)+'" data-activity-route="'+esc(item.route||'')+'"><div class="activity-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':(initial||activityIcon(item)))+'</div><div class="activity-copy"><div class="activity-title">'+esc(item.title)+'</div><div class="activity-body">'+esc(item.body||'')+'</div><div class="activity-time">'+esc(activityRelativeTime(item.createdAt))+'</div></div><div class="activity-side">'+(item.read?'':'<span class="activity-dot" aria-label="Unread"></span>')+actions+'</div></div>';
+ return '<div class="activity-card '+(item.read?'':'unread')+'" data-activity-open="'+esc(item.notificationId)+'"><div class="activity-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':(initial||activityIcon(item)))+'</div><div class="activity-copy"><div class="activity-title">'+esc(item.title)+'</div><div class="activity-body">'+esc(item.body||'')+'</div><div class="activity-time">'+esc(activityRelativeTime(item.createdAt))+'</div></div><div class="activity-side">'+(item.read?'':'<span class="activity-dot" aria-label="Unread"></span>')+actions+'</div></div>';
 }
 async function renderNotificationCenter(){
  const root=$('activityList');if(!root)return;
- const data=await refreshActivityBadge(),items=data.notifications||[];
+ const data=await refreshActivityBadge(false),items=data.notifications||[];
  if($('activityUnreadCount'))$('activityUnreadCount').textContent=(data.unreadCount||0)+' unread';
  if(!items.length){root.innerHTML='<div class="friend-empty">No notifications yet.</div>';return}
  const recent=[],earlier=[],cutoff=Date.now()-24*60*60*1000;
@@ -3094,11 +3210,8 @@ async function renderNotificationCenter(){
    try{await api('/api/shares/respond',{method:'POST',body:JSON.stringify({ownerUserId:button.dataset.ownerId,itemType:button.dataset.itemType,itemId:button.dataset.itemId,action:button.dataset.activityShare})});await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[button.dataset.notificationId]})});await renderNotificationCenter();await loadAll(true)}catch(error){button.disabled=false}
  });
  root.querySelectorAll('[data-activity-open]').forEach(card=>card.onclick=async()=>{
-   const id=card.dataset.activityOpen,route=card.dataset.activityRoute;
-   await api('/api/activity/read',{method:'POST',body:JSON.stringify({notificationIds:[id]})}).catch(()=>{});
-   setActivityBadge(Math.max(0,(activityData.unreadCount||0)-1));
-   if(route){const view=new URL(route,location.origin).searchParams.get('view');if(view)setView(view)}
-   closeModal();
+   const item=(activityData.notifications||[]).find(entry=>entry.notificationId===card.dataset.activityOpen);
+   if(!item)return;await openActivityItem(item);closeModal();
  });
 }
 async function openNotificationCenter(){
@@ -5378,6 +5491,7 @@ async function bootQuestLog(){
    renderAppView(initial);
    initAppHistory(initial);
    if(initialRaw==='agent')openAgentDrawer();
+   startActivityPolling();
    refreshUpdateStatus();
    removeNativeBootOverlay();
  }catch(error){
