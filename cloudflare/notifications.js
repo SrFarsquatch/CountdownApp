@@ -216,6 +216,8 @@ export function notificationConfig(state,env){
     goalReminders:cfg.goalReminders,
     countdownReminders:cfg.countdownReminders,
     socialUpdates:cfg.socialUpdates,
+    messageNotifications:cfg.messageNotifications,
+    messagePush:cfg.messagePush,
     taskLeadMinutes:cfg.taskLeadMinutes,
     eventLeadMinutes:cfg.eventLeadMinutes,
     goalLeadMinutes:cfg.goalLeadMinutes,
@@ -234,6 +236,8 @@ export function updateNotificationPreferences(state,input={}){
     goalReminders:input.goalReminders??state.notifications?.goalReminders,
     countdownReminders:input.countdownReminders??state.notifications?.countdownReminders,
     socialUpdates:input.socialUpdates??state.notifications?.socialUpdates,
+    messageNotifications:input.messageNotifications??state.notifications?.messageNotifications,
+    messagePush:input.messagePush??state.notifications?.messagePush,
     taskLeadMinutes:input.taskLeadMinutes??state.notifications?.taskLeadMinutes,
     eventLeadMinutes:input.eventLeadMinutes??state.notifications?.eventLeadMinutes,
     goalLeadMinutes:input.goalLeadMinutes??state.notifications?.goalLeadMinutes,
@@ -316,7 +320,10 @@ async function sendToSubscriptions(state,payload,env,onlyEndpoint=''){
 }
 export async function sendInstantNotification(state,env,payload={}){
   const cfg=normalizeNotifications(state.notifications);state.notifications=cfg;
-  if(!cfg.enabled||!cfg.socialUpdates)return{sent:0,skipped:true};
+  const isMessage=String(payload.kind||'')==='message';
+  if(!cfg.enabled)return{sent:0,skipped:true};
+  if(isMessage&&!cfg.messagePush)return{sent:0,skipped:true};
+  if(!isMessage&&!cfg.socialUpdates)return{sent:0,skipped:true};
   const safePayload={
     title:cleanText(payload.title||'Quest Log',180),
     body:cleanText(payload.body||'',360),
