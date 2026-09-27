@@ -3075,7 +3075,7 @@ function prefetchConversationMessages(conversationId){
  if(!id||messageCache.has(id)||messagePrefetches.has(id))return;
  const request=api('/api/conversations/'+encodeURIComponent(id)+'/messages?limit=150&peek=1')
    .then(result=>{messageCache.set(id,result.messages||[]);return result})
-   .catch(error=>{throw error})
+   .catch(()=>({messages:[]}))
    .finally(()=>messagePrefetches.delete(id));
  messagePrefetches.set(id,request);
 }
@@ -3355,9 +3355,9 @@ function scheduleMessagePoll(delay=5000){
      if(messageResult&&conversationId===activeConversationId&&tab===activeConversationTab){
        const fresh=messageResult.messages||[],reactionMap=reactionResult?.reactions||{};
        if(fresh.length)messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
-       messageCache.set(conversationId,messageItems);
        const before=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
        messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||[]}));
+       messageCache.set(conversationId,messageItems);
        const after=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
        if(fresh.length||before!==after)renderMessageItems();
      }
