@@ -1,4 +1,4 @@
-const CACHE_NAME='quest-log-pwa-v5';
+const CACHE_NAME='quest-log-pwa-v6';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
@@ -6,7 +6,9 @@ const STATIC_ASSETS=[
   '/branding/icon-quest-192.png',
   '/branding/icon-quest-512.png',
   '/branding/icon-classic-maskable.svg',
-  '/branding/apple-touch-icon.png'
+  '/branding/apple-touch-icon.png',
+  '/integrations.css',
+  '/integrations-ui.js'
 ];
 
 self.addEventListener('install',event=>{
@@ -40,7 +42,7 @@ self.addEventListener('fetch',event=>{
 
   if(!STATIC_ASSETS.includes(url.pathname))return;
   event.respondWith(
-    caches.match(request).then(cached=>{
+    caches.match(request,{ignoreSearch:true}).then(cached=>{
       const fresh=fetch(request).then(response=>{
         if(response&&response.ok){
           const copy=response.clone();
