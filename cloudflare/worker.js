@@ -232,9 +232,24 @@ function ensureItemTitle(value,label,max){
   if(!cleanText(value,max)){const e=new Error(label+' is required.');e.status=400;throw e}
 }
 async function notifyUserActivity(env,userId,input={}){
+  const targetEnv=scopedUserEnv(env,{userId}),targetState=await loadState(targetEnv);
+  const cfg=targetState.notifications||{};
+  if(input.kind==='message'&&cfg.messageNotifications===false){
+    if(cfg.messagePush!==false){
+      try{
+        await sendInstantNotification(targetState,targetEnv,{
+          title:input.subject||'New message',
+          body:input.meta?.body||'You have a new Quest Log message.',
+          url:input.route||'/?view=messages',
+          kind:'message',
+          tag:'questlog-message-'+(input.targetId||Date.now())
+        });
+      }catch(error){console.warn('Quest Log message push failed',error)}
+    }
+    return null;
+  }
   const activity=await createActivityNotification(env,{...input,userId});
   try{
-    const targetEnv=scopedUserEnv(env,{userId}),targetState=await loadState(targetEnv);
     await sendInstantNotification(targetState,targetEnv,{
       title:activity.title,body:activity.body,url:activity.route,kind:activity.kind,
       tag:'questlog-activity-'+activity.notificationId
