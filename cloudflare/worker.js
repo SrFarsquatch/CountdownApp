@@ -22,6 +22,7 @@ import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfi
 import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listMessageReactions, toggleMessageReaction, listGroupEvents, listUserGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
+import { integrationDashboard, saveIntegrationPreference, recordFirstPartyActivity } from './integrations.js';
 
 let jwksCache={expiresAt:0,keys:[]};
 const encoder=new TextEncoder(),decoder=new TextDecoder();
@@ -546,6 +547,9 @@ async function handleApi(request,env,identity){
     }
     const e=new Error('Unsupported shared item type.');e.status=400;throw e;
   }
+  if(p==='/api/integrations'&&method==='GET')return json(await integrationDashboard(env,identity));
+  if(p==='/api/integrations/preferences'&&method==='PUT')return json(await saveIntegrationPreference(env,identity,await body(request)));
+  if(p==='/api/integrations/activity'&&method==='POST')return json(await recordFirstPartyActivity(env,identity,await body(request)),201);
   if(p==='/api/activity'&&method==='GET')return json(await listActivityNotifications(env,identity,{limit:Number(url.searchParams.get('limit'))||60}));
   if(p==='/api/activity/read'&&method==='POST')return json(await markActivityNotifications(env,identity,await body(request)));
   if(p==='/api/activity/remove'&&method==='POST'){const incoming=await body(request);return json(await removeActivityNotification(env,identity,incoming.notificationId))}
