@@ -52,6 +52,10 @@ function kindMessage(kind,actorName,subject='',targetType='item',meta={}){
   if(kind==='share_revoked')return{title:actor+' removed your access',body:name+' is no longer shared with you.'};
   if(kind==='shared_item_completed')return{title:actor+' completed '+name,body:'A shared '+targetType+' was completed.'};
   if(kind==='shared_item_updated')return{title:actor+' updated '+name,body:'A shared '+targetType+' was changed.'};
+  if(kind==='message')return{title:subject||actor,body:clean(meta.body||'',240)||('New message from '+actor)};
+  if(kind==='group_added')return{title:'Added to '+name,body:actor+' added you to a Quest Log group.'};
+  if(kind==='group_event_created')return{title:'New group event: '+name,body:actor+' added an event to the shared calendar.'};
+  if(kind==='group_event_updated')return{title:'Group event updated: '+name,body:actor+' changed a shared calendar event.'};
   return{title:actor+' updated Quest Log',body:subject||''};
 }
 function routeFor(targetType=''){
