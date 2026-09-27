@@ -395,7 +395,7 @@ async function handleApi(request,env,identity){
       await notifyUserActivity(env,userId,{
         kind:'message',actorUserId:identity.userId,targetType:'conversation',targetId:result.conversation.conversationId,
         subject:result.conversation.type==='group'?(result.conversation.title||'Group chat'):senderName,
-        body:(result.conversation.type==='group'?senderName+': ':'')+result.message.body.slice(0,180),
+        meta:{body:(result.conversation.type==='group'?senderName+': ':'')+result.message.body.slice(0,180)},
         dedupeKey:'message:'+result.message.messageId+':'+userId,
         route:'/?view=messages&conversation='+encodeURIComponent(result.conversation.conversationId)
       });
