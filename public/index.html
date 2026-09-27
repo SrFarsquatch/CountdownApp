@@ -2045,7 +2045,9 @@ body.modal-open{overflow:hidden}
   <button id="mobileAccountNav" class="mobile-account-nav" type="button" aria-label="Account" title="Account" aria-expanded="false"><span class="mobile-notification-badge" id="mobileNotificationBadge" hidden></span><span class="account-avatar" id="mobileNavAvatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span><span class="sr-only">Account</span><span class="mobile-update-dot" id="mobileUpdateDot" hidden></span></button>
 </nav>
 
-<div class="in-app-notification-stack" id="inAppNotificationStack" aria-live="polite" aria-atomic="false"></div>\n\n<div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
+<div class="in-app-notification-stack" id="inAppNotificationStack" aria-live="polite" aria-atomic="false"></div>
+
+<div class="mobile-undo" id="mobileUndo" role="status" aria-live="polite"><span id="mobileUndoText"></span><button type="button" id="mobileUndoButton">Undo</button></div>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal">
   <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="btn tiny ghost" id="modalClose">Close</button></div>
@@ -3211,7 +3213,9 @@ async function renderNotificationCenter(){
  });
  root.querySelectorAll('[data-activity-open]').forEach(card=>card.onclick=async()=>{
    const item=(activityData.notifications||[]).find(entry=>entry.notificationId===card.dataset.activityOpen);
-   if(!item)return;await openActivityItem(item);closeModal();
+   if(!item)return;
+   if(item.kind==='friend_request'||item.kind==='share_invite')return;
+   await openActivityItem(item);closeModal();
  });
 }
 async function openNotificationCenter(){
