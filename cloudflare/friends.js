@@ -6,23 +6,29 @@ function userId(identity){
  return value;
 }
 function pair(a,b){return String(a)<String(b)?[String(a),String(b)]:[String(b),String(a)]}
+let friendsSchemaReady=null;
 async function ensureFriendsSchema(env){
  if(!env.DB)throw new Error('Cloudflare D1 binding DB is not configured.');
- await env.DB.prepare(`
-  CREATE TABLE IF NOT EXISTS questlog_friendships(
-   friendship_id TEXT PRIMARY KEY,
-   user_low TEXT NOT NULL,
-   user_high TEXT NOT NULL,
-   requested_by TEXT NOT NULL,
-   status TEXT NOT NULL DEFAULT 'pending',
-   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-   accepted_at TEXT,
-   UNIQUE(user_low,user_high)
-  )
- `).run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_friendships_low ON questlog_friendships(user_low,status)').run();
- await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_friendships_high ON questlog_friendships(user_high,status)').run();
+ if(!friendsSchemaReady){
+  friendsSchemaReady=env.DB.batch([
+   env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS questlog_friendships(
+     friendship_id TEXT PRIMARY KEY,
+     user_low TEXT NOT NULL,
+     user_high TEXT NOT NULL,
+     requested_by TEXT NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending',
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+     accepted_at TEXT,
+     UNIQUE(user_low,user_high)
+    )
+   `),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_friendships_low ON questlog_friendships(user_low,status)'),
+   env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_questlog_friendships_high ON questlog_friendships(user_high,status)')
+  ]).then(()=>undefined).catch(error=>{friendsSchemaReady=null;throw error});
+ }
+ return friendsSchemaReady;
 }
 function publicPerson(row){
  return{
@@ -106,21 +112,24 @@ export async function removeFriend(env,identity,friendshipId){
 
 
 export async function getSocialProfile(env,identity,targetUserId=''){
- await ensureFriendsSchema(env);
  const current=userId(identity),target=clean(targetUserId||current,120),isSelf=target===current;
  if(!target){const e=new Error('Profile user is required.');e.status=400;throw e}
- let friendshipId='',isFriend=false;
+ const rowPromise=env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,profile_accent,profile_settings_json,pinned_goal_ids_json,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
+ const countPromise=env.DB.prepare("SELECT COUNT(*) AS count FROM questlog_friendships WHERE status='accepted' AND (user_low=? OR user_high=?)").bind(target,target).first();
+ let relationPromise=Promise.resolve(null);
  if(!isSelf){
   const [low,high]=pair(current,target);
-  const relation=await env.DB.prepare("SELECT friendship_id,status FROM questlog_friendships WHERE user_low=? AND user_high=? LIMIT 1").bind(low,high).first();
+  relationPromise=env.DB.prepare("SELECT friendship_id,status FROM questlog_friendships WHERE user_low=? AND user_high=? LIMIT 1").bind(low,high).first();
+ }
+ const [row,countRow,relation]=await Promise.all([rowPromise,countPromise,relationPromise]);
+ if(!row||String(row.status||'active')!=='active'){const e=new Error('Profile not found.');e.status=404;throw e}
+ let friendshipId='',isFriend=false;
+ if(!isSelf){
   if(!relation||relation.status!=='accepted'){const e=new Error('This profile is only available to friends.');e.status=403;throw e}
   friendshipId=String(relation.friendship_id||'');isFriend=true;
  }
- const row=await env.DB.prepare("SELECT user_id,primary_email,display_name,avatar_data,bio,profile_visibility,profile_accent,profile_settings_json,pinned_goal_ids_json,created_at,status FROM questlog_users WHERE user_id=? LIMIT 1").bind(target).first();
- if(!row||String(row.status||'active')!=='active'){const e=new Error('Profile not found.');e.status=404;throw e}
  const visibility=['friends','private'].includes(String(row.profile_visibility||''))?String(row.profile_visibility):'friends';
  if(!isSelf&&visibility==='private'){const e=new Error('This profile is private.');e.status=403;throw e}
- const countRow=await env.DB.prepare("SELECT COUNT(*) AS count FROM questlog_friendships WHERE status='accepted' AND (user_low=? OR user_high=?)").bind(target,target).first();
  let profileSettings={};try{profileSettings=JSON.parse(row.profile_settings_json||'{}')}catch{}
  let pinnedGoalIds=[];try{pinnedGoalIds=JSON.parse(row.pinned_goal_ids_json||'[]')}catch{}
  const accent=['quest','violet','blue','green','orange','rose'].includes(String(row.profile_accent||''))?String(row.profile_accent):'quest';
