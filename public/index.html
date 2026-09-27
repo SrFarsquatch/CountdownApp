@@ -5287,7 +5287,7 @@ async function loadAll(force=false){
    state=await api('/api/state');
    appearanceDraft=normalizedAppearance(state.appearance||{});applyAppearance(appearanceDraft);
  }
- await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets(),loadFinance()]);
+ await Promise.all([loadCalendarEvents(),loadWeather(),loadMarkets(),loadFinance(),loadConversations()]);
  renderToday();renderTasks();renderGoals();renderCountdowns();renderFinance();renderMarkets();renderAgent();
  const current=document.querySelector('.view.on')?.id.replace('view-','')||'today';
  if(current==='planner')setPlannerSection(plannerSection,{render:true});if(current==='markets'){renderFinance();renderMarkets();}if(current==='settings')setSettingsSection(settingsSection,{render:true});if(current==='profile')renderSocialProfile(true).catch(console.warn);if(current==='messages')renderMessagesView(true)
