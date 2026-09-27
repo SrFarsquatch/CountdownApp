@@ -402,7 +402,7 @@ async function handleApi(request,env,identity){
     return json(result);
   }
   const conversationMessagesMatch=p.match(/^\/api\/conversations\/([^/]+)\/messages$/);
-  if(conversationMessagesMatch&&method==='GET')return json(await listMessages(env,identity,decodeURIComponent(conversationMessagesMatch[1]),{after:url.searchParams.get('after')||'',limit:Number(url.searchParams.get('limit'))||120}));
+  if(conversationMessagesMatch&&method==='GET')return json(await listMessages(env,identity,decodeURIComponent(conversationMessagesMatch[1]),{after:url.searchParams.get('after')||'',limit:Number(url.searchParams.get('limit'))||120,markRead:url.searchParams.get('peek')!=='1'}));
   if(conversationMessagesMatch&&method==='POST'){
     const incoming=await body(request),result=await sendMessage(env,identity,decodeURIComponent(conversationMessagesMatch[1]),incoming);
     const senderName=identity.user?.displayName||identity.email||'Quest Log friend';
