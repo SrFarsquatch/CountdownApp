@@ -323,12 +323,20 @@ async function assertGroup(env,current,conversationId){
  if(row.type!=='group')fail('Shared calendars are available for groups only.',400);
  return row;
 }
+function groupCalendarColor(conversationId=''){
+ const palette=['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d','#9333ea','#ea580c'];
+ let hash=0;
+ for(const char of String(conversationId||''))hash=((hash*31)+char.charCodeAt(0))>>>0;
+ return palette[hash%palette.length];
+}
 function publicGroupEvent(row,current){
+ const conversationId=String(row.conversation_id||'');
  return{
-  eventId:String(row.event_id||''),conversationId:String(row.conversation_id||''),title:String(row.title||''),
+  eventId:String(row.event_id||''),conversationId,title:String(row.title||''),
   description:String(row.description||''),location:String(row.location||''),start:String(row.start_at||''),end:String(row.end_at||''),
-  allDay:Boolean(row.all_day),createdBy:String(row.created_by||''),createdAt:row.created_at||null,updatedAt:row.updated_at||null,
+  allDay:Boolean(row.all_day),createdBy:String(row.created_by||''),createdAt:dbIso(row.created_at),updatedAt:dbIso(row.updated_at),
   creator:{userId:String(row.creator_user_id||row.created_by||''),displayName:String(row.creator_display_name||''),avatarData:String(row.creator_avatar_data||'')},
+  eventColor:groupCalendarColor(conversationId),
   canEdit:true,mine:String(row.created_by||'')===current
  };
 }
@@ -350,6 +358,51 @@ function eventPayload(input={}){
  if(new Date(end)<=new Date(start))fail('Event end must be after its start.');
  return{title,description,location,start,end,allDay};
 }
+export async function listUserGroupEvents(env,identity,{from='',to=''}={}){
+ await ensureMessagingSchema(env);
+ const current=accountId(identity);
+ let sql=`
+  SELECT e.*,c.title AS conversation_title,
+         u.user_id AS creator_user_id,u.display_name AS creator_display_name,u.avatar_data AS creator_avatar_data
+  FROM questlog_group_events e
+  JOIN questlog_conversations c ON c.conversation_id=e.conversation_id AND c.type='group'
+  JOIN questlog_conversation_members cm ON cm.conversation_id=e.conversation_id AND cm.user_id=?
+  LEFT JOIN questlog_users u ON u.user_id=e.created_by
+  WHERE 1=1
+ `,bind=[current];
+ if(from&&validIso(from)){sql+=' AND e.end_at>=?';bind.push(from)}
+ if(to&&validIso(to)){sql+=' AND e.start_at<?';bind.push(to)}
+ sql+=' ORDER BY e.start_at ASC,e.event_id ASC LIMIT 1000';
+ const result=await env.DB.prepare(sql).bind(...bind).all();
+ return(result.results||[]).map(row=>{
+  const event=publicGroupEvent(row,current),groupTitle=String(row.conversation_title||'Group');
+  return{
+   id:event.eventId,
+   eventId:event.eventId,
+   title:event.title,
+   description:event.description,
+   location:event.location,
+   start:event.start,
+   end:event.end,
+   allDay:event.allDay,
+   accountId:'questlog-groups',
+   accountLabel:'Quest Log',
+   calendarId:'group:'+event.conversationId,
+   calendarName:'Group · '+groupTitle,
+   calendarColor:event.eventColor,
+   eventColor:event.eventColor,
+   accessRole:'writer',
+   groupEvent:true,
+   groupConversationId:event.conversationId,
+   groupTitle,
+   createdBy:event.createdBy,
+   creator:event.creator,
+   canEdit:true,
+   mine:event.mine
+  };
+ });
+}
+
 export async function createGroupEvent(env,identity,conversationId,input={}){
  const current=accountId(identity),row=await assertGroup(env,current,conversationId),event=eventPayload(input),eventId=crypto.randomUUID();
  await env.DB.batch([
