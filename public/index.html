@@ -1552,8 +1552,8 @@ body.modal-open{overflow:hidden}
  body.messages-mode{overflow:hidden}
  body.messages-mode .top,
  body.messages-mode #agentFab,
- body.messages-mode #quickAdd,
- body.messages-mode .mobile-nav{display:none!important}
+ body.messages-mode #quickAdd{display:none!important}
+ body.messages-mode.conversation-open .mobile-nav{display:none!important}
  body.messages-mode .content{padding:0!important;max-width:none;margin:0}
  body.messages-mode #view-messages.on{
    position:fixed;
@@ -1590,6 +1590,9 @@ body.modal-open{overflow:hidden}
  }
  body.messages-mode .messages-title-block h2{font-size:24px}
  body.messages-mode .messages-title-block p{display:none}
+ body.messages-mode:not(.conversation-open) #view-messages.on{
+   height:calc(var(--messages-viewport-height,100dvh) - 78px - env(safe-area-inset-bottom))
+ }
  body.messages-mode.conversation-open .messages-page{grid-template-rows:minmax(0,1fr)}
  body.messages-mode.conversation-open .messages-topbar{display:none}
  body.messages-mode .messages-icon-button{width:39px;height:39px;border:0;background:transparent}
@@ -2025,9 +2028,13 @@ body.modal-open{overflow:hidden}
       <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
     </div>
     <div class="card setting-card" id="notificationSettingsCard">
-      <div class="eyebrow">Notifications</div><h3>Push reminders</h3>
-      <p class="meta">Get reminders for upcoming tasks, calendar events, goals, and countdowns even when Quest Log is not open.</p>
+      <div class="eyebrow">Notifications</div><h3>Notifications & push</h3>
+      <p class="meta">Choose which Quest Log activity appears in the app and which updates can reach this device as push notifications.</p>
       <div class="setting-row"><span>Device</span><strong id="notificationDeviceStatus">Checking support…</strong></div>
+      <label class="setting-row"><span>Message alerts</span><input id="notifyMessages" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="meta" style="margin:-4px 0 4px">Show new direct and group messages in Quest Log notifications and in-app banners.</div>
+      <label class="setting-row"><span>Message push notifications</span><input id="notifyMessagePush" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="meta" style="margin:-4px 0 4px">Send new-message notifications to enabled phones and browsers, even when Quest Log is not open.</div>
       <label class="setting-row"><span>Task reminders</span><input id="notifyTasks" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Task lead time</span><select id="notifyTaskLead"><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option></select></div>
       <label class="setting-row"><span>Calendar reminders</span><input id="notifyEvents" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
@@ -2276,6 +2283,8 @@ async function renderNotificationSettings(){
  $('notifyGoals').checked=cfg.goalReminders!==false;
  $('notifyCountdowns').checked=cfg.countdownReminders!==false;
  $('notifySocial').checked=cfg.socialUpdates!==false;
+ $('notifyMessages').checked=cfg.messageNotifications!==false;
+ $('notifyMessagePush').checked=cfg.messagePush!==false;
  $('notifyTaskLead').value=String(cfg.taskLeadMinutes||30);
  $('notifyEventLead').value=String(cfg.eventLeadMinutes||15);
  $('notifyGoalLead').value=String(cfg.goalLeadMinutes||1440);
@@ -2326,6 +2335,8 @@ async function saveNotificationPreferences(){
    goalReminders:$('notifyGoals').checked,
    countdownReminders:$('notifyCountdowns').checked,
    socialUpdates:$('notifySocial').checked,
+   messageNotifications:$('notifyMessages').checked,
+   messagePush:$('notifyMessagePush').checked,
    taskLeadMinutes:Number($('notifyTaskLead').value),
    eventLeadMinutes:Number($('notifyEventLead').value),
    goalLeadMinutes:Number($('notifyGoalLead').value),
