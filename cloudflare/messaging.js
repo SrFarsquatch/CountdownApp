@@ -272,19 +272,17 @@ export async function addGroupMembers(env,identity,conversationId,userIds=[]){
  await env.DB.prepare("UPDATE questlog_conversations SET updated_at=datetime('now') WHERE conversation_id=?").bind(row.conversation_id).run();
  return getConversation(env,identity,row.conversation_id);
 }
-export async function listMessages(env,identity,conversationId,{after='',limit=120}={}){
+export async function listMessages(env,identity,conversationId,{after='',limit=120,markRead=true}={}){
  const current=accountId(identity),row=await memberRow(env,current,conversationId),bounded=Math.max(1,Math.min(200,Number(limit)||120));
- let result;
- if(after){
-  result=await env.DB.prepare(`
+ const messageQuery=after
+  ?env.DB.prepare(`
    SELECT m.message_id,m.conversation_id,m.sender_user_id,m.body,m.created_at,m.edited_at,
           u.primary_email,u.display_name,u.avatar_data
    FROM questlog_messages m JOIN questlog_users u ON u.user_id=m.sender_user_id
    WHERE m.conversation_id=? AND m.created_at>=?
    ORDER BY m.created_at ASC,m.message_id ASC LIMIT ?
-  `).bind(row.conversation_id,after,bounded).all();
- }else{
-  result=await env.DB.prepare(`
+  `).bind(row.conversation_id,after,bounded).all()
+  :env.DB.prepare(`
    SELECT * FROM(
     SELECT m.message_id,m.conversation_id,m.sender_user_id,m.body,m.created_at,m.edited_at,
            u.primary_email,u.display_name,u.avatar_data
@@ -293,14 +291,16 @@ export async function listMessages(env,identity,conversationId,{after='',limit=1
     ORDER BY m.created_at DESC,m.message_id DESC LIMIT ?
    ) ORDER BY created_at ASC,message_id ASC
   `).bind(row.conversation_id,bounded).all();
- }
- const reactionMap=after?{}:await reactionsForConversation(env,current,row.conversation_id);
+ const reactionQuery=after?Promise.resolve({}):reactionsForConversation(env,current,row.conversation_id);
+ const readUpdate=markRead
+  ?env.DB.prepare("UPDATE questlog_conversation_members SET last_read_at=datetime('now') WHERE conversation_id=? AND user_id=?").bind(row.conversation_id,current).run()
+  :Promise.resolve(null);
+ const [result,reactionMap]=await Promise.all([messageQuery,reactionQuery,readUpdate]).then(values=>[values[0],values[1]]);
  const messages=(result.results||[]).map(message=>({
   messageId:String(message.message_id||''),conversationId:String(message.conversation_id||''),body:String(message.body||''),
   createdAt:dbIso(message.created_at),editedAt:dbIso(message.edited_at),sender:person(message),mine:String(message.sender_user_id||'')===current,
   reactions:reactionMap[String(message.message_id||'')]||[]
  }));
- await env.DB.prepare("UPDATE questlog_conversation_members SET last_read_at=datetime('now') WHERE conversation_id=? AND user_id=?").bind(row.conversation_id,current).run();
  return{messages};
 }
 export async function sendMessage(env,identity,conversationId,input={}){
