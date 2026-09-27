@@ -3233,28 +3233,40 @@ function renderConversationWorkspace(){
  document.querySelectorAll('[data-conversation-pane]').forEach(pane=>pane.classList.toggle('on',pane.dataset.conversationPane===activeConversationTab));
  renderMessageItems();renderGroupCalendar();
 }
+let conversationContentRequestSeq=0,messagePollInFlight=false;
 async function loadConversationContent(){
  if(!activeConversationId)return;
- const conversationResult=await api('/api/conversations/'+encodeURIComponent(activeConversationId));
+ const conversationId=activeConversationId,tab=activeConversationTab,seq=++conversationContentRequestSeq;
+ const encoded=encodeURIComponent(conversationId);
+ const conversationPromise=api('/api/conversations/'+encoded);
+ const messagesPromise=tab==='chat'?api('/api/conversations/'+encoded+'/messages?limit=150'):Promise.resolve({messages:[]});
+ const [conversationResult,messageResult]=await Promise.all([conversationPromise,messagesPromise]);
+ if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
  activeConversation=conversationResult.conversation||null;
- if(activeConversationTab==='chat'){
-   const messageResult=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages?limit=150');
-   messageItems=messageResult.messages||[];
- }else messageItems=[];
- if(activeConversation?.type==='group'){
-   try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}catch{groupEventItems=[]}
- }else groupEventItems=[];
- if(activeConversationTab==='chat'){
-   const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
+ messageItems=messageResult.messages||[];
+ groupEventItems=[];
+ if(tab==='chat'){
+   const item=(conversationData.conversations||[]).find(x=>x.conversationId===conversationId);
    if(item)item.unreadCount=0;
    conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
  }
  renderConversationList();renderConversationWorkspace();
+ if(activeConversation?.type==='group'){
+   try{
+     const result=await api('/api/conversations/'+encoded+'/events');
+     if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
+     groupEventItems=result.events||[];
+   }catch{
+     if(seq!==conversationContentRequestSeq||conversationId!==activeConversationId)return;
+     groupEventItems=[];
+   }
+   renderGroupCalendar();
+ }
 }
-async function renderMessagesView(force=false){
+async function renderMessagesView(force=false,{loadActive=true}={}){
  if(force||!(conversationData?.conversations||[]).length)await loadConversations(force);
  renderConversationList();
- if(activeConversationId){
+ if(activeConversationId&&loadActive){
    try{await loadConversationContent()}catch(error){console.warn(error);activeConversation=null;renderConversationWorkspace()}
  }else renderConversationWorkspace();
 }
@@ -3262,15 +3274,21 @@ function scheduleMessagePoll(delay=5000){
  clearTimeout(messagePollTimer);
  if(currentAppView()!=='messages')return;
  messagePollTimer=setTimeout(async()=>{
+   if(messagePollInFlight){scheduleMessagePoll(5000);return}
+   messagePollInFlight=true;
    try{
-     const previousLast=messageItems.at(-1)?.createdAt||'';
-     await loadConversations(true);renderConversationList();
-     if(activeConversationId&&activeConversationTab==='chat'){
-       const [result,reactionResult]=await Promise.all([
-         api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150')),
-         api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/reactions')
-       ]);
-       const fresh=result.messages||[],reactionMap=reactionResult.reactions||{};
+     const conversationId=activeConversationId,tab=activeConversationTab,previousLast=messageItems.at(-1)?.createdAt||'';
+     const conversationsPromise=loadConversations(true);
+     const messagesPromise=conversationId&&tab==='chat'
+       ?api('/api/conversations/'+encodeURIComponent(conversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150'))
+       :Promise.resolve(null);
+     const reactionsPromise=conversationId&&tab==='chat'
+       ?api('/api/conversations/'+encodeURIComponent(conversationId)+'/reactions')
+       :Promise.resolve(null);
+     const [conversationResult,messageResult,reactionResult]=await Promise.all([conversationsPromise,messagesPromise,reactionsPromise]);
+     if(conversationResult)renderConversationList();
+     if(messageResult&&conversationId===activeConversationId&&tab===activeConversationTab){
+       const fresh=messageResult.messages||[],reactionMap=reactionResult?.reactions||{};
        if(fresh.length)messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];
        const before=JSON.stringify(messageItems.map(item=>[item.messageId,item.reactions||[]]));
        messageItems=messageItems.map(item=>({...item,reactions:reactionMap[item.messageId]||[]}));
@@ -3278,12 +3296,19 @@ function scheduleMessagePoll(delay=5000){
        if(fresh.length||before!==after)renderMessageItems();
      }
    }catch(error){console.warn('Message refresh failed',error)}
+   finally{messagePollInFlight=false}
    scheduleMessagePoll(5000);
  },Math.max(0,delay));
 }
 function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
- activeConversationId=String(conversationId||'');activeConversationTab=tab==='calendar'?'calendar':'chat';activeConversation=null;messageItems=[];groupEventItems=[];
- setView('messages',{historyMode:'none'});renderConversationList();renderConversationWorkspace();loadConversationContent().catch(console.warn);scheduleMessagePoll();
+ const nextConversationId=String(conversationId||''),nextTab=tab==='calendar'?'calendar':'chat';
+ activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];
+ conversationContentRequestSeq++;
+ setView('messages',{historyMode:'none'});
+ activeConversationId=nextConversationId;activeConversationTab=nextTab;
+ renderConversationList();renderConversationWorkspace();
+ loadConversationContent().catch(console.warn);
+ scheduleMessagePoll();
  if(appHistoryReady&&historyMode!=='none'){
    const state={questlog:true,type:'view',view:'messages',conversationId:activeConversationId,tab:activeConversationTab};
    if(historyMode==='replace')history.replaceState(state,'',appViewUrl('messages'));else history.pushState(state,'',appViewUrl('messages'));
