@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { createHealthBridge } from './health-bridge.js';
 
 const APP_VERSION = __QUESTLOG_VERSION__;
 const API_ORIGIN = 'https://questlog.mattmoonie.ca';
@@ -411,6 +412,8 @@ async function initializeNative() {
   refreshPushRegistration().catch(() => {});
 }
 
+const healthBridge=createHealthBridge({Capacitor,nativeApi,platform});
+
 window.QuestLogNative = {
   get isNative() { return isNative(); },
   get platform() { return platform(); },
@@ -433,7 +436,8 @@ window.QuestLogNative = {
     disable: disablePush,
     test: testPush,
     refresh: refreshPushRegistration
-  }
+  },
+  health: healthBridge
 };
 
 initializeNative().catch(() => {});
