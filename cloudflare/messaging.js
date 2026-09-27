@@ -8,6 +8,13 @@ function fail(message,status=400){const e=new Error(message);e.status=status;thr
 function unique(values,max=50){return[...new Set((Array.isArray(values)?values:[]).map(value=>clean(value,120)).filter(Boolean))].slice(0,max)}
 function pairKey(a,b){return[a,b].map(String).sort().join(':')}
 function validIso(value){const time=Date.parse(String(value||''));return Number.isFinite(time)}
+function dbIso(value){
+ const raw=String(value||'').trim();
+ if(!raw)return null;
+ if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw))return raw.replace(' ','T')+'Z';
+ if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw))return raw+'Z';
+ return raw;
+}
 function person(row,prefix=''){
  const p=prefix?prefix+'_':'';
  return{
@@ -112,7 +119,7 @@ async function membersFor(env,conversationId){
   WHERE cm.conversation_id=? AND u.status='active'
   ORDER BY CASE WHEN cm.role='owner' THEN 0 ELSE 1 END, lower(COALESCE(u.display_name,u.primary_email,''))
  `).bind(conversationId).all();
- return(result.results||[]).map(row=>({...person(row),role:String(row.role||'member'),joinedAt:row.joined_at||null}));
+ return(result.results||[]).map(row=>({...person(row),role:String(row.role||'member'),joinedAt:dbIso(row.joined_at)}));
 }
 function reactionGroups(rows=[],current=''){
  const grouped=new Map();
@@ -157,10 +164,10 @@ function publicConversation(row,current,members,last={}){
   memberCount:members.length,
   role:String(row.role||'member'),
   createdBy:String(row.created_by||''),
-  createdAt:row.created_at||null,
-  updatedAt:row.updated_at||null,
+  createdAt:dbIso(row.created_at),
+  updatedAt:dbIso(row.updated_at),
   lastMessage:last.body||'',
-  lastMessageAt:last.created_at||null,
+  lastMessageAt:dbIso(last.created_at),
   lastSenderUserId:last.sender_user_id||'',
   unreadCount:Number(last.unread_count)||0
  };
@@ -261,7 +268,7 @@ export async function listMessages(env,identity,conversationId,{after='',limit=1
  const reactionMap=await reactionsForConversation(env,current,row.conversation_id);
  const messages=(result.results||[]).map(message=>({
   messageId:String(message.message_id||''),conversationId:String(message.conversation_id||''),body:String(message.body||''),
-  createdAt:message.created_at||null,editedAt:message.edited_at||null,sender:person(message),mine:String(message.sender_user_id||'')===current,
+  createdAt:dbIso(message.created_at),editedAt:dbIso(message.edited_at),sender:person(message),mine:String(message.sender_user_id||'')===current,
   reactions:reactionMap[String(message.message_id||'')]||[]
  }));
  await env.DB.prepare("UPDATE questlog_conversation_members SET last_read_at=datetime('now') WHERE conversation_id=? AND user_id=?").bind(row.conversation_id,current).run();
@@ -280,7 +287,7 @@ export async function sendMessage(env,identity,conversationId,input={}){
  const user=await env.DB.prepare('SELECT user_id,primary_email,display_name,avatar_data FROM questlog_users WHERE user_id=?').bind(current).first();
  const members=await membersFor(env,row.conversation_id);
  return{
-  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:stored?.created_at||new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true,reactions:[]},
+  message:{messageId,conversationId:row.conversation_id,body:message,createdAt:dbIso(stored?.created_at)||new Date().toISOString(),editedAt:null,sender:person(user||{}),mine:true,reactions:[]},
   recipients:members.filter(member=>member.userId!==current).map(member=>member.userId),
   conversation:{conversationId:row.conversation_id,type:row.type,title:row.title||'',members}
  };
