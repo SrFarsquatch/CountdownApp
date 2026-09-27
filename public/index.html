@@ -1539,7 +1539,7 @@ body.modal-open{overflow:hidden}
 .conversation-pane{display:none;min-height:0}.conversation-pane.on{display:grid}.chat-pane{grid-template-rows:minmax(0,1fr) auto}
 .message-list{overflow:auto;padding:20px 18px 14px;display:flex;flex-direction:column;gap:8px}
 .message-row{display:flex;gap:8px;align-items:flex-end;max-width:min(72%,620px)}.message-row.mine{align-self:flex-end;flex-direction:row-reverse}.message-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--panel2);font-size:8px;font-weight:900;flex:0 0 auto}.message-avatar img{width:100%;height:100%;object-fit:cover}
-.message-content{min-width:0;position:relative}.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;touch-action:pan-y;-webkit-user-select:none;user-select:none}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time{font-size:8px;color:var(--muted);margin-top:3px;padding:0 5px}.message-row.mine .message-time{text-align:right}.message-date-divider{align-self:stretch;display:flex;align-items:center;gap:10px;margin:8px 0 4px;color:var(--muted);font-size:9px}.message-date-divider:before,.message-date-divider:after{content:"";height:1px;background:var(--line);flex:1}.message-date-divider span{padding:0 4px}.message-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.message-row.mine .message-reactions{justify-content:flex-end}.message-reaction{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 6px;font-size:12px;display:inline-flex;gap:3px;align-items:center}.message-reaction.mine{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft)}.message-reaction span{font-size:9px;font-weight:800}.message-reaction-picker{position:absolute;z-index:25;bottom:calc(100% + 8px);left:0;display:flex;gap:2px;padding:5px 6px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 96%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.16);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);opacity:0;transform:translateY(6px) scale(.96);pointer-events:none;transition:opacity .12s ease,transform .12s ease;white-space:nowrap}.message-row.mine .message-reaction-picker{left:auto;right:0}.message-row.reaction-picker-open .message-reaction-picker{opacity:1;transform:none;pointer-events:auto}.message-reaction-picker button{width:34px;height:34px;border:0;background:transparent;border-radius:50%;padding:0;font-size:18px;display:grid;place-items:center;cursor:pointer}.message-reaction-picker button:hover,.message-reaction-picker button:focus-visible{background:var(--panel2);outline:none}
+.message-content{min-width:0;position:relative}.message-bubble{padding:9px 12px;border-radius:18px 18px 18px 5px;background:var(--panel2);border:0;line-height:1.42;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;touch-action:pan-y;-webkit-user-select:none;user-select:none}.message-row.mine .message-bubble{background:var(--accent);color:var(--accent-contrast);border-radius:18px 18px 5px 18px}.message-author{font-size:8px;color:var(--muted);margin:0 0 3px 5px}.message-row.mine .message-author{display:none}.message-time-divider{align-self:stretch;text-align:center;color:var(--muted);font-size:9px;font-weight:650;margin:12px 0 6px}.message-time-divider span{display:inline-block;padding:2px 8px}.message-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.message-row.mine .message-reactions{justify-content:flex-end}.message-reaction{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 6px;font-size:12px;display:inline-flex;gap:3px;align-items:center}.message-reaction.mine{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--accent-soft)}.message-reaction span{font-size:9px;font-weight:800}.message-reaction-picker{position:absolute;z-index:25;bottom:calc(100% + 8px);left:0;display:flex;gap:2px;padding:5px 6px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 96%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.16);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);opacity:0;transform:translateY(6px) scale(.96);pointer-events:none;transition:opacity .12s ease,transform .12s ease;white-space:nowrap}.message-row.mine .message-reaction-picker{left:auto;right:0}.message-row.reaction-picker-open .message-reaction-picker{opacity:1;transform:none;pointer-events:auto}.message-reaction-picker button{width:34px;height:34px;border:0;background:transparent;border-radius:50%;padding:0;font-size:18px;display:grid;place-items:center;cursor:pointer}.message-reaction-picker button:hover,.message-reaction-picker button:focus-visible{background:var(--panel2);outline:none}
 .chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line);background:var(--panel)}.chat-compose textarea{min-height:42px;max-height:120px;resize:none;border-radius:21px!important;padding:10px 14px!important;background:var(--panel2)!important;border:1px solid transparent!important}.chat-compose textarea:focus{background:var(--panel)!important;border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important}.chat-compose .btn{align-self:end;min-height:42px;border-radius:21px;padding:8px 16px}
 .group-calendar-event{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--event-color) 34%,transparent)}
 .group-calendar-pane{grid-template-rows:auto minmax(0,1fr)}.group-calendar-toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.group-calendar-toolbar h3{margin:0}.group-calendar-events{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}.group-event-card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:12px;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:center;cursor:pointer}.group-event-date{display:grid;place-items:center;background:var(--panel2);border-radius:10px;padding:8px 4px}.group-event-date strong{font-size:20px;line-height:1}.group-event-date span{font-size:9px;color:var(--muted);font-weight:850;margin-top:3px}.group-event-copy strong{display:block}.group-event-copy .meta{margin-top:4px}.group-event-edit{font-size:10px;color:var(--muted)}
@@ -2070,8 +2070,10 @@ body.modal-open{overflow:hidden}
       <div class="setting-row"><span>Event lead time</span><select id="notifyEventLead"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
       <label class="setting-row"><span>Goal reminders</span><input id="notifyGoals" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Goal lead time</span><select id="notifyGoalLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
+      <label class="setting-row"><span>Invite push notifications</span><input id="notifyInvites" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
+      <div class="meta" style="margin:-4px 0 4px">Friend requests, planner invites, and group invitations can reach enabled phones and browsers even if broader social updates are off.</div>
       <label class="setting-row"><span>Social & collaboration</span><input id="notifySocial" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
-      <div class="meta" style="margin:-4px 0 4px">Friend requests, planner invites, responses, permission changes, and shared-item activity.</div>
+      <div class="meta" style="margin:-4px 0 4px">Responses, permission changes, shared-item updates, and other collaboration activity.</div>
       <label class="setting-row"><span>Countdown reminders</span><input id="notifyCountdowns" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Countdown lead time</span><select id="notifyCountdownLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
       <div class="modal-actions"><button class="btn" id="saveNotificationPreferencesButton" type="button">Save preferences</button><button class="btn" id="testNotification" type="button" disabled>Send test</button><button class="btn" id="disableNotifications" type="button" disabled>Disable on this device</button><button class="btn primary" id="enableNotifications" type="button">Enable notifications</button></div>
@@ -2303,6 +2305,24 @@ async function currentPushSubscription(){
  const registration=await navigator.serviceWorker.ready;
  return registration.pushManager.getSubscription();
 }
+let pushRegistrationSyncAt=0;
+async function syncPushRegistration({force=false}={}){
+ if(runtimeInfo?.runtime!=='cloudflare')return;
+ if(!force&&Date.now()-pushRegistrationSyncAt<5*60*1000)return;
+ pushRegistrationSyncAt=Date.now();
+ try{
+   if(window.QuestLogNative?.isNative){
+     await window.QuestLogNative.push.refresh();
+     return;
+   }
+   if(!window.isSecureContext||!('Notification' in window)||Notification.permission!=='granted')return;
+   const subscription=await currentPushSubscription();
+   if(!subscription)return;
+   await api('/api/notifications/subscribe',{method:'POST',body:JSON.stringify({subscription:subscription.toJSON()})});
+ }catch(error){
+   console.warn('Quest Log push registration sync failed',error);
+ }
+}
 async function renderNotificationSettings(){
  const status=$('notificationDeviceStatus'),enable=$('enableNotifications'),disable=$('disableNotifications'),test=$('testNotification');
  if(!status||!enable||!disable||!test)return;
@@ -2312,6 +2332,7 @@ async function renderNotificationSettings(){
  $('notifyGoals').checked=cfg.goalReminders!==false;
  $('notifyCountdowns').checked=cfg.countdownReminders!==false;
  $('notifySocial').checked=cfg.socialUpdates!==false;
+ $('notifyInvites').checked=cfg.invitePush!==false;
  $('notifyMessages').checked=cfg.messageNotifications!==false;
  $('notifyMessagePush').checked=cfg.messagePush!==false;
  $('notifyTaskLead').value=String(cfg.taskLeadMinutes||30);
@@ -2364,6 +2385,7 @@ async function saveNotificationPreferences(){
    goalReminders:$('notifyGoals').checked,
    countdownReminders:$('notifyCountdowns').checked,
    socialUpdates:$('notifySocial').checked,
+   invitePush:$('notifyInvites').checked,
    messageNotifications:$('notifyMessages').checked,
    messagePush:$('notifyMessagePush').checked,
    taskLeadMinutes:Number($('notifyTaskLead').value),
@@ -2382,6 +2404,7 @@ async function enablePushNotifications(){
      if(!configured)throw Error(window.QuestLogNative.platform==='android'?'Android push is not configured on the server.':'iOS push is not configured on the server.');
      await window.QuestLogNative.push.enable();
      state.notifications=await saveNotificationPreferences();
+     await syncPushRegistration({force:true});
      note.textContent='Notifications enabled on this device.';
      await renderNotificationSettings();
      return;
@@ -2529,7 +2552,12 @@ function startActivityPolling(){
  refreshSocialIndicators({announce:false});
  activityPollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshSocialIndicators({announce:true})},15000);
 }
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare')refreshSocialIndicators({announce:true})});
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible'&&runtimeInfo?.runtime==='cloudflare'){
+   refreshSocialIndicators({announce:true});
+   syncPushRegistration().catch(()=>{});
+ }
+});
 
 document.addEventListener('click',event=>{
  const menu=$('accountMenu');
@@ -3213,17 +3241,32 @@ function bindMessageReactions(root){
    bubble.onpointerleave=event=>{if(event.pointerType==='mouse')cancelMessageReactionHold()};
  });
 }
+function instagramMessageSeparator(message,previous){
+ const currentTime=new Date(message?.createdAt||'').getTime();
+ if(!Number.isFinite(currentTime))return'';
+ const previousTime=new Date(previous?.createdAt||'').getTime();
+ const dateLabel=messageDateLabel(message.createdAt);
+ let show=false;
+ if(!previous||!Number.isFinite(previousTime))show=true;
+ else{
+   const sameDate=messageDateLabel(previous.createdAt)===dateLabel;
+   const gap=currentTime-previousTime;
+   show=!sameDate||gap>=15*60*1000;
+ }
+ if(!show)return'';
+ const time=messageTimestamp(message.createdAt);
+ const label=dateLabel==='Today'?time:(dateLabel==='Yesterday'?'Yesterday '+time:dateLabel+' '+time);
+ return '<div class="message-time-divider"><span>'+esc(label)+'</span></div>';
+}
 function renderMessageItems(){
  const root=$('messageList');if(!root)return;
  if(!messageItems.length){root.innerHTML='<div class="empty">No messages yet. Say hello.</div>';return}
- let lastDate='';
- root.innerHTML=messageItems.map(message=>{
+ root.innerHTML=messageItems.map((message,index)=>{
    const sender=message.sender||{},avatar=profileAvatarData(sender),author=message.mine?'You':(sender.displayName||sender.email||'Friend');
-   const dateLabel=messageDateLabel(message.createdAt),divider=dateLabel&&dateLabel!==lastDate?'<div class="message-date-divider"><span>'+esc(dateLabel)+'</span></div>':'';
-   lastDate=dateLabel||lastDate;
-   return divider+'<div class="message-row '+(message.mine?'mine':'')+'" data-message-id="'+esc(message.messageId)+'">'+
+   const separator=instagramMessageSeparator(message,index>0?messageItems[index-1]:null);
+   return separator+'<div class="message-row '+(message.mine?'mine':'')+'" data-message-id="'+esc(message.messageId)+'">'+
      '<div class="message-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(sender)))+'</div>'+
-     '<div class="message-content"><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div>'+reactionChipHtml(message)+messageReactionPickerHtml(message)+'<div class="message-time">'+esc(messageTimestamp(message.createdAt))+'</div></div>'+
+     '<div class="message-content"><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div>'+reactionChipHtml(message)+messageReactionPickerHtml(message)+'</div>'+
    '</div>';
  }).join('');
  bindMessageReactions(root);
@@ -5991,6 +6034,7 @@ async function bootQuestLog(){
    }
 
    await withBootTimeout(loadAll(),30000,'Quest Log startup');
+   syncPushRegistration({force:true}).catch(()=>{});
    if(initial==='profile'&&!activeProfileUserId)activeProfileUserId=runtimeInfo?.profile?.userId||'';
    runViewRenderer('Initial '+initial,()=>renderAppView(initial));
    initAppHistory(initial);

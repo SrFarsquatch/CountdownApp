@@ -216,6 +216,7 @@ export function notificationConfig(state,env){
     goalReminders:cfg.goalReminders,
     countdownReminders:cfg.countdownReminders,
     socialUpdates:cfg.socialUpdates,
+    invitePush:cfg.invitePush,
     messageNotifications:cfg.messageNotifications,
     messagePush:cfg.messagePush,
     taskLeadMinutes:cfg.taskLeadMinutes,
@@ -236,6 +237,7 @@ export function updateNotificationPreferences(state,input={}){
     goalReminders:input.goalReminders??state.notifications?.goalReminders,
     countdownReminders:input.countdownReminders??state.notifications?.countdownReminders,
     socialUpdates:input.socialUpdates??state.notifications?.socialUpdates,
+    invitePush:input.invitePush??state.notifications?.invitePush,
     messageNotifications:input.messageNotifications??state.notifications?.messageNotifications,
     messagePush:input.messagePush??state.notifications?.messagePush,
     taskLeadMinutes:input.taskLeadMinutes??state.notifications?.taskLeadMinutes,
@@ -318,12 +320,14 @@ async function sendToSubscriptions(state,payload,env,onlyEndpoint=''){
   state.notifications=normalizeNotifications(cfg);
   return results;
 }
+const INVITE_PUSH_KINDS=new Set(['friend_request','share_invite','group_added']);
 export async function sendInstantNotification(state,env,payload={}){
   const cfg=normalizeNotifications(state.notifications);state.notifications=cfg;
-  const isMessage=String(payload.kind||'')==='message';
-  if(!cfg.enabled)return{sent:0,skipped:true};
-  if(isMessage&&!cfg.messagePush)return{sent:0,skipped:true};
-  if(!isMessage&&!cfg.socialUpdates)return{sent:0,skipped:true};
+  const kind=String(payload.kind||''),isMessage=kind==='message',isInvite=INVITE_PUSH_KINDS.has(kind);
+  if(!cfg.enabled)return{sent:0,skipped:true,reason:'disabled'};
+  if(isMessage&&!cfg.messagePush)return{sent:0,skipped:true,reason:'message-push-disabled'};
+  if(isInvite&&!cfg.invitePush)return{sent:0,skipped:true,reason:'invite-push-disabled'};
+  if(!isMessage&&!isInvite&&!cfg.socialUpdates)return{sent:0,skipped:true,reason:'social-updates-disabled'};
   const safePayload={
     title:cleanText(payload.title||'Quest Log',180),
     body:cleanText(payload.body||'',360),

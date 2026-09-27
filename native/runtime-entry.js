@@ -336,6 +336,10 @@ async function refreshPushRegistration() {
   const permission = await PushNotifications.checkPermissions();
   if (permission.receive !== 'granted') return;
   await createAndroidChannel();
+  const existing = nativePushToken || localStorage.getItem(PUSH_TOKEN_KEY) || '';
+  if (existing) {
+    try { await savePushRegistration(existing); } catch {}
+  }
   try { await PushNotifications.register(); } catch {}
 }
 
@@ -382,6 +386,10 @@ async function initializeNative() {
 
   await App.addListener('appUrlOpen', event => {
     handleNativeUrl(event.url).catch(() => {});
+  });
+
+  await App.addListener('appStateChange', state => {
+    if (state?.isActive) refreshPushRegistration().catch(() => {});
   });
 
   await Browser.addListener('browserFinished', () => {
