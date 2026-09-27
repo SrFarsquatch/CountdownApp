@@ -100,6 +100,9 @@ jobs:
       - name: Verify Android Quest Log app link
         run: grep -q 'android:host="questlog.mattmoonie.ca"' android/app/src/main/AndroidManifest.xml
 
+      - name: Verify Android keyboard resize behavior
+        run: grep -q 'android:windowSoftInputMode="adjustResize"' android/app/src/main/AndroidManifest.xml
+
       - name: Verify Android push metadata
         run: |
           grep -q 'default_notification_icon' android/app/src/main/AndroidManifest.xml
