@@ -2739,6 +2739,216 @@ async function acceptedFriends(force=false){
  try{const data=await api('/api/friends');friendDirectory=data.friends||[];return friendDirectory}
  catch{return friendDirectory||[]}
 }
+
+function conversationInitial(conversation){
+ const source=String(conversation?.title||'?').trim();
+ return(source[0]||'?').toUpperCase();
+}
+function conversationAvatarHtml(conversation){
+ const avatar=String(conversation?.avatarData||'');
+ if(avatar)return'<img src="'+esc(avatar)+'" alt="">';
+ return esc(conversationInitial(conversation));
+}
+function conversationRelativeTime(value){
+ if(!value)return'';
+ const ms=Date.now()-new Date(value).getTime();if(!Number.isFinite(ms))return'';
+ if(ms<60000)return'now';if(ms<3600000)return Math.max(1,Math.floor(ms/60000))+'m';
+ if(ms<86400000)return Math.max(1,Math.floor(ms/3600000))+'h';
+ return new Intl.DateTimeFormat([],{month:'short',day:'numeric'}).format(new Date(value));
+}
+function messageTimestamp(value){
+ if(!value)return'';
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return'';
+ return date.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
+function updateMessageBadge(){
+ const count=Number(conversationData?.unreadCount)||0,badge=$('mobileMessageBadge');
+ if(badge){badge.hidden=count<=0;badge.textContent=count>99?'99+':String(count)}
+}
+async function loadConversations(force=false){
+ if(messageLoading&&!force)return conversationData;
+ messageLoading=true;
+ try{
+   const data=await api('/api/conversations');
+   conversationData={conversations:data.conversations||[],unreadCount:Number(data.unreadCount)||0};
+   updateMessageBadge();
+   return conversationData;
+ }catch(error){console.warn('Could not load conversations',error);return conversationData}
+ finally{messageLoading=false}
+}
+function renderConversationList(){
+ const root=$('conversationList');if(!root)return;
+ const list=conversationData?.conversations||[];
+ $('messagesInboxMeta').textContent=list.length?(list.length+' conversation'+(list.length===1?'':'s')):'Quest Log friends only';
+ root.innerHTML=list.length?list.map(conversation=>{
+   const preview=conversation.lastMessage||((conversation.type==='group'?conversation.memberCount+' members':'Start chatting'));
+   return '<button class="conversation-row '+(conversation.conversationId===activeConversationId?'on':'')+'" type="button" data-conversation-id="'+esc(conversation.conversationId)+'">'+
+     '<span class="conversation-avatar '+(conversation.type==='group'?'group':'')+'">'+conversationAvatarHtml(conversation)+'</span>'+
+     '<span class="conversation-copy"><strong>'+esc(conversation.title||'Conversation')+'</strong><span>'+esc(preview)+'</span></span>'+
+     '<span class="conversation-meta"><span class="conversation-time">'+esc(conversationRelativeTime(conversation.lastMessageAt||conversation.updatedAt))+'</span>'+(conversation.unreadCount?'<span class="message-unread">'+esc(conversation.unreadCount)+'</span>':'')+'</span>'+
+   '</button>';
+ }).join(''):'<div class="empty">No conversations yet.<div class="meta" style="margin-top:5px">Message a friend or make a group.</div></div>';
+ root.querySelectorAll('[data-conversation-id]').forEach(button=>button.onclick=()=>openConversation(button.dataset.conversationId));
+}
+function renderMessageItems(){
+ const root=$('messageList');if(!root)return;
+ if(!messageItems.length){root.innerHTML='<div class="empty">No messages yet. Say hello.</div>';return}
+ root.innerHTML=messageItems.map(message=>{
+   const sender=message.sender||{},avatar=profileAvatarData(sender),author=message.mine?'You':(sender.displayName||sender.email||'Friend');
+   return '<div class="message-row '+(message.mine?'mine':'')+'">'+
+     '<div class="message-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(sender)))+'</div>'+
+     '<div><div class="message-author">'+esc(author)+'</div><div class="message-bubble">'+esc(message.body||'')+'</div><div class="message-time">'+esc(messageTimestamp(message.createdAt))+'</div></div>'+
+   '</div>';
+ }).join('');
+ root.scrollTop=root.scrollHeight;
+}
+function renderGroupCalendar(){
+ const root=$('groupCalendarEvents');if(!root)return;
+ if(!activeConversation||activeConversation.type!=='group'){root.innerHTML='<div class="empty">Shared calendar is available for groups.</div>';return}
+ const events=groupEventItems||[];
+ root.innerHTML=events.length?events.map(event=>{
+   const date=new Date(event.start),month=date.toLocaleDateString([],{month:'short'}).toUpperCase(),day=date.getDate();
+   const when=event.allDay?'All day':fmtTime(event.start)+' – '+fmtTime(event.end);
+   return '<div class="group-event-card" data-group-event="'+esc(event.eventId)+'" role="button" tabindex="0">'+
+     '<div class="group-event-date"><strong>'+esc(day)+'</strong><span>'+esc(month)+'</span></div>'+
+     '<div class="group-event-copy"><strong>'+esc(event.title||'Event')+'</strong><div class="meta">'+esc(fmtDate(event.start,{weekday:'short',year:'numeric'}))+' · '+esc(when)+(event.location?' · '+esc(event.location):'')+'</div></div>'+
+     '<div class="group-event-edit">Edit</div></div>';
+ }).join(''):'<div class="empty">No group events yet.<div class="meta" style="margin-top:5px">Everyone in this group can add events.</div></div>';
+ root.querySelectorAll('[data-group-event]').forEach(card=>{const open=()=>{const event=events.find(item=>item.eventId===card.dataset.groupEvent);if(event)openGroupEventModal(event)};card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
+}
+function renderConversationWorkspace(){
+ const shell=$('messagesShell'),workspace=$('conversationWorkspace'),empty=$('messagesEmpty');
+ if(!shell||!workspace||!empty)return;
+ if(!activeConversation){
+   shell.classList.remove('has-conversation');workspace.hidden=true;empty.hidden=false;return;
+ }
+ shell.classList.add('has-conversation');workspace.hidden=false;empty.hidden=true;
+ $('conversationHeadTitle').textContent=activeConversation.title||'Conversation';
+ $('conversationHeadMeta').textContent=activeConversation.type==='group'?(activeConversation.memberCount+' members · shared calendar'):'Direct message';
+ const avatar=$('conversationHeadAvatar');avatar.className='conversation-avatar '+(activeConversation.type==='group'?'group':'');avatar.innerHTML=conversationAvatarHtml(activeConversation);
+ $('conversationTabs').hidden=activeConversation.type!=='group';
+ $('groupMembersButton').hidden=activeConversation.type!=='group';
+ if(activeConversation.type!=='group'&&activeConversationTab==='calendar')activeConversationTab='chat';
+ document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.classList.toggle('on',button.dataset.conversationTab===activeConversationTab));
+ document.querySelectorAll('[data-conversation-pane]').forEach(pane=>pane.classList.toggle('on',pane.dataset.conversationPane===activeConversationTab));
+ renderMessageItems();renderGroupCalendar();
+}
+async function loadConversationContent(){
+ if(!activeConversationId)return;
+ const [conversationResult,messageResult]=await Promise.all([
+   api('/api/conversations/'+encodeURIComponent(activeConversationId)),
+   api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages?limit=150')
+ ]);
+ activeConversation=conversationResult.conversation||null;messageItems=messageResult.messages||[];
+ if(activeConversation?.type==='group'){
+   try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}catch{groupEventItems=[]}
+ }else groupEventItems=[];
+ const item=(conversationData.conversations||[]).find(x=>x.conversationId===activeConversationId);
+ if(item)item.unreadCount=0;
+ conversationData.unreadCount=(conversationData.conversations||[]).reduce((sum,x)=>sum+(Number(x.unreadCount)||0),0);updateMessageBadge();
+ renderConversationList();renderConversationWorkspace();
+}
+async function renderMessagesView(force=false){
+ if(force||!(conversationData?.conversations||[]).length)await loadConversations(force);
+ renderConversationList();
+ if(activeConversationId){
+   try{await loadConversationContent()}catch(error){console.warn(error);activeConversation=null;renderConversationWorkspace()}
+ }else renderConversationWorkspace();
+}
+function scheduleMessagePoll(delay=5000){
+ clearTimeout(messagePollTimer);
+ if(currentAppView()!=='messages')return;
+ messagePollTimer=setTimeout(async()=>{
+   try{
+     const previousLast=messageItems.at(-1)?.createdAt||'';
+     await loadConversations(true);renderConversationList();
+     if(activeConversationId){
+       const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages'+(previousLast?'?after='+encodeURIComponent(previousLast):'?limit=150'));
+       const fresh=result.messages||[];
+       if(fresh.length){messageItems=[...messageItems,...fresh.filter(item=>!messageItems.some(existing=>existing.messageId===item.messageId))];renderMessageItems()}
+     }
+   }catch(error){console.warn('Message refresh failed',error)}
+   scheduleMessagePoll(5000);
+ },Math.max(0,delay));
+}
+function openConversation(conversationId,{tab='chat',historyMode='push'}={}){
+ activeConversationId=String(conversationId||'');activeConversationTab=tab==='calendar'?'calendar':'chat';activeConversation=null;messageItems=[];groupEventItems=[];
+ setView('messages',{historyMode:'none'});renderConversationList();renderConversationWorkspace();loadConversationContent().catch(console.warn);scheduleMessagePoll();
+ if(appHistoryReady&&historyMode!=='none'){
+   const state={questlog:true,type:'view',view:'messages',conversationId:activeConversationId,tab:activeConversationTab};
+   if(historyMode==='replace')history.replaceState(state,'',appViewUrl('messages'));else history.pushState(state,'',appViewUrl('messages'));
+ }
+}
+function closeConversationMobile(){
+ activeConversationId='';activeConversation=null;messageItems=[];groupEventItems=[];$('messagesShell')?.classList.remove('has-conversation');renderConversationList();renderConversationWorkspace();
+ if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages'},'',appViewUrl('messages'));
+}
+async function startDirectMessage(userId){
+ const result=await api('/api/conversations/direct',{method:'POST',body:JSON.stringify({userId})});
+ await loadConversations(true);openConversation(result.conversation.conversationId);
+}
+async function openNewDirectMessage(){
+ const friends=await acceptedFriends(true);
+ if(!friends.length){openModal('New message','<div class="empty">Add a Quest Log friend first.</div>');return}
+ openModal('New message','<div class="group-create-members">'+friends.map(friend=>'<button class="group-create-member" type="button" data-direct-friend="'+esc(friend.userId)+'"><span class="friend-avatar">'+(profileAvatarData(friend)?'<img src="'+esc(profileAvatarData(friend))+'" alt="">':esc(friendInitial(friend)))+'</span><span><strong>'+esc(friendLabel(friend))+'</strong><div class="meta">'+esc(friend.email||'Quest Log friend')+'</div></span><span>›</span></button>').join('')+'</div>');
+ $('modalBody').querySelectorAll('[data-direct-friend]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{closeModal();await startDirectMessage(button.dataset.directFriend)}catch(error){console.warn(error)}});
+}
+async function openNewGroup(){
+ const friends=await acceptedFriends(true);
+ if(!friends.length){openModal('New group','<div class="empty">Add Quest Log friends first.</div>');return}
+ openModal('New group','<form id="newGroupForm"><div class="field"><label>Group name</label><input id="newGroupTitle" maxlength="100" placeholder="Weekend crew" required></div><div class="field" style="margin-top:12px"><label>Members</label><div class="group-create-members">'+friends.map(friend=>'<label class="group-create-member"><span class="friend-avatar">'+(profileAvatarData(friend)?'<img src="'+esc(profileAvatarData(friend))+'" alt="">':esc(friendInitial(friend)))+'</span><span><strong>'+esc(friendLabel(friend))+'</strong><div class="meta">'+esc(friend.email||'Quest Log friend')+'</div></span><input type="checkbox" data-new-group-member="'+esc(friend.userId)+'"></label>').join('')+'</div></div><div class="modal-actions"><button class="btn primary" type="submit">Create group</button></div></form>');
+ $('newGroupForm').onsubmit=async e=>{
+   e.preventDefault();const memberUserIds=[...document.querySelectorAll('[data-new-group-member]:checked')].map(input=>input.dataset.newGroupMember);
+   const title=$('newGroupTitle').value.trim();if(!memberUserIds.length)return;
+   const result=await api('/api/conversations/group',{method:'POST',body:JSON.stringify({title,memberUserIds})});closeModal();await loadConversations(true);openConversation(result.conversation.conversationId);
+ };
+}
+function groupMemberRows(members=[]){
+ return members.map(member=>'<div class="group-member-row"><span class="friend-avatar">'+(profileAvatarData(member)?'<img src="'+esc(profileAvatarData(member))+'" alt="">':esc(friendInitial(member)))+'</span><span><strong>'+esc(friendLabel(member))+'</strong><div class="meta">'+esc(member.email||'Quest Log user')+'</div></span><span class="pill">'+esc(member.role||'member')+'</span></div>').join('');
+}
+async function openGroupMembers(){
+ if(!activeConversation||activeConversation.type!=='group')return;
+ const canAdd=activeConversation.role==='owner',friends=canAdd?await acceptedFriends(true):[],existing=new Set((activeConversation.members||[]).map(member=>member.userId));
+ const choices=friends.filter(friend=>!existing.has(friend.userId));
+ openModal('Group members','<div class="group-member-grid">'+groupMemberRows(activeConversation.members||[])+'</div>'+(canAdd&&choices.length?'<div class="field" style="margin-top:16px"><label>Add friends</label><div class="group-create-members">'+choices.map(friend=>'<label class="group-create-member"><span class="friend-avatar">'+(profileAvatarData(friend)?'<img src="'+esc(profileAvatarData(friend))+'" alt="">':esc(friendInitial(friend)))+'</span><span><strong>'+esc(friendLabel(friend))+'</strong></span><input type="checkbox" data-add-group-member="'+esc(friend.userId)+'"></label>').join('')+'</div></div><div class="modal-actions"><button class="btn primary" id="addGroupMembers" type="button">Add members</button></div>':'');
+ if($('addGroupMembers'))$('addGroupMembers').onclick=async()=>{const userIds=[...document.querySelectorAll('[data-add-group-member]:checked')].map(input=>input.dataset.addGroupMember);if(!userIds.length)return;await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/members',{method:'POST',body:JSON.stringify({userIds})});closeModal();await loadConversationContent()};
+}
+function groupEventDetail(event){
+ let body='<div class="event-detail-grid">';
+ body+=questDetailRow('When',event.allDay?('All day · '+fmtDate(event.start,{year:'numeric'})):(fmtDate(event.start,{weekday:'long',year:'numeric'})+' · '+fmtTime(event.start)+' – '+fmtTime(event.end)));
+ if(event.location)body+=questDetailRow('Location',event.location);
+ if(event.description)body+=questDetailRow('Notes',event.description);
+ body+=questDetailRow('Calendar',activeConversation?.title||'Group calendar');
+ body+='<div class="modal-actions"><button class="btn primary" id="editGroupEvent" type="button">Edit</button></div></div>';
+ openModal(event.title||'Group event',body);$('editGroupEvent').onclick=()=>openGroupEventModal(event);
+}
+function openGroupEventModal(event=null){
+ if(!activeConversationId||activeConversation?.type!=='group')return;
+ const editing=Boolean(event),start=event?.start?new Date(event.start):new Date(Date.now()+3600000),end=event?.end?new Date(event.end):new Date(start.getTime()+3600000);
+ openModal(editing?'Edit group event':'New group event','<form id="groupEventForm"><div class="form-grid"><div class="field full"><label>Title</label><input id="groupEventTitle" required value="'+esc(event?.title||'')+'" placeholder="Dinner, practice, trip…"></div><div class="field"><label>Start</label><input id="groupEventStart" type="datetime-local" value="'+localInput(start)+'" required></div><div class="field"><label>End</label><input id="groupEventEnd" type="datetime-local" value="'+localInput(end)+'" required></div><div class="field full"><label><input id="groupEventAllDay" type="checkbox" style="width:auto" '+(event?.allDay?'checked':'')+'> All day</label></div><div class="field full"><label>Location</label><input id="groupEventLocation" value="'+esc(event?.location||'')+'" placeholder="Optional"></div><div class="field full"><label>Notes</label><textarea id="groupEventDescription" placeholder="Optional">'+esc(event?.description||'')+'</textarea></div></div><div class="modal-actions">'+(editing?'<button class="btn" id="deleteGroupEvent" type="button">Delete</button>':'')+'<button class="btn primary" type="submit">'+(editing?'Save changes':'Add to group calendar')+'</button></div></form>');
+ $('groupEventForm').onsubmit=async e=>{e.preventDefault();const payload={title:$('groupEventTitle').value.trim(),start:zonedInputToIso($('groupEventStart').value),end:zonedInputToIso($('groupEventEnd').value),allDay:$('groupEventAllDay').checked,location:$('groupEventLocation').value.trim(),description:$('groupEventDescription').value};await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events'+(editing?'/'+encodeURIComponent(event.eventId):''),{method:editing?'PUT':'POST',body:JSON.stringify(payload)});closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
+ if(editing&&$('deleteGroupEvent'))$('deleteGroupEvent').onclick=async()=>{if(!confirm('Delete this event from the group calendar?'))return;await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events/'+encodeURIComponent(event.eventId),{method:'DELETE'});closeModal();const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[];renderGroupCalendar()};
+}
+
+if($('newDirectMessage'))$('newDirectMessage').onclick=openNewDirectMessage;
+if($('newGroupMessage'))$('newGroupMessage').onclick=openNewGroup;
+if($('messagesBack'))$('messagesBack').onclick=closeConversationMobile;
+if($('groupMembersButton'))$('groupMembersButton').onclick=openGroupMembers;
+if($('newGroupEvent'))$('newGroupEvent').onclick=()=>openGroupEventModal();
+if($('messageForm'))$('messageForm').onsubmit=async e=>{
+ e.preventDefault();if(!activeConversationId)return;const input=$('messageInput'),value=input.value.trim();if(!value)return;
+ const button=e.currentTarget.querySelector('button');button.disabled=true;
+ try{const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/messages',{method:'POST',body:JSON.stringify({body:value})});input.value='';messageItems.push(result.message);renderMessageItems();await loadConversations(true);renderConversationList()}
+ finally{button.disabled=false;input.focus()}
+};
+document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.onclick=async()=>{
+ if(!activeConversation)return;activeConversationTab=button.dataset.conversationTab==='calendar'?'calendar':'chat';
+ if(activeConversationTab==='calendar'&&activeConversation.type==='group'){const result=await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/events');groupEventItems=result.events||[]}
+ renderConversationWorkspace();
+ if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages',conversationId:activeConversationId,tab:activeConversationTab},'',appViewUrl('messages'));
+});
+$('groupCalendarEvents')?.addEventListener('click',event=>{const card=event.target.closest('[data-group-event]');if(!card)return;const item=groupEventItems.find(x=>x.eventId===card.dataset.groupEvent);if(item)groupEventDetail(item)});
+
 function collaborationPermissionOptions(type,current='view'){
  const options=type==='task'||type==='goal'
   ?[['view','View only'],['complete','Can complete'],['edit','Can edit']]
