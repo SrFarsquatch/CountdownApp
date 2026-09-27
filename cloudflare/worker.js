@@ -19,6 +19,7 @@ import { renderEinkHtml } from '../eink/render.mjs';
 import { notificationConfig, updateNotificationPreferences, registerSubscription, unregisterSubscription, registerNativeDevice, unregisterNativeDevice, sendTestNotification, sendNativeTestNotification, runNotificationSweep, sendInstantNotification } from './notifications.js';
 import { nativeSession, signup, login, logout, updateProfile, authCookie, expiredAuthCookie, authPublicConfig, createNativeAuthChallenge } from './auth.js';
 import { listFriends, requestFriend, respondFriend, removeFriend, getSocialProfile, mutualFriends } from './friends.js';
+import { listConversations, createDirectConversation, createGroupConversation, getConversation, addGroupMembers, listMessages, sendMessage, listGroupEvents, createGroupEvent, updateGroupEvent, deleteGroupEvent } from './messaging.js';
 import { syncItemShare, deleteItemShare, decorateOwnedShares, sharedPlannerItems, mergeSharedEvents, sharedEventSnapshot, pruneSharesForFormerFriend, refreshOwnedShareSnapshots, listShareInvitations, respondShareInvitation, getSharedItemAccess } from './sharing.js';
 import { createActivityNotification, listActivityNotifications, markActivityNotifications, removeActivityNotification, resolveActivityByDedupe } from './activity.js';
 
@@ -353,6 +354,82 @@ async function handleApi(request,env,identity){
     };
     return json(response);
   }
+  if(p==='/api/conversations'&&method==='GET')return json(await listConversations(env,identity));
+  if(p==='/api/conversations/direct'&&method==='POST'){
+    const incoming=await body(request);
+    return json(await createDirectConversation(env,identity,incoming.userId),201);
+  }
+  if(p==='/api/conversations/group'&&method==='POST'){
+    const incoming=await body(request),created=await createGroupConversation(env,identity,incoming);
+    for(const member of created.conversation.members||[]){
+      if(member.userId===identity.userId)continue;
+      await notifyUserActivity(env,member.userId,{
+        kind:'group_added',actorUserId:identity.userId,targetType:'conversation',targetId:created.conversation.conversationId,
+        subject:created.conversation.title,dedupeKey:'group-added:'+created.conversation.conversationId+':'+member.userId,
+        route:'/?view=messages&conversation='+encodeURIComponent(created.conversation.conversationId)
+      });
+    }
+    return json(created,201);
+  }
+  const conversationMatch=p.match(/^\/api\/conversations\/([^/]+)$/);
+  if(conversationMatch&&method==='GET')return json(await getConversation(env,identity,decodeURIComponent(conversationMatch[1])));
+  const conversationMembersMatch=p.match(/^\/api\/conversations\/([^/]+)\/members$/);
+  if(conversationMembersMatch&&method==='POST'){
+    const incoming=await body(request),result=await addGroupMembers(env,identity,decodeURIComponent(conversationMembersMatch[1]),incoming.userIds||[]);
+    for(const member of result.conversation.members||[]){
+      if(!(incoming.userIds||[]).includes(member.userId))continue;
+      await notifyUserActivity(env,member.userId,{
+        kind:'group_added',actorUserId:identity.userId,targetType:'conversation',targetId:result.conversation.conversationId,
+        subject:result.conversation.title,dedupeKey:'group-added:'+result.conversation.conversationId+':'+member.userId+':'+Date.now(),
+        route:'/?view=messages&conversation='+encodeURIComponent(result.conversation.conversationId)
+      });
+    }
+    return json(result);
+  }
+  const conversationMessagesMatch=p.match(/^\/api\/conversations\/([^/]+)\/messages$/);
+  if(conversationMessagesMatch&&method==='GET')return json(await listMessages(env,identity,decodeURIComponent(conversationMessagesMatch[1]),{after:url.searchParams.get('after')||'',limit:Number(url.searchParams.get('limit'))||120}));
+  if(conversationMessagesMatch&&method==='POST'){
+    const incoming=await body(request),result=await sendMessage(env,identity,decodeURIComponent(conversationMessagesMatch[1]),incoming);
+    const senderName=identity.user?.displayName||identity.email||'Quest Log friend';
+    for(const userId of result.recipients||[]){
+      await notifyUserActivity(env,userId,{
+        kind:'message',actorUserId:identity.userId,targetType:'conversation',targetId:result.conversation.conversationId,
+        subject:result.conversation.type==='group'?(result.conversation.title||'Group chat'):senderName,
+        body:(result.conversation.type==='group'?senderName+': ':'')+result.message.body.slice(0,180),
+        dedupeKey:'message:'+result.message.messageId+':'+userId,
+        route:'/?view=messages&conversation='+encodeURIComponent(result.conversation.conversationId)
+      });
+    }
+    return json(result,201);
+  }
+  const groupEventsMatch=p.match(/^\/api\/conversations\/([^/]+)\/events$/);
+  if(groupEventsMatch&&method==='GET')return json(await listGroupEvents(env,identity,decodeURIComponent(groupEventsMatch[1]),{from:url.searchParams.get('from')||'',to:url.searchParams.get('to')||''}));
+  if(groupEventsMatch&&method==='POST'){
+    const incoming=await body(request),conversationId=decodeURIComponent(groupEventsMatch[1]),result=await createGroupEvent(env,identity,conversationId,incoming),conversation=(await getConversation(env,identity,conversationId)).conversation;
+    for(const member of conversation.members||[]){
+      if(member.userId===identity.userId)continue;
+      await notifyUserActivity(env,member.userId,{
+        kind:'group_event_created',actorUserId:identity.userId,targetType:'conversation',targetId:conversationId,subject:result.event.title,
+        dedupeKey:'group-event-created:'+result.event.eventId+':'+member.userId,
+        route:'/?view=messages&conversation='+encodeURIComponent(conversationId)+'&tab=calendar'
+      });
+    }
+    return json(result,201);
+  }
+  const groupEventItemMatch=p.match(/^\/api\/conversations\/([^/]+)\/events\/([^/]+)$/);
+  if(groupEventItemMatch&&method==='PUT'){
+    const conversationId=decodeURIComponent(groupEventItemMatch[1]),eventId=decodeURIComponent(groupEventItemMatch[2]),incoming=await body(request),result=await updateGroupEvent(env,identity,conversationId,eventId,incoming),conversation=(await getConversation(env,identity,conversationId)).conversation;
+    for(const member of conversation.members||[]){
+      if(member.userId===identity.userId)continue;
+      await notifyUserActivity(env,member.userId,{
+        kind:'group_event_updated',actorUserId:identity.userId,targetType:'conversation',targetId:conversationId,subject:result.event?.title||'Group event',
+        dedupeKey:'group-event-updated:'+eventId+':'+member.userId+':'+Date.now(),
+        route:'/?view=messages&conversation='+encodeURIComponent(conversationId)+'&tab=calendar'
+      });
+    }
+    return json(result);
+  }
+  if(groupEventItemMatch&&method==='DELETE')return json(await deleteGroupEvent(env,identity,decodeURIComponent(groupEventItemMatch[1]),decodeURIComponent(groupEventItemMatch[2])));
   if(p==='/api/friends'&&method==='GET')return json(await listFriends(env,identity));
   if(p==='/api/friends/request'&&method==='POST'){
     const incoming=await body(request),before=await listFriends(env,identity),result=await requestFriend(env,identity,incoming.email),after=await listFriends(env,identity);
