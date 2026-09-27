@@ -2909,10 +2909,31 @@ function groupMemberRows(members=[]){
 }
 async function openGroupMembers(){
  if(!activeConversation||activeConversation.type!=='group')return;
- const canAdd=activeConversation.role==='owner',friends=canAdd?await acceptedFriends(true):[],existing=new Set((activeConversation.members||[]).map(member=>member.userId));
+ const canAdd=activeConversation.role==='owner';
+ const friends=canAdd?await acceptedFriends(true):[];
+ const existing=new Set((activeConversation.members||[]).map(member=>member.userId));
  const choices=friends.filter(friend=>!existing.has(friend.userId));
- openModal('Group members','<div class="group-member-grid">'+groupMemberRows(activeConversation.members||[])+'</div>'+(canAdd&&choices.length?'<div class="field" style="margin-top:16px"><label>Add friends</label><div class="group-create-members">'+choices.map(friend=>'<label class="group-create-member"><span class="friend-avatar">'+(profileAvatarData(friend)?'<img src="'+esc(profileAvatarData(friend))+'" alt="">':esc(friendInitial(friend)))+'</span><span><strong>'+esc(friendLabel(friend))+'</strong></span><input type="checkbox" data-add-group-member="'+esc(friend.userId)+'"></label>').join('')+'</div></div><div class="modal-actions"><button class="btn primary" id="addGroupMembers" type="button">Add members</button></div>:''));
- if($('addGroupMembers'))$('addGroupMembers').onclick=async()=>{const userIds=[...document.querySelectorAll('[data-add-group-member]:checked')].map(input=>input.dataset.addGroupMember);if(!userIds.length)return;await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/members',{method:'POST',body:JSON.stringify({userIds})});closeModal();await loadConversationContent()};
+ let html='<div class="group-member-grid">'+groupMemberRows(activeConversation.members||[])+'</div>';
+ if(canAdd&&choices.length){
+   html+='<div class="field" style="margin-top:16px"><label>Add friends</label><div class="group-create-members">';
+   html+=choices.map(friend=>{
+     const avatar=profileAvatarData(friend);
+     return '<label class="group-create-member">'+
+       '<span class="friend-avatar">'+(avatar?'<img src="'+esc(avatar)+'" alt="">':esc(friendInitial(friend)))+'</span>'+
+       '<span><strong>'+esc(friendLabel(friend))+'</strong></span>'+
+       '<input type="checkbox" data-add-group-member="'+esc(friend.userId)+'">'+
+     '</label>';
+   }).join('');
+   html+='</div></div><div class="modal-actions"><button class="btn primary" id="addGroupMembers" type="button">Add members</button></div>';
+ }
+ openModal('Group members',html);
+ if($('addGroupMembers'))$('addGroupMembers').onclick=async()=>{
+   const userIds=[...document.querySelectorAll('[data-add-group-member]:checked')].map(input=>input.dataset.addGroupMember);
+   if(!userIds.length)return;
+   await api('/api/conversations/'+encodeURIComponent(activeConversationId)+'/members',{method:'POST',body:JSON.stringify({userIds})});
+   closeModal();
+   await loadConversationContent();
+ };
 }
 function groupEventDetail(event){
  let body='<div class="event-detail-grid">';
