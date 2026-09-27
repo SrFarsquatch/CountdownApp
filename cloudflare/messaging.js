@@ -154,7 +154,7 @@ export async function createDirectConversation(env,identity,targetUserId){
  if(!row){
   const conversationId=crypto.randomUUID();
   await env.DB.batch([
-   env.DB.prepare("INSERT INTO questlog_conversations(conversation_id,type,title,direct_key,created_by) VALUES(?,'direct',NULL,?,?,datetime('now'))").bind(conversationId,directKey,current),
+   env.DB.prepare("INSERT INTO questlog_conversations(conversation_id,type,title,direct_key,created_by,created_at) VALUES(?,'direct',NULL,?,?,datetime('now'))").bind(conversationId,directKey,current),
    env.DB.prepare("INSERT INTO questlog_conversation_members(conversation_id,user_id,role) VALUES(?,?,'owner')").bind(conversationId,current),
    env.DB.prepare("INSERT INTO questlog_conversation_members(conversation_id,user_id,role) VALUES(?,?,'member')").bind(conversationId,target)
   ]);
@@ -171,7 +171,7 @@ export async function createGroupConversation(env,identity,input={}){
  await assertFriends(env,current,targets);
  const conversationId=crypto.randomUUID();
  const statements=[
-  env.DB.prepare("INSERT INTO questlog_conversations(conversation_id,type,title,created_by) VALUES(?,'group',?,?,datetime('now'))").bind(conversationId,title,current),
+  env.DB.prepare("INSERT INTO questlog_conversations(conversation_id,type,title,created_by,created_at) VALUES(?,'group',?,?,datetime('now'))").bind(conversationId,title,current),
   env.DB.prepare("INSERT INTO questlog_conversation_members(conversation_id,user_id,role) VALUES(?,?,'owner')").bind(conversationId,current)
  ];
  for(const target of targets)statements.push(env.DB.prepare("INSERT INTO questlog_conversation_members(conversation_id,user_id,role) VALUES(?,?,'member')").bind(conversationId,target));
