@@ -2045,7 +2045,7 @@ body.modal-open{overflow:hidden}
       <div class="meta" style="margin:-4px 0 4px">Friend requests, planner invites, responses, permission changes, and shared-item activity.</div>
       <label class="setting-row"><span>Countdown reminders</span><input id="notifyCountdowns" type="checkbox" style="width:18px;height:18px;justify-self:end"></label>
       <div class="setting-row"><span>Countdown lead time</span><select id="notifyCountdownLead"><option value="60">1 hour</option><option value="360">6 hours</option><option value="720">12 hours</option><option value="1440">1 day</option><option value="4320">3 days</option><option value="10080">1 week</option></select></div>
-      <div class="modal-actions"><button class="btn" id="testNotification" type="button" disabled>Send test</button><button class="btn" id="disableNotifications" type="button" disabled>Disable on this device</button><button class="btn primary" id="enableNotifications" type="button">Enable notifications</button></div>
+      <div class="modal-actions"><button class="btn" id="saveNotificationPreferencesButton" type="button">Save preferences</button><button class="btn" id="testNotification" type="button" disabled>Send test</button><button class="btn" id="disableNotifications" type="button" disabled>Disable on this device</button><button class="btn primary" id="enableNotifications" type="button">Enable notifications</button></div>
       <div class="notice" id="notificationStatus" style="display:none;margin-top:10px"></div>
       <div class="meta" style="margin-top:8px">Notification preferences are stored with this Quest Log instance. Each phone/browser must be enabled separately.</div>
     </div>
@@ -2406,6 +2406,15 @@ async function testPushNotification(){
    note.textContent='Test sent. It should appear as a system notification.';
  }catch(error){note.textContent=error.message||'Could not send test notification.'}
 }
+async function saveNotificationPreferencesOnly(){
+ const note=$('notificationStatus');note.style.display='block';note.textContent='Saving notification preferences…';
+ try{
+   state.notifications=await saveNotificationPreferences();
+   note.textContent='Notification preferences saved.';
+   await renderNotificationSettings();
+ }catch(error){note.textContent=error.message||'Could not save notification preferences.'}
+}
+$('saveNotificationPreferencesButton').onclick=saveNotificationPreferencesOnly;
 $('enableNotifications').onclick=enablePushNotifications;
 $('disableNotifications').onclick=disablePushNotifications;
 $('testNotification').onclick=testPushNotification;
