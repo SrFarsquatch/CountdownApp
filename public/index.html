@@ -2815,7 +2815,7 @@ function renderGroupCalendar(){
      '<div class="group-event-copy"><strong>'+esc(event.title||'Event')+'</strong><div class="meta">'+esc(fmtDate(event.start,{weekday:'short',year:'numeric'}))+' · '+esc(when)+(event.location?' · '+esc(event.location):'')+'</div></div>'+
      '<div class="group-event-edit">Edit</div></div>';
  }).join(''):'<div class="empty">No group events yet.<div class="meta" style="margin-top:5px">Everyone in this group can add events.</div></div>';
- root.querySelectorAll('[data-group-event]').forEach(card=>{const open=()=>{const event=events.find(item=>item.eventId===card.dataset.groupEvent);if(event)openGroupEventModal(event)};card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
+ root.querySelectorAll('[data-group-event]').forEach(card=>{const open=()=>{const event=events.find(item=>item.eventId===card.dataset.groupEvent);if(event)groupEventDetail(event)};card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
 }
 function renderConversationWorkspace(){
  const shell=$('messagesShell'),workspace=$('conversationWorkspace'),empty=$('messagesEmpty');
@@ -2948,7 +2948,6 @@ document.querySelectorAll('[data-conversation-tab]').forEach(button=>button.oncl
  renderConversationWorkspace();
  if(appHistoryReady)history.replaceState({questlog:true,type:'view',view:'messages',conversationId:activeConversationId,tab:activeConversationTab},'',appViewUrl('messages'));
 });
-$('groupCalendarEvents')?.addEventListener('click',event=>{const card=event.target.closest('[data-group-event]');if(!card)return;const item=groupEventItems.find(x=>x.eventId===card.dataset.groupEvent);if(item)groupEventDetail(item)});
 
 function collaborationPermissionOptions(type,current='view'){
  const options=type==='task'||type==='goal'
