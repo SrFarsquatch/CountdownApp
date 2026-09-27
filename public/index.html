@@ -1683,6 +1683,7 @@ body.modal-open{overflow:hidden}
 }
 
 </style>
+<link rel="stylesheet" href="/integrations.css?v=1">
 </head>
 <body>
 <div id="nativeBootOverlay" hidden style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;place-items:center;padding:24px">
@@ -2005,6 +2006,9 @@ body.modal-open{overflow:hidden}
     <button class="on" type="button" data-settings-section="general" aria-selected="true">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.37.36.7.6 1 .3.3.7.4 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6z"></path></svg><span>General</span>
     </button>
+    <button type="button" data-settings-section="integrations" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8"></path><path d="M12 8v8"></path><path d="M6.5 5.5 4 8l2.5 2.5"></path><path d="M17.5 13.5 20 16l-2.5 2.5"></path></svg><span>Integrations</span>
+    </button>
     <button type="button" data-settings-section="displays" aria-selected="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg><span>Displays</span>
     </button>
@@ -2102,6 +2106,11 @@ body.modal-open{overflow:hidden}
     </div>
   </div>
   </div>
+  <div class="settings-pane" data-settings-pane="integrations">
+    <div id="integrationsRoot">
+      <div class="card"><div class="empty">Loading integrations…</div></div>
+    </div>
+  </div>
   <div class="settings-pane" data-settings-pane="displays">
   <div class="hero"><div><h2>E-ink display</h2><p>Choose what your FrameOS display should show and arrange each section exactly where you want it.</p></div></div>
   <div class="settings-grid">
@@ -2191,6 +2200,7 @@ body.modal-open{overflow:hidden}
 </div></div>
 
 <script src="/native-runtime.js"></script>
+<script src="/integrations-ui.js?v=1"></script>
 <script>
 let state=null,runtimeInfo=null,friendDirectory=null,profileViewData=null,profileViewCache=new Map(),profileViewRequestSeq=0,activeProfileUserId=new URLSearchParams(location.search).get('user')||'',conversationData={conversations:[],unreadCount:0},activeConversationId=new URLSearchParams(location.search).get('conversation')||'',activeConversation=null,activeConversationTab=new URLSearchParams(location.search).get('tab')==='calendar'?'calendar':'chat',messageItems=[],messageCache=new Map(),messagePrefetches=new Map(),groupEventItems=[],groupEventCache=new Map(),messagePollTimer=null,messageLoading=false,suppressMessageAutoLoad=false,conversationSearchQuery='',activityData={notifications:[],unreadCount:0},activityKnownIds=new Set(),activityPollPrimed=false,calEvents=[],weatherData=null,weatherError='',marketData=null,marketError='',marketHistoryData=null,marketHistoryError='',marketHistoryLoading=false,marketHistoryRange='monthly',financeData=null,financeError='',financeLinkLoading=false,plaidLinkLoading=false,financeFlinksOrigin='',financeTransactionLimit=20,taskFilter='open',plannerView=window.matchMedia('(max-width:760px)').matches?'day':'week',plannerAnchor=new Date(),calendarCache={},taskListCache={},taskSyncBootstrapped=false,displayLayoutDraft=null,displayLayoutsDraft=null,displaySectionsDraft=null,selectedDisplayWidget='agenda',updatePollTimer=null,activityPollTimer=null,updateAutoCheckAttempted=false,updateStartedInPage=false,updateReloadScheduled=false,agentMessages=[],agentSending=false,deferredPwaInstallPrompt=null,mobileUndoTimer=null,mobileUndoAction=null,openTaskSwipe=null,plannerSwipeNavigating=false,plannerSwipeSuppressUntil=0,plannerEventCache=new Map(),plannerRenderSeq=0,plannerShowTasks=localStorage.getItem('questlog.planner.showTasks')!=='0',plannerWeekStartsSunday=localStorage.getItem('questlog.planner.weekStartsSunday')!=='0',appHistoryReady=false,plannerSection='calendar',activeAppRoute='today';
 const $=id=>document.getElementById(id);
@@ -2623,7 +2633,7 @@ async function syncGoogleTasksClient(){
 }
 
 
-const APP_VIEWS=new Set(['today','profile','messages','planner','tasks','goals','markets','countdowns','displays','settings']);
+const APP_VIEWS=new Set(['today','profile','messages','planner','tasks','goals','markets','countdowns','integrations','displays','settings']);
 const LAST_VIEW_SESSION_KEY='questlog.activeView',LAST_NATIVE_VIEW_KEY='questlog.native.lastView',LAST_VIEW_ERROR_KEY='questlog.lastViewError';
 function rememberAppView(name){
  if(!APP_VIEWS.has(name))return;
@@ -2651,7 +2661,7 @@ function runViewRenderer(label,renderer){
   return null;
  }
 }
-const SETTINGS_SECTIONS=new Set(['general','displays']);
+const SETTINGS_SECTIONS=new Set(['general','integrations','displays']);
 let settingsSection='general';
 const PLANNER_ROUTE_SECTIONS=Object.freeze({tasks:'tasks',goals:'goals',countdowns:'countdowns'});
 const PLANNER_SECTION_ROUTES=Object.freeze({calendar:'planner',tasks:'tasks',goals:'goals',countdowns:'countdowns'});
@@ -2700,6 +2710,7 @@ function setSettingsSection(section,{render=true}={}){
  document.querySelectorAll('[data-settings-pane]').forEach(pane=>pane.classList.toggle('on',pane.dataset.settingsPane===section));
  if(!render||!state)return;
  if(section==='displays')runViewRenderer('Display settings',()=>renderDisplay());
+ else if(section==='integrations')runViewRenderer('Integrations',()=>window.QuestLogIntegrations?.render());
  else runViewRenderer('Settings',()=>renderSettings());
 }
 function renderAppView(name){
@@ -2708,7 +2719,7 @@ function renderAppView(name){
  activeAppRoute=name;
  rememberAppView(name);
  const requestedPlannerSection=PLANNER_ROUTE_SECTIONS[name]||(name==='planner'?'calendar':null);
- const requestedSettingsSection=name==='displays'?'displays':(name==='settings'?'general':null);
+ const requestedSettingsSection=name==='displays'?'displays':(name==='integrations'?'integrations':(name==='settings'?'general':null));
  const visibleView=requestedPlannerSection?'planner':(requestedSettingsSection?'settings':name);
  if(visibleView==='planner'&&!document.body.classList.contains('planner-mode')){
    // Home/Finance use the document scroll, while Planner owns its own viewport.
@@ -2778,7 +2789,7 @@ window.addEventListener('popstate',event=>{
 });
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.querySelectorAll('[data-planner-section]').forEach(b=>b.onclick=()=>setView(PLANNER_SECTION_ROUTES[b.dataset.plannerSection]||'planner'));
-document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>setView(b.dataset.settingsSection==='displays'?'displays':'settings'));
+document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>setView(b.dataset.settingsSection==='displays'?'displays':(b.dataset.settingsSection==='integrations'?'integrations':'settings')));
 document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>setView(b.dataset.jump));
 document.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>openCreate(b.dataset.create));
 $('quickAdd').onclick=()=>openChooser();
