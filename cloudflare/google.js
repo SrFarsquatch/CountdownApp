@@ -93,7 +93,7 @@ async function googleRequest(accountValue,state,env,endpoint,method='GET',payloa
   const response=await fetch('https://www.googleapis.com/calendar/v3'+endpoint,{method,headers:{Authorization:'Bearer '+access,...(hasBody?{'Content-Type':'application/json'}:{})},body:hasBody?JSON.stringify(payload):undefined});
   if(response.status===204)return null;
   const raw=await response.text();let data=null;try{data=raw?JSON.parse(raw):null}catch{}
-  if(!response.ok)throw new Error('Google Calendar request failed: '+(data?.error?.message||raw.slice(0,180)||('HTTP '+response.status)));
+  if(!response.ok){const e=new Error('Google Calendar request failed: '+(data?.error?.message||raw.slice(0,180)||('HTTP '+response.status)));e.status=response.status;throw e}
   return data;
 }
 async function tasksRequest(accountValue,state,env,endpoint,method='GET',payload){
@@ -208,7 +208,7 @@ export async function eventsBetween(from,to,state,env){
       const cal=map.get(calendarId)||{},q=new URLSearchParams({timeMin:min.toISOString(),timeMax:max.toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'250'});
       const data=await googleRequest(a,state,env,'/calendars/'+encodeURIComponent(calendarId)+'/events?'+q);
       for(const e of data.items||[]){
-        if(e.status==='cancelled')continue;const start=e.start?.dateTime||e.start?.date;if(!start)continue;
+        if(e.status==='cancelled'||e.extendedProperties?.private?.questLogTaskId)continue;const start=e.start?.dateTime||e.start?.date;if(!start)continue;
         const k=calendarId+'|'+e.id+'|'+start;if(seen.has(k))continue;seen.add(k);const color=e.colorId?colors[e.colorId]:null;
         out.push({id:e.id,calendarId,accountId:a.id,accountLabel:a.label,calendarName:cal.summary||'Calendar',accessRole:cal.accessRole||'reader',calendarColor:cal.backgroundColor||'#6c5ce7',calendarForeground:cal.foregroundColor||'#ffffff',eventColor:color?.background||'',eventForeground:color?.foreground||'',colorId:e.colorId||'',title:e.summary||'Busy',description:e.description||'',start,end:e.end?.dateTime||e.end?.date||start,allDay:Boolean(e.start?.date),transparency:e.transparency||'opaque',recurringEventId:e.recurringEventId||'',recurrence:e.recurrence||[],location:e.location||'',htmlLink:e.htmlLink||''});
       }
@@ -216,21 +216,113 @@ export async function eventsBetween(from,to,state,env){
   }
   return out.sort((a,b)=>new Date(a.start)-new Date(b.start));
 }
-function localDateKey(value){if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
-function taskPayload(task){return{title:cleanText(task.title||'Task',1024),notes:cleanText(task.description,8192),status:task.status==='done'?'completed':'needsAction',completed:task.status==='done'?(iso(task.completedAt)||new Date().toISOString()):null,due:localDateKey(task.due)?localDateKey(task.due)+'T00:00:00.000Z':null}}
-function dueFromGoogle(value,existing){const key=String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(key))return null;const [y,m,d]=key.split('-').map(Number),old=existing?new Date(existing):null,h=old&&!Number.isNaN(old.getTime())?old.getHours():12,min=old&&!Number.isNaN(old.getTime())?old.getMinutes():0;return new Date(y,m-1,d,h,min).toISOString()}
-function applyRemoteTask(local,remote,a,list){const done=remote.status==='completed',base=local||{};return normalizeTask({...base,id:base.id||id(),title:cleanText(remote.title||base.title||'Task',160),description:cleanText(remote.notes||'',2000),status:done?'done':(base.status==='progress'?'progress':'todo'),due:remote.due?dueFromGoogle(remote.due,base.due):null,project:base.project||cleanText(list?.title,80),created:base.created||iso(remote.updated)||new Date().toISOString(),updated:iso(remote.updated)||new Date().toISOString(),completedAt:done?(iso(remote.completed)||iso(remote.updated)||new Date().toISOString()):null,googleAccountId:a.id,googleTaskListId:list.id,googleTaskListTitle:list.title||'Tasks',googleTaskId:remote.id,googleParentId:remote.parent||'',googleUpdated:iso(remote.updated),googleEtag:remote.etag||''})}
+function taskTimeZone(state){
+  const zone=cleanText(state?.timeZone||state?.weather?.timeZone||'America/Vancouver',100)||'America/Vancouver';
+  try{new Intl.DateTimeFormat('en-CA',{timeZone:zone}).format(new Date());return zone}catch{return'UTC'}
+}
+function zonedParts(value,timeZone){
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return null;
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);
+  return Object.fromEntries(parts.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+}
+function zonedDateKey(value,timeZone){
+  if(!value)return'';
+  const raw=String(value);if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+  const p=zonedParts(value,timeZone);return p?p.year+'-'+p.month+'-'+p.day:'';
+}
+function zonedDateTimeIso(dateKey,hour,minute,timeZone){
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey||''));if(!match)return null;
+  const target=Date.UTC(+match[1],+match[2]-1,+match[3],Number(hour)||0,Number(minute)||0,0);let guess=target;
+  for(let i=0;i<4;i++){
+    const p=zonedParts(new Date(guess),timeZone);if(!p)break;
+    const shown=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,0);
+    guess+=target-shown;
+  }
+  return new Date(guess).toISOString();
+}
+function taskPayload(task,state){
+  const key=zonedDateKey(task.due,taskTimeZone(state));
+  return{title:cleanText(task.title||'Task',1024),notes:cleanText(task.description,8192),status:task.status==='done'?'completed':'needsAction',completed:task.status==='done'?(iso(task.completedAt)||new Date().toISOString()):null,due:key?key+'T00:00:00.000Z':null};
+}
+function dueFromGoogle(value,existing,state){
+  const key=String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(key))return null;
+  const zone=taskTimeZone(state);
+  if(existing&&zonedDateKey(existing,zone)===key)return iso(existing);
+  const old=existing?zonedParts(existing,zone):null,h=old?Number(old.hour):12,min=old?Number(old.minute):0;
+  return zonedDateTimeIso(key,h,min,zone);
+}
+function applyRemoteTask(local,remote,a,list,state){
+  const done=remote.status==='completed',base=local||{};
+  return normalizeTask({...base,id:base.id||id(),title:cleanText(remote.title||base.title||'Task',160),description:cleanText(remote.notes||'',2000),status:done?'done':(base.status==='progress'?'progress':'todo'),due:remote.due?dueFromGoogle(remote.due,base.due,state):null,project:base.project||cleanText(list?.title,80),created:base.created||iso(remote.updated)||new Date().toISOString(),updated:iso(remote.updated)||new Date().toISOString(),completedAt:done?(iso(remote.completed)||iso(remote.updated)||new Date().toISOString()):null,googleAccountId:a.id,googleTaskListId:list.id,googleTaskListTitle:list.title||'Tasks',googleTaskId:remote.id,googleParentId:remote.parent||'',googleUpdated:iso(remote.updated),googleEtag:remote.etag||''});
+}
+function writableCalendar(entry){return['writer','owner'].includes(String(entry?.accessRole||''))}
+async function taskCalendarFor(a,task,state,env){
+  const items=await calendarList(a,state,env),preferred=cleanText(task.googleTaskCalendarId,500);
+  return(items.find(item=>item.id===preferred&&writableCalendar(item))
+    ||items.find(item=>item.primary&&writableCalendar(item))
+    ||items.find(item=>(a.selectedCalendarIds||[]).includes(item.id)&&writableCalendar(item))
+    ||items.find(writableCalendar)
+    ||null);
+}
+function taskCalendarPayload(task,state){
+  const start=iso(task.due);if(!start)return null;
+  const zone=taskTimeZone(state),minutes=clamp(Math.round(num(task.estimatedMinutes,30))||30,5,1440);
+  const end=new Date(new Date(start).getTime()+minutes*60000).toISOString();
+  return{
+    summary:cleanText(task.title||'Task',500),
+    description:cleanText(task.description,8000),
+    start:{dateTime:start,timeZone:zone},
+    end:{dateTime:end,timeZone:zone},
+    transparency:'transparent',
+    extendedProperties:{private:{questLogTaskId:String(task.id||''),questLogGoogleTaskId:String(task.googleTaskId||'')}}
+  };
+}
+async function deleteTaskCalendarEvent(task,a,state,env){
+  const calendarId=cleanText(task.googleTaskCalendarId,500),eventId=cleanText(task.googleTaskCalendarEventId,500);
+  if(!calendarId||!eventId)return normalizeTask({...task,googleTaskCalendarId:'',googleTaskCalendarEventId:''});
+  const caps=await accountCapabilities(a,env);if(!caps.canWrite)return task;
+  try{await googleRequest(a,state,env,'/calendars/'+encodeURIComponent(calendarId)+'/events/'+encodeURIComponent(eventId),'DELETE')}
+  catch(error){if(error.status!==404&&error.status!==410)throw error}
+  return normalizeTask({...task,googleTaskCalendarId:'',googleTaskCalendarEventId:''});
+}
+async function syncTaskCalendarEvent(task,a,state,env){
+  const caps=await accountCapabilities(a,env);if(!caps.canWrite)return task;
+  if(!task.due)return deleteTaskCalendarEvent(task,a,state,env);
+  const calendar=await taskCalendarFor(a,task,state,env);if(!calendar)return task;
+  let next=task,eventId=cleanText(task.googleTaskCalendarEventId,500),oldCalendarId=cleanText(task.googleTaskCalendarId,500);
+  if(eventId&&oldCalendarId&&oldCalendarId!==calendar.id){
+    try{await googleRequest(a,state,env,'/calendars/'+encodeURIComponent(oldCalendarId)+'/events/'+encodeURIComponent(eventId),'DELETE')}catch{}
+    eventId='';next=normalizeTask({...next,googleTaskCalendarId:'',googleTaskCalendarEventId:''});
+  }
+  const payload=taskCalendarPayload(next,state);let event=null;
+  if(eventId){
+    try{event=await googleRequest(a,state,env,'/calendars/'+encodeURIComponent(calendar.id)+'/events/'+encodeURIComponent(eventId),'PATCH',payload)}
+    catch(error){if(error.status!==404&&error.status!==410)throw error;eventId=''}
+  }
+  if(!eventId)event=await googleRequest(a,state,env,'/calendars/'+encodeURIComponent(calendar.id)+'/events','POST',payload);
+  return normalizeTask({...next,googleTaskCalendarId:calendar.id,googleTaskCalendarEventId:event?.id||eventId});
+}
+async function safeSyncTaskCalendarEvent(task,a,state,env){
+  try{return await syncTaskCalendarEvent(task,a,state,env)}
+  catch(error){console.warn('Quest Log timed Google task calendar sync failed',error);return task}
+}
 export async function createGoogleTaskLink(task,accountId,listId,state,env){
   const a=account(state,accountId);if(!a)throw new Error('Google account was not found.');const lists=await taskLists(a,state,env),list=lists.find(x=>x.id===listId);if(!list)throw new Error('Google task list was not found.');
-  return applyRemoteTask(task,await tasksRequest(a,state,env,'/lists/'+encodeURIComponent(listId)+'/tasks','POST',taskPayload(task)),a,list);
+  const remote=await tasksRequest(a,state,env,'/lists/'+encodeURIComponent(listId)+'/tasks','POST',taskPayload(task,state));
+  let next=applyRemoteTask(task,remote,a,list,state);
+  if(task.due)next=await safeSyncTaskCalendarEvent(next,a,state,env);
+  return next;
 }
-export async function updateLinkedGoogleTask(task,state,env){
+export async function updateLinkedGoogleTask(task,state,env,{syncCalendarTime=false}={}){
   if(!task.googleAccountId||!task.googleTaskListId||!task.googleTaskId)return task;const a=account(state,task.googleAccountId);if(!a)throw new Error('The Google account linked to this task is disconnected.');
-  const remote=await tasksRequest(a,state,env,'/lists/'+encodeURIComponent(task.googleTaskListId)+'/tasks/'+encodeURIComponent(task.googleTaskId),'PATCH',taskPayload(task));
-  return applyRemoteTask(task,remote,a,{id:task.googleTaskListId,title:task.googleTaskListTitle||task.project||'Tasks'});
+  const remote=await tasksRequest(a,state,env,'/lists/'+encodeURIComponent(task.googleTaskListId)+'/tasks/'+encodeURIComponent(task.googleTaskId),'PATCH',taskPayload(task,state));
+  let next=applyRemoteTask(task,remote,a,{id:task.googleTaskListId,title:task.googleTaskListTitle||task.project||'Tasks'},state);
+  if(syncCalendarTime||task.googleTaskCalendarEventId)next=await safeSyncTaskCalendarEvent(next,a,state,env);
+  return next;
 }
 export async function deleteLinkedGoogleTask(task,state,env){
   if(!task.googleAccountId||!task.googleTaskListId||!task.googleTaskId)return;const a=account(state,task.googleAccountId);if(!a)return;
+  if(task.googleTaskCalendarEventId){try{await deleteTaskCalendarEvent(task,a,state,env)}catch(error){console.warn('Quest Log timed task calendar cleanup failed',error)}}
   try{await tasksRequest(a,state,env,'/lists/'+encodeURIComponent(task.googleTaskListId)+'/tasks/'+encodeURIComponent(task.googleTaskId),'DELETE')}catch(e){if(e.status!==404)throw e}
 }
 async function remoteTasks(a,listId,state,env){
@@ -246,13 +338,34 @@ export async function syncGoogleTasks(state,env){
       const remoteMap=new Map(remotes.filter(x=>x.id).map(x=>[x.id,x])),linked=state.tasks.filter(t=>t.googleAccountId===a.id&&t.googleTaskListId===listId);
       for(const remote of remotes){
         const local=linked.find(t=>t.googleTaskId===remote.id);
-        if(remote.deleted){if(local){state.tasks=state.tasks.filter(t=>t.id!==local.id);result.deleted++;changed=true}continue}
-        if(!local){state.tasks.push(applyRemoteTask(null,remote,a,list));result.imported++;changed=true;continue}
+        if(remote.deleted){
+          if(local){
+            if(local.googleTaskCalendarEventId)try{await deleteTaskCalendarEvent(local,a,state,env)}catch{}
+            state.tasks=state.tasks.filter(t=>t.id!==local.id);result.deleted++;changed=true;
+          }
+          continue;
+        }
+        if(!local){state.tasks.push(applyRemoteTask(null,remote,a,list,state));result.imported++;changed=true;continue}
         const baseline=local.googleUpdated?new Date(local.googleUpdated).getTime():0,lu=local.updated?new Date(local.updated).getTime():0,ru=remote.updated?new Date(remote.updated).getTime():0;
-        if(lu>baseline+500&&(!(ru>baseline+500)||lu>ru)){try{const next=await updateLinkedGoogleTask(local,state,env),i=state.tasks.findIndex(t=>t.id===local.id);if(i>=0)state.tasks[i]=next;result.pushed++;changed=true}catch(e){result.errors.push(a.label+' / '+local.title+': '+e.message)}}
-        else if(ru>baseline+500){const i=state.tasks.findIndex(t=>t.id===local.id);if(i>=0)state.tasks[i]=applyRemoteTask(local,remote,a,list);result.pulled++;changed=true}
+        if(lu>baseline+500&&(!(ru>baseline+500)||lu>ru)){
+          try{
+            const next=await updateLinkedGoogleTask(local,state,env,{syncCalendarTime:Boolean(local.googleTaskCalendarEventId)}),i=state.tasks.findIndex(t=>t.id===local.id);
+            if(i>=0)state.tasks[i]=next;result.pushed++;changed=true;
+          }catch(e){result.errors.push(a.label+' / '+local.title+': '+e.message)}
+        }else if(ru>baseline+500){
+          const i=state.tasks.findIndex(t=>t.id===local.id);
+          if(i>=0){
+            let next=applyRemoteTask(local,remote,a,list,state);
+            if(next.googleTaskCalendarEventId)next=await safeSyncTaskCalendarEvent(next,a,state,env);
+            state.tasks[i]=next;
+          }
+          result.pulled++;changed=true;
+        }
       }
-      for(const local of linked)if(local.googleTaskId&&!remoteMap.has(local.googleTaskId)){state.tasks=state.tasks.filter(t=>t.id!==local.id);result.deleted++;changed=true}
+      for(const local of linked)if(local.googleTaskId&&!remoteMap.has(local.googleTaskId)){
+        if(local.googleTaskCalendarEventId)try{await deleteTaskCalendarEvent(local,a,state,env)}catch{}
+        state.tasks=state.tasks.filter(t=>t.id!==local.id);result.deleted++;changed=true;
+      }
     }
   }
   if(changed)await saveState(env,state);return result;
@@ -260,6 +373,6 @@ export async function syncGoogleTasks(state,env){
 export async function disconnectAccount(accountId,state,env){
   const before=state.google.accounts.length;state.google.accounts=state.google.accounts.filter(a=>a.id!==accountId);
   if(before===state.google.accounts.length)return false;
-  state.tasks=state.tasks.map(t=>t.googleAccountId===accountId?normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:''}):t);
+  state.tasks=state.tasks.map(t=>t.googleAccountId===accountId?normalizeTask({...t,googleAccountId:'',googleTaskListId:'',googleTaskListTitle:'',googleTaskId:'',googleParentId:'',googleUpdated:null,googleEtag:'',googleTaskCalendarId:'',googleTaskCalendarEventId:''}):t);
   await saveState(env,state);return true;
 }
