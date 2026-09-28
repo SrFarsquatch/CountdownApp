@@ -2056,7 +2056,7 @@ body.modal-open{overflow:hidden}
       <div class="setting-row"><span>Android</span><strong id="androidInstallStatus">Latest APK</strong></div>
       <div class="modal-actions">
         <button class="btn primary" id="installPwaNow" type="button" disabled>Install web app</button>
-        <a class="btn" id="downloadAndroidApk" href="/download/android">Download Android APK</a>
+        <button class="btn" id="downloadAndroidApk" type="button">Download Android APK</button>
       </div>
       <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
       <div class="meta" id="androidInstallHint" style="margin-top:6px">Android may ask you to allow installs from this browser before opening the downloaded APK.</div>
@@ -2285,6 +2285,23 @@ async function installQuestLog(){
  try{await prompt.userChoice}catch{}
  updatePwaInstallUi();
 }
+async function downloadAndroidApk(){
+ const direct='https://github.com/SrFarsquatch/CountdownApp/releases/latest/download/QuestLog-Android.apk';
+ const button=$('downloadAndroidApk');
+ if(button)button.disabled=true;
+ try{
+   if(window.QuestLogNative?.isNative){
+     await window.QuestLogNative.openExternalUrl(direct);
+   }else{
+     window.location.assign('/download/android');
+   }
+ }catch(error){
+   console.warn('Quest Log Android download failed',error);
+   window.open(direct,'_blank','noopener,noreferrer');
+ }finally{
+   if(button)setTimeout(()=>{button.disabled=false},800);
+ }
+}
 window.addEventListener('beforeinstallprompt',event=>{
  event.preventDefault();
  deferredPwaInstallPrompt=event;
@@ -2300,6 +2317,7 @@ if('serviceWorker' in navigator&&window.isSecureContext){
  });
 }
 $('installPwaNow').onclick=installQuestLog;
+$('downloadAndroidApk').onclick=downloadAndroidApk;
 updatePwaInstallUi();
 
 function urlBase64ToUint8Array(value){
