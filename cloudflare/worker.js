@@ -242,7 +242,7 @@ async function notifyUserActivity(env,userId,input={}){
           body:input.meta?.body||'You have a new Quest Log message.',
           url:input.route||'/?view=messages',
           kind:'message',
-          tag:'questlog-message-'+(input.targetId||Date.now())
+          tag:'questlog-message-'+cleanText(input.dedupeKey||input.targetId||Date.now(),180)
         });
       }catch(error){console.warn('Quest Log message push failed',error)}
     }
