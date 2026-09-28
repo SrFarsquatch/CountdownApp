@@ -2051,10 +2051,15 @@ body.modal-open{overflow:hidden}
     <div class="card setting-card"><div class="eyebrow">Markets</div><h3>Yahoo Finance</h3><p class="meta" id="settingsMarketStatus">Checking configuration…</p><div class="setting-row"><span>Cache / refresh</span><select id="settingsMarketRefresh"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes — recommended</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="1440">Once daily</option></select></div><div class="modal-actions"><button class="btn" id="testMarketSettings" type="button">Test connection</button><button class="btn primary" id="saveMarketSettings" type="button">Save markets</button></div><div class="notice" id="settingsMarketMessage" style="display:none;margin-top:10px"></div><div class="meta" style="margin-top:8px">Yahoo Finance is accessed server-side and does not require an API key. Quest Log caches responses to reduce repeated requests.</div></div>
     <div class="card setting-card" id="pwaInstallCard">
       <div class="eyebrow">Install</div><h3>Quest Log app</h3>
-      <p class="meta">Install Quest Log on this device for a standalone app window while keeping the normal browser version available.</p>
-      <div class="setting-row"><span>Status</span><strong id="pwaInstallStatus">Checking install support…</strong></div>
-      <div class="modal-actions"><button class="btn primary" id="installPwaNow" type="button" disabled>Install Quest Log</button></div>
+      <p class="meta">Choose the lightweight PWA or install the latest signed Android app. Both use the same Quest Log account and cloud data.</p>
+      <div class="setting-row"><span>Web app</span><strong id="pwaInstallStatus">Checking install support…</strong></div>
+      <div class="setting-row"><span>Android</span><strong id="androidInstallStatus">Latest APK</strong></div>
+      <div class="modal-actions">
+        <button class="btn primary" id="installPwaNow" type="button" disabled>Install web app</button>
+        <a class="btn" id="downloadAndroidApk" href="/download/android">Download Android APK</a>
+      </div>
       <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
+      <div class="meta" id="androidInstallHint" style="margin-top:6px">Android may ask you to allow installs from this browser before opening the downloaded APK.</div>
     </div>
     <div class="card setting-card" id="notificationSettingsCard">
       <div class="eyebrow">Notifications</div><h3>Notifications & push</h3>
@@ -2242,8 +2247,11 @@ function pwaStandalone(){
  return window.matchMedia?.('(display-mode: standalone)').matches===true||window.navigator.standalone===true;
 }
 function updatePwaInstallUi(){
- const button=$('installPwaNow'),status=$('pwaInstallStatus'),hint=$('pwaInstallHint');
+ const button=$('installPwaNow'),status=$('pwaInstallStatus'),hint=$('pwaInstallHint'),androidStatus=$('androidInstallStatus'),androidHint=$('androidInstallHint'),androidButton=$('downloadAndroidApk');
  if(!button||!status||!hint)return;
+ if(androidStatus)androidStatus.textContent=/android/i.test(navigator.userAgent)?'Ready to download':'Available for Android';
+ if(androidHint)androidHint.textContent=/android/i.test(navigator.userAgent)?'Downloads the newest signed Quest Log APK. Android may ask you to allow installs from this browser before opening it.':'Open this page on an Android device to download and install the latest signed APK.';
+ if(androidButton)androidButton.textContent=/android/i.test(navigator.userAgent)?'Download Android APK':'Android APK';
  if(pwaStandalone()){
    status.textContent='Installed';
    hint.textContent='Quest Log is running as an installed app. You can still open the same URL normally in your browser.';
@@ -2260,13 +2268,13 @@ function updatePwaInstallUi(){
  if(deferredPwaInstallPrompt){
    status.textContent='Ready to install';
    hint.textContent='Install adds Quest Log to your home screen/app launcher and opens it without normal browser chrome.';
-   button.textContent='Install Quest Log';
+   button.textContent='Install web app';
    button.disabled=false;
    return;
  }
  status.textContent='Install from browser';
  hint.textContent=/iphone|ipad|ipod/i.test(navigator.userAgent)?'Use Share → Add to Home Screen.':'Chrome may offer Install app/Add to Home screen from its menu after the site has been used briefly.';
- button.textContent='Install Quest Log';
+ button.textContent='Install web app';
  button.disabled=true;
 }
 async function installQuestLog(){
