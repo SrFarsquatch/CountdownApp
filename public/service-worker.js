@@ -1,4 +1,4 @@
-const CACHE_NAME='quest-log-pwa-v5';
+const CACHE_NAME='quest-log-pwa-v6';
 const STATIC_ASSETS=[
   '/offline.html',
   '/manifest.webmanifest',
@@ -57,13 +57,15 @@ self.addEventListener('push',event=>{
   let data={};
   try{data=event.data?event.data.json():{}}catch{data={body:event.data?.text?.()||''}}
   const title=data.title||'Quest Log';
+  const kind=data.kind||'general';
+  const shouldRenotify=kind==='message'||kind==='friend_request'||kind==='share_invite'||kind==='group_added';
   const options={
     body:data.body||'You have a new Quest Log notification.',
     icon:'/branding/icon-quest-192.png',
     badge:'/branding/icon-quest-192.png',
     tag:data.tag||'questlog-notification',
-    renotify:false,
-    data:{url:data.url||'/?view=today',kind:data.kind||'general',timestamp:data.timestamp||new Date().toISOString()}
+    renotify:shouldRenotify,
+    data:{url:data.url||'/?view=today',kind,timestamp:data.timestamp||new Date().toISOString()}
   };
   event.waitUntil(self.registration.showNotification(title,options));
 });
