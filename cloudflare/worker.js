@@ -504,8 +504,8 @@ async function handleApi(request,env,identity){
       if(allowed.status==='done'&&!merged.completedAt)merged.completedAt=new Date().toISOString();
       let next=normalizeTask(merged);
       if(existing.googleTaskId){
-        next.googleAccountId=existing.googleAccountId;next.googleTaskListId=existing.googleTaskListId;next.googleTaskListTitle=existing.googleTaskListTitle;next.googleTaskId=existing.googleTaskId;next.googleParentId=existing.googleParentId;next.googleUpdated=existing.googleUpdated;next.googleEtag=existing.googleEtag;
-        next=await updateLinkedGoogleTask(next,ownerState,ownerEnv);
+        next.googleAccountId=existing.googleAccountId;next.googleTaskListId=existing.googleTaskListId;next.googleTaskListTitle=existing.googleTaskListTitle;next.googleTaskId=existing.googleTaskId;next.googleParentId=existing.googleParentId;next.googleUpdated=existing.googleUpdated;next.googleEtag=existing.googleEtag;next.googleTaskCalendarId=existing.googleTaskCalendarId;next.googleTaskCalendarEventId=existing.googleTaskCalendarEventId;
+        next=await updateLinkedGoogleTask(next,ownerState,ownerEnv,{syncCalendarTime:allowed.due!==undefined||Boolean(existing.googleTaskCalendarEventId)});
       }
       ownerState.tasks[index]=next;await saveState(ownerEnv,ownerState);await refreshOwnedShareSnapshots(ownerEnv,ownerIdentity,'task',[next]);
       await notifyUserActivity(env,ownerUserId,{kind:next.status==='done'&&existing.status!=='done'?'shared_item_completed':'shared_item_updated',actorUserId:identity.userId,targetType:'task',targetId:itemId,targetOwnerUserId:ownerUserId,subject:next.title,dedupeKey:'shared-change:'+ownerUserId+':task:'+itemId+':'+identity.userId+':'+Date.now()});
@@ -679,8 +679,8 @@ async function handleApi(request,env,identity){
       if(incoming.status==='done'&&!merged.completedAt)merged.completedAt=new Date().toISOString();
       let next=normalizeTask(merged);
       if(existing.googleTaskId){
-        next.googleAccountId=existing.googleAccountId;next.googleTaskListId=existing.googleTaskListId;next.googleTaskListTitle=existing.googleTaskListTitle;next.googleTaskId=existing.googleTaskId;next.googleParentId=existing.googleParentId;next.googleUpdated=existing.googleUpdated;next.googleEtag=existing.googleEtag;
-        next=await updateLinkedGoogleTask(next,state,env);
+        next.googleAccountId=existing.googleAccountId;next.googleTaskListId=existing.googleTaskListId;next.googleTaskListTitle=existing.googleTaskListTitle;next.googleTaskId=existing.googleTaskId;next.googleParentId=existing.googleParentId;next.googleUpdated=existing.googleUpdated;next.googleEtag=existing.googleEtag;next.googleTaskCalendarId=existing.googleTaskCalendarId;next.googleTaskCalendarEventId=existing.googleTaskCalendarEventId;
+        next=await updateLinkedGoogleTask(next,state,env,{syncCalendarTime:incoming.due!==undefined||Boolean(existing.googleTaskCalendarEventId)});
       }else if(incoming.googleAccountId&&incoming.googleTaskListId){
         next=await createGoogleTaskLink(next,String(incoming.googleAccountId),String(incoming.googleTaskListId),state,env);
       }
