@@ -937,6 +937,9 @@ export default{
   async fetch(request,env){
     const url=new URL(request.url),path=url.pathname;
     if(path==='/healthz')return json({ok:true,runtime:'cloudflare',standalone:true});
+    if(path==='/download/android'&&request.method==='GET'){
+      return Response.redirect('https://github.com/SrFarsquatch/CountdownApp/releases/latest/download/QuestLog-Android.apk',302);
+    }
 
     if(path==='/.well-known/assetlinks.json'&&request.method==='GET'){
       const fingerprints=String(env.ANDROID_APP_CERT_SHA256||'').split(',').map(value=>value.trim()).filter(Boolean);
