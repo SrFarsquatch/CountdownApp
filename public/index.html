@@ -2053,13 +2053,13 @@ body.modal-open{overflow:hidden}
       <div class="eyebrow">Install</div><h3>Quest Log app</h3>
       <p class="meta">Choose the lightweight PWA or install the latest signed Android app. Both use the same Quest Log account and cloud data.</p>
       <div class="setting-row"><span>Web app</span><strong id="pwaInstallStatus">Checking install support…</strong></div>
-      <div class="setting-row"><span>Android</span><strong id="androidInstallStatus">Latest APK</strong></div>
+      <div class="setting-row"><span>Android</span><strong id="androidInstallStatus">Checking APK…</strong></div>
       <div class="modal-actions">
         <button class="btn primary" id="installPwaNow" type="button" disabled>Install web app</button>
         <button class="btn" id="downloadAndroidApk" type="button">Download Android APK</button>
       </div>
       <div class="meta" id="pwaInstallHint" style="margin-top:8px">The installed app and browser view use the same Quest Log server and data for this URL.</div>
-      <div class="meta" id="androidInstallHint" style="margin-top:6px">Android may ask you to allow installs from this browser before opening the downloaded APK.</div>
+      <div class="meta" id="androidInstallHint" style="margin-top:6px">Downloads the latest available Quest Log Android build.</div>
     </div>
     <div class="card setting-card" id="notificationSettingsCard">
       <div class="eyebrow">Notifications</div><h3>Notifications & push</h3>
@@ -2249,8 +2249,8 @@ function pwaStandalone(){
 function updatePwaInstallUi(){
  const button=$('installPwaNow'),status=$('pwaInstallStatus'),hint=$('pwaInstallHint'),androidStatus=$('androidInstallStatus'),androidHint=$('androidInstallHint'),androidButton=$('downloadAndroidApk');
  if(!button||!status||!hint)return;
- if(androidStatus)androidStatus.textContent=/android/i.test(navigator.userAgent)?'Ready to download':'Available for Android';
- if(androidHint)androidHint.textContent=/android/i.test(navigator.userAgent)?'Downloads the newest signed Quest Log APK. Android may ask you to allow installs from this browser before opening it.':'Open this page on an Android device to download and install the latest signed APK.';
+ if(androidStatus)androidStatus.textContent=/android/i.test(navigator.userAgent)?'Latest APK available':'APK available';
+ if(androidHint)androidHint.textContent=/android/i.test(navigator.userAgent)?'Downloads the newest Quest Log Android build. Android may ask you to allow installs from this browser before opening it.':'Open this page on an Android device to download and install the latest APK.';
  if(androidButton)androidButton.textContent=/android/i.test(navigator.userAgent)?'Download Android APK':'Android APK';
  if(pwaStandalone()){
    status.textContent='Installed';
