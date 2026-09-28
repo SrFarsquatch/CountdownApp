@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - ".github/workflows/native-android-release.yml"
+      - "public/**"
       - "native/**"
       - "capacitor.config.json"
       - "package.json"
@@ -25,6 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +45,17 @@ jobs:
           echo "NATIVE_BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
           echo "ANDROID_RELEASE_TAG=android-build-$BUILD_NUMBER" >> "$GITHUB_ENV"
 
+      - name: Detect release signing
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "ANDROID_SIGNED_RELEASE=1" >> "$GITHUB_ENV"
+            echo "Android release signing is configured."
+          else
+            echo "ANDROID_SIGNED_RELEASE=0" >> "$GITHUB_ENV"
+            echo "Android release signing is not configured; publishing an installable debug APK."
+          fi
+
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
@@ -51,18 +67,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Require Android signing secrets
-        env:
-          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          test -n "$KEYSTORE"
-          test -n "$STORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-          test -n "$KEY_PASSWORD"
-
       - name: Install dependencies
         run: npm install
 
@@ -73,18 +77,19 @@ jobs:
         if: ${{ env.ANDROID_GOOGLE_SERVICES_JSON_BASE64 != '' }}
         run: echo "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
 
-      - name: Build release bundle and APK
+      - name: Build Android APK
+        shell: bash
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew bundleRelease assembleRelease
+          if [ "$ANDROID_SIGNED_RELEASE" = "1" ]; then
+            ./gradlew bundleRelease assembleRelease
+          else
+            ./gradlew assembleDebug
+          fi
 
-      - name: Sign Android release outputs
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Prepare signed release outputs
+        if: ${{ env.ANDROID_SIGNED_RELEASE == '1' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -104,9 +109,6 @@ jobs:
           UNSIGNED_APK="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
           test -n "$UNSIGNED_APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          test -x "$BUILD_TOOLS/zipalign"
-          test -x "$BUILD_TOOLS/apksigner"
-
           "$BUILD_TOOLS/zipalign" -p -f 4 "$UNSIGNED_APK" "$RUNNER_TEMP/QuestLog-Android-aligned.apk"
           "$BUILD_TOOLS/apksigner" sign \
             --ks "$RUNNER_TEMP/questlog-release.jks" \
@@ -117,24 +119,44 @@ jobs:
             "$RUNNER_TEMP/QuestLog-Android-aligned.apk"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/QuestLog-Android.apk"
 
-      - name: Upload signed Android artifacts
+      - name: Prepare debug APK fallback
+        if: ${{ env.ANDROID_SIGNED_RELEASE != '1' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/QuestLog-Android.apk"
+
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: quest-log-android-release-${{ env.NATIVE_BUILD_NUMBER }}
+          name: quest-log-android-${{ env.NATIVE_BUILD_NUMBER }}
           path: |
             ${{ runner.temp }}/QuestLog-Android.apk
             ${{ runner.temp }}/QuestLog-Android.aab
-          if-no-files-found: error
+          if-no-files-found: warn
 
-      - name: Publish latest Android release
+      - name: Publish latest Android download
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
+          if [ "$ANDROID_SIGNED_RELEASE" = "1" ]; then
+            TITLE="Quest Log Android build $NATIVE_BUILD_NUMBER"
+            NOTES="Signed Quest Log Android release. Download QuestLog-Android.apk for direct installation."
+          else
+            TITLE="Quest Log Android preview build $NATIVE_BUILD_NUMBER"
+            NOTES="Installable Quest Log Android debug build. Release signing is not configured yet, so Android may require uninstalling an older build if its signing certificate differs."
+          fi
+
+          ASSETS=("$RUNNER_TEMP/QuestLog-Android.apk")
+          if [ -f "$RUNNER_TEMP/QuestLog-Android.aab" ]; then
+            ASSETS+=("$RUNNER_TEMP/QuestLog-Android.aab")
+          fi
+
           gh release create "$ANDROID_RELEASE_TAG" \
-            "$RUNNER_TEMP/QuestLog-Android.apk" \
-            "$RUNNER_TEMP/QuestLog-Android.aab" \
+            "${ASSETS[@]}" \
             --target "$GITHUB_SHA" \
-            --title "Quest Log Android build $NATIVE_BUILD_NUMBER" \
-            --notes "Signed Quest Log Android release. Download QuestLog-Android.apk for direct installation or QuestLog-Android.aab for Play Store distribution." \
+            --title "$TITLE" \
+            --notes "$NOTES" \
             --latest
